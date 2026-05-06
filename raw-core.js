@@ -1369,6 +1369,10 @@ window.addEventListener('DOMContentLoaded',()=>{
       if(typeof cargarScore==='function') cargarScore();
       api.getPatrimonio().then(r=>{ if(typeof renderPatrimonio==='function') renderPatrimonio(r); }).catch(()=>{});
       if(typeof cargarRevision==='function') cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
+      // Refrescar espejos del dial con datos ya renderizados
+      setTimeout(function(){
+        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
+      }, 800);
     })
     .catch(err=>{ setChip('err','Error'); mostrarErrorConexion(err.message); });
 
