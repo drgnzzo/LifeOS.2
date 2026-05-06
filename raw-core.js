@@ -1228,10 +1228,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   _dialOverlay.style.webkitBackdropFilter = 'none';
   _dialOverlay.style.pointerEvents = 'none'; // temporalmente
 
-  // Dibujar el canvas pero empezar invisible
-  _dialDraw();
+  // Canvas invisible ANTES de dibujar — así el browser nunca ve el frame visible
   _dialCanvas.style.opacity = '0';
   _dialCanvas.style.transition = 'opacity 2000ms ease-out';
+  _dialDraw();
 
   // Mostrar el overlay (transparente) para que el canvas sea visible
   _dialOverlay.style.display = 'flex';
