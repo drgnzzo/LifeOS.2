@@ -481,22 +481,14 @@ function _crearDialOverlay(){
 
   // Función para refrescar los espejos con contenido actual del anverso
   window._refrescarEspejos = function(){
-    var total=0, actualizados=0;
     _hudPanels.forEach(function(hp){
       hp.el.querySelectorAll('[data-mirror-src]').forEach(function(mirror){
-        total++;
         var src = document.getElementById(mirror.dataset.mirrorSrc);
-        if(src){
-          var html = src.innerHTML;
-          // Aceptar si tiene contenido sustancial (más de 50 chars y no solo spinner)
-          if(html && html.length > 50 && html.indexOf('fa-spin')<0){
-            mirror.innerHTML = html;
-            actualizados++;
-          }
+        if(src && src.innerHTML && src.innerHTML.indexOf('fa-spin')<0){
+          mirror.innerHTML = src.innerHTML;
         }
       });
     });
-    console.log('[HUD] Espejos refrescados: '+actualizados+'/'+total);
   };
 
   // Exponer paneles globalmente para animación
@@ -1339,13 +1331,9 @@ window.addEventListener('DOMContentLoaded',()=>{
       _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
       _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
 
-      // Mostrar anverso inmediatamente
+      // Mostrar anverso inmediatamente — sin transición
       var anv = document.getElementById('board-anverso');
-      if(anv){
-        anv.style.visibility = 'visible';
-        anv.style.pointerEvents = 'auto';
-        anv.style.opacity = '1';
-      }
+      if(anv){ anv.style.display = ''; anv.style.opacity = '1'; }
 
       // Quitar splash inmediatamente
       var splash = document.getElementById('splash-dial');
@@ -1381,14 +1369,6 @@ window.addEventListener('DOMContentLoaded',()=>{
       if(typeof cargarScore==='function') cargarScore();
       api.getPatrimonio().then(r=>{ if(typeof renderPatrimonio==='function') renderPatrimonio(r); }).catch(()=>{});
       if(typeof cargarRevision==='function') cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
-      // Refrescar espejos del dial — esperar a que el GAS termine de renderizar
-      // Primer intento a 1.5s, segundo a 4s por si algunos renders son lentos
-      setTimeout(function(){
-        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
-      }, 1500);
-      setTimeout(function(){
-        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
-      }, 4000);
     })
     .catch(err=>{ setChip('err','Error'); mostrarErrorConexion(err.message); });
 
