@@ -334,14 +334,14 @@ function _crearDialOverlay(){
   _dialCtx = _dialCanvas.getContext('2d');
 
   // Overlay centrado — fondo atmósferico del design system
+  // opacity:0 desde el inicio para que el fade-in funcione correctamente
   _dialOverlay.style.cssText = [
     'position:fixed','inset:0','z-index:9000',
     'display:none','align-items:center','justify-content:center',
-    // Tres capas: viñeta + tinte violeta + base
+    'opacity:0',
     'background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),rgba(4,4,14,0.6)',
     'backdrop-filter:blur(26px) saturate(160%) brightness(0.72)',
     '-webkit-backdrop-filter:blur(26px) saturate(160%) brightness(0.72)',
-    // Grid circuit-board sutil
     'background-image:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),linear-gradient(rgba(120,80,200,0.025) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.025) 1px,transparent 1px)',
     'background-size:auto,auto,48px 48px,48px 48px',
   ].join(';');
@@ -966,15 +966,13 @@ function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   _dialDraw();
-  // Fade-in: empieza en 0, llega a 1 en 300ms
-  _dialOverlay.style.opacity = '0';
-  _dialOverlay.style.transition = 'opacity 300ms cubic-bezier(.16,1,.3,1)';
+  // El overlay ya nace con opacity:0 en su cssText.
+  // Solo ponemos display:flex y en el siguiente frame activamos la transición + opacity:1
   _dialOverlay.style.display = 'flex';
   _dialVisible = true;
   requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      if(_dialOverlay) _dialOverlay.style.opacity = '1';
-    });
+    _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
+    _dialOverlay.style.opacity = '1';
   });
   var navPanel=document.getElementById('dial-nav-panel');
   if(navPanel) navPanel.style.display=window.innerWidth<900?'none':'flex';
