@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LifeOS</title>
+
+  <!-- BLOQUEO RENDER: negro absoluto antes de que el browser pinte cualquier cosa -->
+  <style id="render-block">
+    html, body { background: #020810 !important; }
+    body > *:not(#splash-dial) { visibility: hidden !important; }
+  </style>
+
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="raw-app.css?v=5071">
   <link rel="stylesheet" href="encom-theme.css">
