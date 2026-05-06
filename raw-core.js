@@ -1172,40 +1172,52 @@ window.addEventListener('DOMContentLoaded',()=>{
   _inyectarToggleModo();
 
   // ── Inicio con dial como landing ──
-  // El anverso carga normalmente detrás mientras el dial aparece encima.
-  // Secuencia:
-  //   0ms    → página visible normal, anverso rendering
-  //   650ms  → dial aparece con fade-in (el anverso ya tuvo tiempo de pintar)
-  //   cierre → dial se desvanece, anverso ya está listo
+  // Estrategia: bloquear visibilidad del anverso desde el inicio.
+  // El browser puede renderizar todo en background sin que el usuario lo vea.
+  // El dial aparece solo, limpio, sobre negro.
+  // Al cerrar el dial → anverso aparece con fade (ya renderizado).
 
-  var _dialLandingAbierto = false;
+  var _anversoEl = document.getElementById('board-anverso');
+  var _dialLandingUsed = false;
 
-  setTimeout(function(){
-    if(_dialLandingAbierto) return;
-    _dialLandingAbierto = true;
+  // Ocultar anverso inmediatamente — antes de cualquier paint
+  if(_anversoEl){
+    _anversoEl.style.visibility = 'hidden';
+    _anversoEl.style.opacity = '0';
+  }
 
-    abrirDial();
-
-    // Fade-in del overlay: empieza transparente y sube a 1
-    if(_dialOverlay){
-      _dialOverlay.style.opacity = '0';
-      _dialOverlay.style.transition = 'opacity 500ms cubic-bezier(.16,1,.3,1)';
-      requestAnimationFrame(function(){
+  // Abrir dial en el siguiente frame — el browser ya puede renderizar el anverso en bg
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      abrirDial();
+      // Fade-in del overlay del dial
+      if(_dialOverlay){
+        _dialOverlay.style.opacity = '0';
+        _dialOverlay.style.transition = 'opacity 350ms cubic-bezier(.16,1,.3,1)';
         requestAnimationFrame(function(){
           if(_dialOverlay) _dialOverlay.style.opacity = '1';
         });
-      });
-    }
-  }, 650);
+      }
+    });
+  });
 
-  // Al cerrar: quitar transition del overlay para que futuros opens no tengan fade
+  // Wrapper de cerrarDial: primera vez revela el anverso
   var _origCerrarDial = cerrarDial;
   cerrarDial = function(){
     _origCerrarDial();
-    // Después del primer cierre, limpiar la transition para comportamiento normal
-    setTimeout(function(){
-      if(_dialOverlay) _dialOverlay.style.transition = '';
-    }, 300);
+    if(!_dialLandingUsed){
+      _dialLandingUsed = true;
+      var anv = document.getElementById('board-anverso');
+      if(anv){
+        anv.style.visibility = 'visible';
+        anv.style.transition = 'opacity 400ms ease';
+        requestAnimationFrame(function(){
+          anv.style.opacity = '1';
+        });
+      }
+    }
+    // Limpiar transition del overlay para opens futuros
+    setTimeout(function(){ if(_dialOverlay) _dialOverlay.style.transition = ''; }, 400);
   };
 
   setChip('load','Cargando');
