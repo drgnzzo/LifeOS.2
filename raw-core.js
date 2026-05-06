@@ -369,61 +369,59 @@ function _crearDialOverlay(){
   }
   _dialOverlay.appendChild(_glowEl);
 
-  // ── HUD PANELS — múltiples paneles alrededor del dial ──
-  // Helper: crear panel base con estilo HUD del design system
-  var _hudPanels = []; // para animación
+  // ── HUD PANELS — 6 paneles alrededor del dial ──
+  var _hudPanels = [];
 
-  function _crearHudPanel(id, pos, w, h){
+  // CSS base compartido
+  var _hudBase = [
+    'position:fixed','z-index:9001',
+    'background:rgba(10,8,22,0.90)',
+    'border:1px solid rgba(140,100,220,0.28)',
+    'backdrop-filter:blur(18px)','-webkit-backdrop-filter:blur(18px)',
+    'clip-path:polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)',
+    'opacity:0','visibility:hidden',
+    'transition:opacity 500ms ease-out',
+    'overflow:hidden',
+    'font-family:-apple-system,BlinkMacSystemFont,sans-serif',
+    'animation:dialGlowPulse 4s ease-in-out infinite',
+  ].join(';');
+
+  function _mkP(id, top, left, w){
     var p = document.createElement('div');
     p.id = id;
-    var styles = {
-      position:'fixed', zIndex:'9001',
-      width: w+'px',
-      background:'rgba(10,8,20,0.82)',
-      border:'1px solid rgba(140,100,220,0.22)',
-      backdropFilter:'blur(14px)',
-      webkitBackdropFilter:'blur(14px)',
-      boxShadow:'0 0 0 1px rgba(120,80,200,0.08),0 4px 32px rgba(0,0,0,0.5)',
-      clipPath:'polygon(12px 0,100% 0,100% calc(100% - 12px),calc(100% - 12px) 100%,0 100%,0 12px)',
-      opacity:'0', visibility:'hidden',
-      transition:'opacity 500ms ease-out, transform 500ms cubic-bezier(.16,1,.3,1)',
-      overflow:'hidden',
-      fontFamily:'-apple-system,BlinkMacSystemFont,sans-serif',
-    };
-    // Posición
-    Object.assign(styles, pos);
-    p.style.cssText = Object.keys(styles).map(function(k){
-      var v = styles[k];
-      var key = k.replace(/([A-Z])/g,function(m){ return '-'+m.toLowerCase(); });
-      return key+':'+v;
-    }).join(';');
+    p.style.cssText = _hudBase;
+    p.style.top     = top;
+    p.style.left    = left;
+    p.style.width   = w + 'px';
+    p.style.maxHeight = '310px';
+    p.style.overflowY = 'auto';
     return p;
   }
 
-  function _hudTitle(label, color, icon){
-    return '<div style="display:flex;align-items:center;gap:7px;padding:10px 14px 8px;border-bottom:1px solid rgba(140,100,220,0.15)">' +
-      '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 4px '+color+'88)"></i>' +
-      '<span style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:'+color+'">'+label+'</span>' +
+  function _hTitle(label, color, icon){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 9px;border-bottom:1px solid rgba(140,100,220,0.18);flex-shrink:0">' +
+      '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 5px '+color+'99)"></i>' +
+      '<span style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:'+color+'">'+label+'</span>' +
     '</div>';
   }
 
-  function _hudRow(label, val, color){
-    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499;font-weight:500">'+label+'</span>' +
-      '<span style="font-size:12px;font-weight:700;color:'+(color||'#C8D0E0')+';font-variant-numeric:tabular-nums">'+val+'</span>' +
+  function _hRow(label, valId, color){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:11px;color:#7A8499">'+label+'</span>' +
+      '<span id="'+valId+'" style="font-size:12px;font-weight:700;color:'+(color||'#C8D0E0')+';font-variant-numeric:tabular-nums">—</span>' +
     '</div>';
   }
 
-  function _hudBtn(label, icon, color, fn){
+  function _hBtn(label, icon, color, fn){
     var b = document.createElement('button');
-    b.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 14px;width:100%;background:none;border:none;' +
-      'cursor:pointer;font-family:inherit;text-align:left;transition:background .12s;' +
-      'border-top:1px solid rgba(140,100,220,0.10)';
-    b.innerHTML = '<i class="fas '+icon+'" style="font-size:12px;color:'+color+';width:16px;text-align:center;' +
-      'filter:drop-shadow(0 0 3px '+color+'88)"></i>' +
-      '<span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:rgba(212,216,232,.7)">'+label+'</span>';
-    b.addEventListener('mouseenter',function(){ b.style.background='rgba(140,100,220,0.08)'; b.querySelector('span').style.color='#fff'; });
-    b.addEventListener('mouseleave',function(){ b.style.background='none'; b.querySelector('span').style.color='rgba(212,216,232,.7)'; });
+    b.style.cssText = 'display:flex;align-items:center;gap:8px;padding:9px 14px;border:none;'+
+      'border-top:1px solid rgba(140,100,220,0.15);width:100%;'+
+      'background:rgba(120,80,200,0.07);cursor:pointer;font-family:inherit;'+
+      'font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;'+
+      'color:'+color+';transition:background .12s';
+    b.innerHTML = '<i class="fas '+icon+'" style="font-size:11px;filter:drop-shadow(0 0 4px '+color+'88)"></i>'+label;
+    b.addEventListener('mouseenter',function(){ b.style.background='rgba(120,80,200,0.16)'; b.style.color='#fff'; });
+    b.addEventListener('mouseleave',function(){ b.style.background='rgba(120,80,200,0.07)'; b.style.color=color; });
     b.addEventListener('click',function(e){
       e.stopPropagation(); cerrarDial();
       if(typeof window[fn]==='function') window[fn]();
@@ -431,174 +429,164 @@ function _crearDialOverlay(){
     return b;
   }
 
-  // Actualizar paneles HUD con datos reales del anverso
-  function _actualizarHudPanels(){
-    function txt(id){ var e=document.getElementById(id); return e?e.textContent.trim():''; }
-    function setEl(id,v){ var e=document.getElementById(id); if(e&&v) e.textContent=v; }
+  // ── Las posiciones: centradas verticalmente con el dial (canvas ~600px, centrado en 50%) ──
+  // Izquierda: left = calc(50% - 505px)  Derecha: left = calc(50% + 265px)
+  // Top row:   top = calc(50% - 300px)
+  // Mid row:   top = calc(50% - 80px)
+  // Bot row:   top = calc(50% + 140px)
 
-    // ── Patrimonio ──
-    setEl('_hud-saldo',   txt('saldo-val'));
-    // Leer filas de entes-list para banco/efectivo
-    var entes = document.querySelectorAll('#entes-list .ente-row');
-    var banco='—', efec='—';
-    entes.forEach(function(r){
-      var n=(r.querySelector('.ente-nombre')||{}).textContent||'';
-      var v=(r.querySelector('.ente-saldo')||{}).textContent||'';
-      if(/BBVA|banco|bank/i.test(n)) banco=v;
-      if(/efectivo|cash/i.test(n)) efec=v;
-    });
-    setEl('_hud-banco',   banco);
-    setEl('_hud-efec',    efec);
-    setEl('_hud-apart',   txt('apartados-total'));
-
-    // ── Financiero ──
-    setEl('_hud-fin-saldo',    txt('fin-saldo-val') || txt('financiero-excedente') || txt('excedente-val'));
-    setEl('_hud-fin-ing',      txt('fin-ingresos')  || txt('ingresos-total'));
-    setEl('_hud-fin-egr',      txt('fin-egresos')   || txt('egresos-total'));
-    setEl('_hud-fin-ahorro',   txt('tasa-ahorro')   || txt('fin-tasa-ahorro'));
-
-    // ── Activity ──
-    if(window._actData){
-      var d=window._actData;
-      var totH=(d.habitosPersonal||[]).length+(d.habitosElectronics||[]).length;
-      var doneH=(d.habitosPersonal||[]).filter(function(h){return h.checks&&Object.values(h.checks).some(Boolean);}).length+
-                (d.habitosElectronics||[]).filter(function(h){return h.checks&&Object.values(h.checks).some(Boolean);}).length;
-      setEl('_hud-act-done', doneH+'/'+totH);
-    }
-    // Logros
-    if(window._logrosData){
-      var items=window._logrosData.items||window._logrosData||[];
-      var done=items.filter(function(l){return l.completado==='Sí'||l.completado===true;}).length;
-      setEl('_hud-lgr-done', done+'/'+items.length);
-    }
-    // Racha
-    setEl('_hud-racha', txt('racha-val') || txt('enc-tick-val'));
-
-    // ── Bitácora ──
-    var pens=document.querySelectorAll('#pensamientos-body .pens-item');
-    setEl('_hud-pens', pens.length ? pens.length+' notas' : '');
-    var rels=document.querySelectorAll('#relaciones-body .rel-item');
-    setEl('_hud-rels', rels.length ? rels.length+' personas' : '');
-  }
-
-  // ── PANEL 1: TOP-LEFT — Patrimonio / Bancos ──
-  var _p1 = _crearHudPanel('hud-patrimonio', {
-    top:'calc(50% - 310px)', left:'calc(50% - min(500px,60vw))',
-  }, 210);
-  _p1.innerHTML = _hudTitle('Patrimonio','#22C55E','fa-building-columns') +
+  // P1 TOP-LEFT — Patrimonio
+  var _p1 = _mkP('hud-patrimonio','calc(50% - 300px)','calc(50% - min(505px,61vw))',210);
+  _p1.innerHTML = _hTitle('Patrimonio','#22C55E','fa-landmark') +
     '<div style="padding:10px 14px 6px">' +
-      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Disponible</div>' +
-      '<div id="_hud-saldo" style="font-size:20px;font-weight:800;color:#22C55E;letter-spacing:-.02em;text-shadow:0 0 12px rgba(34,197,94,0.4)">—</div>' +
+      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Disponible hoy</div>' +
+      '<div id="_hud-saldo" style="font-size:22px;font-weight:800;color:#22C55E;letter-spacing:-.02em;text-shadow:0 0 16px rgba(34,197,94,0.5)">—</div>' +
     '</div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Banco</span>' +
-      '<span id="_hud-banco" style="font-size:11px;font-weight:700;color:#C8D0E0">—</span></div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Efectivo</span>' +
-      '<span id="_hud-efec" style="font-size:11px;font-weight:700;color:#C8D0E0">—</span></div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Apartados</span>' +
-      '<span id="_hud-apart" style="font-size:11px;font-weight:700;color:#F59E0B">—</span></div>';
-  _p1.appendChild(_hudBtn('Ver Patrimonio','fa-landmark','#22C55E','irABitacora'));
-  _hudPanels.push({el:_p1, dx:-1, dy:-1});
+    _hRow('Apartados','_hud-apart','#F59E0B') +
+    _hRow('Efectivo','_hud-efec','#C8D0E0');
+  _p1.appendChild(_hBtn('Ver Patrimonio','fa-landmark','#22C55E','irABitacora'));
+  _hudPanels.push({el:_p1});
 
-  // ── PANEL 2: TOP-RIGHT — Financiero ──
-  var _p2 = _crearHudPanel('hud-financiero', {
-    top:'calc(50% - 310px)', left:'calc(50% + min(260px,32vw))',
-  }, 230);
-  _p2.innerHTML = _hudTitle('Financiero','#22D3EE','fa-chart-line') +
+  // P2 TOP-RIGHT — Financiero
+  var _p2 = _mkP('hud-financiero','calc(50% - 300px)','calc(50% + min(265px,32vw))',230);
+  _p2.innerHTML = _hTitle('Financiero','#22D3EE','fa-chart-line') +
     '<div style="padding:10px 14px 6px">' +
-      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Excedente mes</div>' +
-      '<div id="_hud-fin-saldo" style="font-size:20px;font-weight:800;color:#22D3EE;letter-spacing:-.02em;text-shadow:0 0 12px rgba(34,211,238,0.4)">—</div>' +
+      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Excedente del mes</div>' +
+      '<div id="_hud-fin-exc" style="font-size:22px;font-weight:800;color:#22D3EE;letter-spacing:-.02em;text-shadow:0 0 16px rgba(34,211,238,0.5)">—</div>' +
     '</div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Ingresos</span>' +
-      '<span id="_hud-fin-ing" style="font-size:11px;font-weight:700;color:#22C55E">—</span></div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Egresos</span>' +
-      '<span id="_hud-fin-egr" style="font-size:11px;font-weight:700;color:#EF4444">—</span></div>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Tasa ahorro</span>' +
-      '<span id="_hud-fin-ahorro" style="font-size:11px;font-weight:700;color:#FACC15">—</span></div>';
-  _p2.appendChild(_hudBtn('Ver Financiero','fa-chart-line','#22D3EE','togGraf'));
-  _hudPanels.push({el:_p2, dx:1, dy:-1});
+    _hRow('Ingresos','_hud-fin-ing','#22C55E') +
+    _hRow('Egresos','_hud-fin-egr','#EF4444') +
+    _hRow('Ahorro %','_hud-fin-aho','#FACC15');
+  _p2.appendChild(_hBtn('Ver Financiero','fa-chart-line','#22D3EE',''));
+  _hudPanels.push({el:_p2});
 
-  // ── PANEL 3: LEFT-MID — Necesidades ──
-  var _p3 = _crearHudPanel('hud-necesidades', {
-    top:'calc(50% - 115px)', left:'calc(50% - min(500px,60vw))',
-  }, 210);
-  _p3.innerHTML = _hudTitle('Necesidades','#A855F7','fa-layer-group') +
-    _hudRow('Fisiológicas','—','#EF4444') +
-    _hudRow('Seguridad','—','#F59E0B') +
-    _hudRow('Afiliación','—','#22D3EE') +
-    _hudRow('Reconocimiento','—','#A855F7') +
-    _hudRow('Autoreal.','—','#22C55E');
-  _p3.appendChild(_hudBtn('Ver Necesidades','fa-layer-group','#A855F7',''));
-  _hudPanels.push({el:_p3, dx:-1, dy:0});
+  // P3 MID-LEFT — Necesidades
+  var _p3 = _mkP('hud-necesidades','calc(50% - 80px)','calc(50% - min(505px,61vw))',210);
+  _p3.innerHTML = _hTitle('Necesidades','#A855F7','fa-layer-group') +
+    _hRow('Fisiológicas','_hud-nec-1','#EF4444') +
+    _hRow('Seguridad','_hud-nec-2','#F59E0B') +
+    _hRow('Afiliación','_hud-nec-3','#22D3EE') +
+    _hRow('Reconocimiento','_hud-nec-4','#A855F7') +
+    _hRow('Autorrealización','_hud-nec-5','#22C55E');
+  _p3.appendChild(_hBtn('Ver Necesidades','fa-layer-group','#A855F7','irABitacora'));
+  _hudPanels.push({el:_p3});
 
-  // ── PANEL 4: RIGHT-MID — Activity + Logros ──
-  var _p4 = _crearHudPanel('hud-activity', {
-    top:'calc(50% - 115px)', left:'calc(50% + min(260px,32vw))',
-  }, 220);
-  _p4.innerHTML = _hudTitle('Activity + Logros','#FB923C','fa-bolt') +
-    '<div style="padding:8px 14px 6px">' +
-      '<div style="font-size:9px;color:#7A8499;letter-spacing:.10em;text-transform:uppercase;margin-bottom:4px">Hoy</div>' +
-      '<div style="display:flex;gap:6px">' +
-        '<div style="flex:1;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.25);border-radius:6px;padding:6px;text-align:center">' +
-          '<div id="_hud-act-done" style="font-size:18px;font-weight:800;color:#FB923C">—</div>' +
-          '<div style="font-size:8px;color:#7A8499;text-transform:uppercase;letter-spacing:.08em">Hábitos</div>' +
+  // P4 MID-RIGHT — Activity + Logros
+  var _p4 = _mkP('hud-activity','calc(50% - 80px)','calc(50% + min(265px,32vw))',230);
+  _p4.innerHTML = _hTitle('Activity + Logros','#FB923C','fa-bolt') +
+    '<div style="padding:10px 14px 8px">' +
+      '<div style="font-size:9px;color:#7A8499;text-transform:uppercase;letter-spacing:.10em;margin-bottom:8px">Hoy</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+        '<div style="flex:1;background:rgba(251,146,60,0.1);border:1px solid rgba(251,146,60,0.3);border-radius:8px;padding:8px;text-align:center">' +
+          '<div id="_hud-act-done" style="font-size:22px;font-weight:800;color:#FB923C;line-height:1">—</div>' +
+          '<div style="font-size:8px;color:#7A8499;text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Hábitos</div>' +
         '</div>' +
-        '<div style="flex:1;background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.25);border-radius:6px;padding:6px;text-align:center">' +
-          '<div id="_hud-lgr-done" style="font-size:18px;font-weight:800;color:#FACC15">—</div>' +
-          '<div style="font-size:8px;color:#7A8499;text-transform:uppercase;letter-spacing:.08em">Logros</div>' +
+        '<div style="flex:1;background:rgba(250,204,21,0.1);border:1px solid rgba(250,204,21,0.3);border-radius:8px;padding:8px;text-align:center">' +
+          '<div id="_hud-lgr-done" style="font-size:22px;font-weight:800;color:#FACC15;line-height:1">—</div>' +
+          '<div style="font-size:8px;color:#7A8499;text-transform:uppercase;letter-spacing:.08em;margin-top:3px">Logros</div>' +
         '</div>' +
       '</div>' +
-    '</div>' +
-    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +'<span style="font-size:10px;color:#7A8499">Racha</span>' +'<span id="_hud-racha" style="font-size:11px;font-weight:700;color:#FB923C">—</span></div>';
-  _p4.appendChild(_hudBtn('Activity','fa-bolt','#FB923C','irAActivity'));
-  _p4.appendChild(_hudBtn('Logros','fa-trophy','#FACC15','irALogros'));
-  _hudPanels.push({el:_p4, dx:1, dy:0});
+      _hRow('Racha','_hud-racha','#FB923C') +
+    '</div>';
+  _p4.appendChild(_hBtn('Activity','fa-bolt','#FB923C','irAActivity'));
+  _p4.appendChild(_hBtn('Logros','fa-trophy','#FACC15','irALogros'));
+  _hudPanels.push({el:_p4});
 
-  // ── PANEL 5: BOT-LEFT — Pensamientos / Bitácora ──
-  var _p5 = _crearHudPanel('hud-bitacora', {
-    top:'calc(50% + 110px)', left:'calc(50% - min(500px,60vw))',
-  }, 210);
-  _p5.innerHTML = _hudTitle('Bitácora','#C084FC','fa-book-open') +
-    '<div style="padding:8px 14px;font-size:11px;color:#7A8499;line-height:1.5">Pensamientos, relaciones,<br>salud y entrenamiento</div>' +
-    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Pensamientos</span>' +
-      '<span id="_hud-pens" style="font-size:11px;font-weight:700;color:#C8D0E0">—</span></div>' +
-    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Relaciones</span>' +
-      '<span id="_hud-rels" style="font-size:11px;font-weight:700;color:#EC4899">—</span></div>' +
-    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<span style="font-size:10px;color:#7A8499">Salud</span>' +
-      '<span style="font-size:11px;font-weight:700;color:#EF4444">—</span></div>';
-  _p5.appendChild(_hudBtn('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
-  _hudPanels.push({el:_p5, dx:-1, dy:1});
+  // P5 BOT-LEFT — Bitácora
+  var _p5 = _mkP('hud-bitacora','calc(50% + 140px)','calc(50% - min(505px,61vw))',210);
+  _p5.innerHTML = _hTitle('Bitácora','#C084FC','fa-book-open') +
+    _hRow('Pensamientos','_hud-pens','#C8D0E0') +
+    _hRow('Relaciones','_hud-rels','#EC4899') +
+    _hRow('Salud','_hud-sal','#EF4444') +
+    _hRow('Entrenamiento','_hud-ent','#FB923C');
+  _p5.appendChild(_hBtn('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
+  _hudPanels.push({el:_p5});
 
-  // ── PANEL 6: BOT-RIGHT — Navegación rápida ──
-  var _p6 = _crearHudPanel('hud-nav', {
-    top:'calc(50% + 110px)', left:'calc(50% + min(260px,32vw))',
-  }, 220);
-  _p6.innerHTML = _hudTitle('Navegación','#A78BFA','fa-compass');
+  // P6 BOT-RIGHT — Navegación
+  var _p6 = _mkP('hud-nav','calc(50% + 140px)','calc(50% + min(265px,32vw))',220);
+  _p6.innerHTML = _hTitle('Navegación','#A78BFA','fa-compass');
   [
-    { label:'Nutrición',  icon:'fa-leaf',        fn:'irANutricion', color:'#86efac' },
-    { label:'RAW Sheet',  icon:'fa-table',       fn:'irASheets',    color:'#a5b4fc' },
-    { label:'Actualizar', icon:'fa-rotate-right', fn:'refreshTodo',  color:'#94a3b8' },
+    {label:'Nutrición',  icon:'fa-leaf',         fn:'irANutricion', color:'#86efac'},
+    {label:'RAW Sheet',  icon:'fa-table',         fn:'irASheets',    color:'#a5b4fc'},
+    {label:'Actualizar', icon:'fa-rotate-right',  fn:'refreshTodo',  color:'#94a3b8'},
   ].forEach(function(nav){
-    _p6.appendChild(_hudBtn(nav.label, nav.icon, nav.color, nav.fn));
+    _p6.appendChild(_hBtn(nav.label, nav.icon, nav.color, nav.fn));
   });
-  _hudPanels.push({el:_p6, dx:1, dy:1});
+  _hudPanels.push({el:_p6});
 
-  // ── Montar todos los paneles en el overlay ──
+  // Montar en el overlay
   _dialOverlay.appendChild(_dialCanvas);
   _hudPanels.forEach(function(hp){ _dialOverlay.appendChild(hp.el); });
   document.body.appendChild(_dialOverlay);
 
-  // Exponer paneles globalmente para animación
   window._hudPanels = _hudPanels;
   var _navPanel = _p6;
+
+  // ── Actualizar paneles con datos reales del API ──
+  window._refrescarEspejos = function(datos){
+    function fmt(v){ if(v===null||v===undefined||v==='') return '—'; var n=Number(v); if(isNaN(n)) return String(v); return '$ '+Math.abs(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function pct(v){ return (v!==null&&v!==undefined&&!isNaN(Number(v))) ? Math.round(Number(v))+'%' : '—'; }
+    function set(id,v){ var e=document.getElementById(id); if(e) e.textContent=v||'—'; }
+
+    var d = datos || window._hudDatos || {};
+
+    // Patrimonio — saldo del día
+    var sv = document.getElementById('saldo-val');
+    set('_hud-saldo', sv&&sv.textContent&&sv.textContent!=='…' ? sv.textContent : fmt(d.saldo));
+    set('_hud-apart', fmt(d.totalApartado));
+    set('_hud-efec',  fmt(d.efectivo));
+
+    // Financiero
+    var fin = d.financiero || d.datosMes || {};
+    set('_hud-fin-exc', fmt(fin.excedente || fin.saldo));
+    set('_hud-fin-ing', fmt(fin.ingresos  || fin.totalIngresos));
+    set('_hud-fin-egr', fmt(fin.egresos   || fin.totalEgresos));
+    set('_hud-fin-aho', pct(fin.tasaAhorro));
+
+    // Necesidades
+    var nec = d.necesidades || {};
+    var niveles = nec.niveles || nec.porNivel || [];
+    var necNames = ['Fisiológicas','Seguridad','Afiliación','Reconocimiento','Autorrealización'];
+    [1,2,3,4,5].forEach(function(n){
+      var nv = niveles[n-1] || nec['nivel'+n] || {};
+      var pctV = nv.porcentaje != null ? Math.round(nv.porcentaje)+'%' : (nv.total!=null ? Math.round(nv.total)+'%' : '—');
+      set('_hud-nec-'+n, pctV);
+    });
+
+    // Activity
+    if(window._actData){
+      var a = window._actData;
+      var totH = (a.habitosPersonal||[]).length + (a.habitosElectronics||[]).length;
+      var doneH = (a.habitosPersonal||[]).filter(function(h){ return h.checks&&Object.values(h.checks).some(Boolean); }).length +
+                  (a.habitosElectronics||[]).filter(function(h){ return h.checks&&Object.values(h.checks).some(Boolean); }).length;
+      set('_hud-act-done', doneH+'/'+totH);
+    }
+
+    // Logros
+    if(window._logrosData){
+      var items = window._logrosData.items || window._logrosData || [];
+      var done  = items.filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length;
+      set('_hud-lgr-done', done+'/'+items.length);
+    }
+
+    // Racha — intentar desde DOM
+    var rv = document.getElementById('racha-val') || document.getElementById('enc-tick-val');
+    if(rv && rv.textContent) set('_hud-racha', rv.textContent);
+
+    // Bitácora — contar elementos del DOM
+    var pens = document.querySelectorAll('#pensamientos-body .pens-item, #pensamientos-body [class*="pens"]');
+    set('_hud-pens', pens.length ? pens.length+' notas' : '—');
+    var rels = document.querySelectorAll('#relaciones-body .rel-item, #relaciones-body [class*="rel"]');
+    set('_hud-rels', rels.length ? rels.length+' personas' : '—');
+    var sals = document.querySelectorAll('#salud-body .sal-item, #salud-body [class*="sal"]');
+    set('_hud-sal',  sals.length ? sals.length+' registros' : '—');
+    var ents = document.querySelectorAll('#entrenamiento-body .ent-item, #entrenamiento-body [class*="ent"]');
+    set('_hud-ent',  ents.length ? ents.length+' sesiones' : '—');
+  };
+
+  // Exponer paneles globalmente para animación
+  window._hudPanels = _hudPanels;
+  var _navPanel = _hudPanels[5].el;
 
 
   _dialOverlay.addEventListener('click',function(e){ if(e.target===_dialOverlay) cerrarDial(); });
@@ -1135,8 +1123,8 @@ function abrirDial(){
     _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
-  // Actualizar datos y mostrar todos los HUD panels al abrir el dial
-  if(typeof _actualizarHudPanels==='function') _actualizarHudPanels();
+  // Actualizar paneles HUD al abrir
+  if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
   if(window._hudPanels && window.innerWidth>=900){
     window._hudPanels.forEach(function(hp, i){
       hp.el.style.opacity='0'; hp.el.style.visibility='hidden';
@@ -1355,12 +1343,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   _inyectarToggleModo();
 
   // ── LANDING: negro → dial → anverso ──
-  // El splash negro (#splash-dial) ya está en el HTML cubriendo todo.
-  // El anverso nace con display:none.
-  // Paso 1: el splash es negro, el usuario lo ve.
-  // Paso 2: el dial abre directamente SIN overlay propio — el splash ES el fondo.
-  //         El canvas hace fade-in sobre el negro ya existente.
-  // Paso 3: al cerrar → anverso aparece, splash desaparece.
+  // El splash negro (#splash-dial) cubre todo — el anverso carga detrás invisible.
+  // El dial aparece sobre el splash. Al cerrar el dial, el splash desaparece.
 
   var _dialLandingUsed = false;
 
@@ -1436,9 +1420,12 @@ window.addEventListener('DOMContentLoaded',()=>{
       _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
       _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
 
-      // Mostrar anverso inmediatamente — sin transición
+      // Mostrar anverso inmediatamente
       var anv = document.getElementById('board-anverso');
-      if(anv){ anv.style.display = ''; anv.style.opacity = '1'; }
+      if(anv){
+        anv.style.visibility = '';
+        anv.style.opacity = '1';
+      }
 
       // Quitar splash inmediatamente
       var splash = document.getElementById('splash-dial');
@@ -1468,12 +1455,26 @@ window.addEventListener('DOMContentLoaded',()=>{
       if(typeof renderFlujoMensual==='function') renderFlujoMensual(d.flujoPorMes);
       if(d.activityCheck){ _actData=d.activityCheck; }
       if(typeof renderFinancieroAvanzado==='function'&&d.financieroAvanzado) renderFinancieroAvanzado(d.financieroAvanzado);
-      api.getPensamientos().then(r=>{ if(typeof renderPensamientos==='function') renderPensamientos(r); }).catch(()=>{});
+      api.getPensamientos().then(r=>{ if(typeof renderPensamientos==='function') renderPensamientos(r); setTimeout(function(){ if(window._refrescarEspejos) window._refrescarEspejos(); },200); }).catch(()=>{});
       api.getRelaciones().then(r=>{ if(typeof renderRelaciones==='function') renderRelaciones(r); }).catch(()=>{});
       api.getSalud().then(r=>{ if(typeof renderSalud==='function') renderSalud(r); }).catch(()=>{});
       if(typeof cargarScore==='function') cargarScore();
       api.getPatrimonio().then(r=>{ if(typeof renderPatrimonio==='function') renderPatrimonio(r); }).catch(()=>{});
       if(typeof cargarRevision==='function') cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
+      // Pasar datos directamente a los paneles HUD
+      window._hudDatos = {
+        totalApartado: (d.apartados&&d.apartados.totalApartado) || 0,
+        necesidades: d.necesidades || {},
+        datosMes: d.datosMes || {},
+        financiero: d.financieroAvanzado || {},
+      };
+      setTimeout(function(){
+        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos(window._hudDatos);
+      }, 600);
+      // Segundo intento para datos que llegan async (pensamientos, salud, etc.)
+      setTimeout(function(){
+        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos(window._hudDatos);
+      }, 3000);
     })
     .catch(err=>{ setChip('err','Error'); mostrarErrorConexion(err.message); });
 
