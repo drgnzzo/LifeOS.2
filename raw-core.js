@@ -431,56 +431,101 @@ function _crearDialOverlay(){
     return b;
   }
 
-  // Función para actualizar los valores en vivo desde window data
+  // Actualizar paneles HUD con datos reales del anverso
   function _actualizarHudPanels(){
-    // Patrimonio / Bancos
-    var saldo = document.getElementById('_hud-saldo');
-    var bancoTotal = document.getElementById('_hud-banco-total');
-    if(saldo){
-      var sv = document.getElementById('saldo-val');
-      if(sv && sv.textContent && sv.textContent !== '…') saldo.textContent = sv.textContent;
+    function txt(id){ var e=document.getElementById(id); return e?e.textContent.trim():''; }
+    function setEl(id,v){ var e=document.getElementById(id); if(e&&v) e.textContent=v; }
+
+    // ── Patrimonio ──
+    setEl('_hud-saldo',   txt('saldo-val'));
+    // Leer filas de entes-list para banco/efectivo
+    var entes = document.querySelectorAll('#entes-list .ente-row');
+    var banco='—', efec='—';
+    entes.forEach(function(r){
+      var n=(r.querySelector('.ente-nombre')||{}).textContent||'';
+      var v=(r.querySelector('.ente-saldo')||{}).textContent||'';
+      if(/BBVA|banco|bank/i.test(n)) banco=v;
+      if(/efectivo|cash/i.test(n)) efec=v;
+    });
+    setEl('_hud-banco',   banco);
+    setEl('_hud-efec',    efec);
+    setEl('_hud-apart',   txt('apartados-total'));
+
+    // ── Financiero ──
+    setEl('_hud-fin-saldo',    txt('fin-saldo-val') || txt('financiero-excedente') || txt('excedente-val'));
+    setEl('_hud-fin-ing',      txt('fin-ingresos')  || txt('ingresos-total'));
+    setEl('_hud-fin-egr',      txt('fin-egresos')   || txt('egresos-total'));
+    setEl('_hud-fin-ahorro',   txt('tasa-ahorro')   || txt('fin-tasa-ahorro'));
+
+    // ── Activity ──
+    if(window._actData){
+      var d=window._actData;
+      var totH=(d.habitosPersonal||[]).length+(d.habitosElectronics||[]).length;
+      var doneH=(d.habitosPersonal||[]).filter(function(h){return h.checks&&Object.values(h.checks).some(Boolean);}).length+
+                (d.habitosElectronics||[]).filter(function(h){return h.checks&&Object.values(h.checks).some(Boolean);}).length;
+      setEl('_hud-act-done', doneH+'/'+totH);
     }
-    // Financiero
-    var finSaldo = document.getElementById('_hud-fin-saldo');
-    if(finSaldo){
-      var fv = document.getElementById('financiero-saldo');
-      if(fv && fv.textContent) finSaldo.textContent = fv.textContent;
+    // Logros
+    if(window._logrosData){
+      var items=window._logrosData.items||window._logrosData||[];
+      var done=items.filter(function(l){return l.completado==='Sí'||l.completado===true;}).length;
+      setEl('_hud-lgr-done', done+'/'+items.length);
     }
+    // Racha
+    setEl('_hud-racha', txt('racha-val') || txt('enc-tick-val'));
+
+    // ── Bitácora ──
+    var pens=document.querySelectorAll('#pensamientos-body .pens-item');
+    setEl('_hud-pens', pens.length ? pens.length+' notas' : '');
+    var rels=document.querySelectorAll('#relaciones-body .rel-item');
+    setEl('_hud-rels', rels.length ? rels.length+' personas' : '');
   }
 
   // ── PANEL 1: TOP-LEFT — Patrimonio / Bancos ──
   var _p1 = _crearHudPanel('hud-patrimonio', {
-    top:'calc(50% - 380px)', left:'calc(50% - min(470px,57vw))',
-  }, 220);
+    top:'calc(50% - 310px)', left:'calc(50% - min(500px,60vw))',
+  }, 210);
   _p1.innerHTML = _hudTitle('Patrimonio','#22C55E','fa-building-columns') +
-    '<div style="padding:10px 14px">' +
+    '<div style="padding:10px 14px 6px">' +
       '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Disponible</div>' +
-      '<div id="_hud-saldo" style="font-size:22px;font-weight:800;color:#22C55E;letter-spacing:-.02em;text-shadow:0 0 12px rgba(34,197,94,0.4)">—</div>' +
+      '<div id="_hud-saldo" style="font-size:20px;font-weight:800;color:#22C55E;letter-spacing:-.02em;text-shadow:0 0 12px rgba(34,197,94,0.4)">—</div>' +
     '</div>' +
-    _hudRow('Banco','—','#C8D0E0') +
-    _hudRow('Efectivo','—','#C8D0E0') +
-    _hudRow('Apartados','—','#F59E0B');
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Banco</span>' +
+      '<span id="_hud-banco" style="font-size:11px;font-weight:700;color:#C8D0E0">—</span></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Efectivo</span>' +
+      '<span id="_hud-efec" style="font-size:11px;font-weight:700;color:#C8D0E0">—</span></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Apartados</span>' +
+      '<span id="_hud-apart" style="font-size:11px;font-weight:700;color:#F59E0B">—</span></div>';
   _p1.appendChild(_hudBtn('Ver Patrimonio','fa-landmark','#22C55E','irABitacora'));
   _hudPanels.push({el:_p1, dx:-1, dy:-1});
 
   // ── PANEL 2: TOP-RIGHT — Financiero ──
   var _p2 = _crearHudPanel('hud-financiero', {
-    top:'calc(50% - 380px)', left:'calc(50% + min(210px,26vw))',
-  }, 240);
+    top:'calc(50% - 310px)', left:'calc(50% + min(260px,32vw))',
+  }, 230);
   _p2.innerHTML = _hudTitle('Financiero','#22D3EE','fa-chart-line') +
-    '<div style="padding:10px 14px">' +
-      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Este mes</div>' +
+    '<div style="padding:10px 14px 6px">' +
+      '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Excedente mes</div>' +
       '<div id="_hud-fin-saldo" style="font-size:20px;font-weight:800;color:#22D3EE;letter-spacing:-.02em;text-shadow:0 0 12px rgba(34,211,238,0.4)">—</div>' +
     '</div>' +
-    _hudRow('Ingresos','—','#22C55E') +
-    _hudRow('Egresos','—','#EF4444') +
-    _hudRow('Tasa ahorro','—','#FACC15');
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Ingresos</span>' +
+      '<span id="_hud-fin-ing" style="font-size:11px;font-weight:700;color:#22C55E">—</span></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Egresos</span>' +
+      '<span id="_hud-fin-egr" style="font-size:11px;font-weight:700;color:#EF4444">—</span></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Tasa ahorro</span>' +
+      '<span id="_hud-fin-ahorro" style="font-size:11px;font-weight:700;color:#FACC15">—</span></div>';
   _p2.appendChild(_hudBtn('Ver Financiero','fa-chart-line','#22D3EE','togGraf'));
   _hudPanels.push({el:_p2, dx:1, dy:-1});
 
   // ── PANEL 3: LEFT-MID — Necesidades ──
   var _p3 = _crearHudPanel('hud-necesidades', {
-    top:'calc(50% - 90px)', left:'calc(50% - min(490px,59vw))',
+    top:'calc(50% - 115px)', left:'calc(50% - min(500px,60vw))',
   }, 210);
   _p3.innerHTML = _hudTitle('Necesidades','#A855F7','fa-layer-group') +
     _hudRow('Fisiológicas','—','#EF4444') +
@@ -493,8 +538,8 @@ function _crearDialOverlay(){
 
   // ── PANEL 4: RIGHT-MID — Activity + Logros ──
   var _p4 = _crearHudPanel('hud-activity', {
-    top:'calc(50% - 110px)', left:'calc(50% + min(240px,30vw))',
-  }, 230);
+    top:'calc(50% - 115px)', left:'calc(50% + min(260px,32vw))',
+  }, 220);
   _p4.innerHTML = _hudTitle('Activity + Logros','#FB923C','fa-bolt') +
     '<div style="padding:8px 14px 6px">' +
       '<div style="font-size:9px;color:#7A8499;letter-spacing:.10em;text-transform:uppercase;margin-bottom:4px">Hoy</div>' +
@@ -509,26 +554,32 @@ function _crearDialOverlay(){
         '</div>' +
       '</div>' +
     '</div>' +
-    _hudRow('Racha','—','#FB923C');
+    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +'<span style="font-size:10px;color:#7A8499">Racha</span>' +'<span id="_hud-racha" style="font-size:11px;font-weight:700;color:#FB923C">—</span></div>';
   _p4.appendChild(_hudBtn('Activity','fa-bolt','#FB923C','irAActivity'));
   _p4.appendChild(_hudBtn('Logros','fa-trophy','#FACC15','irALogros'));
   _hudPanels.push({el:_p4, dx:1, dy:0});
 
   // ── PANEL 5: BOT-LEFT — Pensamientos / Bitácora ──
   var _p5 = _crearHudPanel('hud-bitacora', {
-    top:'calc(50% + 200px)', left:'calc(50% - min(470px,57vw))',
-  }, 220);
+    top:'calc(50% + 110px)', left:'calc(50% - min(500px,60vw))',
+  }, 210);
   _p5.innerHTML = _hudTitle('Bitácora','#C084FC','fa-book-open') +
     '<div style="padding:8px 14px;font-size:11px;color:#7A8499;line-height:1.5">Pensamientos, relaciones,<br>salud y entrenamiento</div>' +
-    _hudRow('Pensamientos','—','#C8D0E0') +
-    _hudRow('Relaciones','—','#EC4899') +
-    _hudRow('Salud','—','#EF4444');
+    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Pensamientos</span>' +
+      '<span id="_hud-pens" style="font-size:11px;font-weight:700;color:#C8D0E0">—</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Relaciones</span>' +
+      '<span id="_hud-rels" style="font-size:11px;font-weight:700;color:#EC4899">—</span></div>' +
+    '<div style="display:flex;justify-content:space-between;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<span style="font-size:10px;color:#7A8499">Salud</span>' +
+      '<span style="font-size:11px;font-weight:700;color:#EF4444">—</span></div>';
   _p5.appendChild(_hudBtn('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
   _hudPanels.push({el:_p5, dx:-1, dy:1});
 
   // ── PANEL 6: BOT-RIGHT — Navegación rápida ──
   var _p6 = _crearHudPanel('hud-nav', {
-    top:'calc(50% + 200px)', left:'calc(50% + min(210px,26vw))',
+    top:'calc(50% + 110px)', left:'calc(50% + min(260px,32vw))',
   }, 220);
   _p6.innerHTML = _hudTitle('Navegación','#A78BFA','fa-compass');
   [
@@ -1084,7 +1135,8 @@ function abrirDial(){
     _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
-  // Mostrar todos los HUD panels al abrir el dial
+  // Actualizar datos y mostrar todos los HUD panels al abrir el dial
+  if(typeof _actualizarHudPanels==='function') _actualizarHudPanels();
   if(window._hudPanels && window.innerWidth>=900){
     window._hudPanels.forEach(function(hp, i){
       hp.el.style.opacity='0'; hp.el.style.visibility='hidden';
