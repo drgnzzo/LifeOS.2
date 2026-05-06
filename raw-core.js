@@ -1223,10 +1223,20 @@ window.addEventListener('DOMContentLoaded',()=>{
   _dialVisible = true;
   _dialOverlay.style.pointerEvents = 'auto';
 
-  // Fade-in del canvas sobre el splash negro
+  // Quitar el CSS de bloqueo + fade-in del canvas
   requestAnimationFrame(function(){
+    // Eliminar render-block — ahora el splash negro es el único fondo
+    var rb = document.getElementById('render-block');
+    if(rb) rb.parentNode.removeChild(rb);
+
+    // Hacer visible el splash explícitamente
+    var splash = document.getElementById('splash-dial');
+    if(splash) splash.style.visibility = 'visible';
+
+    // Fade-in del canvas
     _dialCanvas.style.opacity = '1';
-    // También el nav panel
+
+    // Nav panel
     var navPanel = document.getElementById('dial-nav-panel');
     if(navPanel){
       navPanel.style.opacity = '0';
