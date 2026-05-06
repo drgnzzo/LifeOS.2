@@ -1231,13 +1231,35 @@ window.addEventListener('DOMContentLoaded',()=>{
     // setTimeout 50ms garantiza que el browser pintó el negro y el canvas opacity:0
     // antes de activar la transición
     setTimeout(function(){
+      // ── Fade-in del canvas del dial ──
       _dialCanvas.style.opacity = '1';
+
+      // ── Nav panel: elementos entran uno a uno al azar, DESPUÉS del dial ──
       var navPanel = document.getElementById('dial-nav-panel');
-      if(navPanel){
-        navPanel.style.opacity = '0';
-        navPanel.style.transition = 'opacity 1600ms ease-out';
-        navPanel.style.display = window.innerWidth < 900 ? 'none' : 'flex';
-        setTimeout(function(){ navPanel.style.opacity = '1'; }, 16);
+      if(navPanel && window.innerWidth >= 900){
+        navPanel.style.display = 'flex';
+        navPanel.style.opacity = '1';
+
+        // Ocultar todos los hijos y el header del panel
+        var children = Array.prototype.slice.call(navPanel.children);
+        children.forEach(function(el){
+          el.style.opacity = '0';
+          el.style.transform = 'translateX(18px)';
+          el.style.transition = 'opacity 500ms ease-out, transform 500ms cubic-bezier(.16,1,.3,1)';
+        });
+
+        // Barajar orden de aparición
+        var shuffled = children.slice().sort(function(){ return Math.random() - 0.5; });
+
+        // Empezar a aparecer cuando el dial ya está ~70% visible (1400ms después)
+        var baseDelay = 1400;
+        shuffled.forEach(function(el, i){
+          var delay = baseDelay + i * 180 + Math.random() * 120;
+          setTimeout(function(){
+            el.style.opacity = '1';
+            el.style.transform = 'translateX(0)';
+          }, delay);
+        });
       }
     }, 50);
   });
