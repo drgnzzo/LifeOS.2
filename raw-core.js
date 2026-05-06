@@ -1172,34 +1172,40 @@ window.addEventListener('DOMContentLoaded',()=>{
   _inyectarToggleModo();
 
   // ── Inicio con dial como landing ──
-  // 1. Ocultar el anverso inmediatamente (negro)
-  var _anv = document.getElementById('board-anverso');
-  if(_anv) _anv.style.opacity = '0';
+  // El anverso carga normalmente detrás mientras el dial aparece encima.
+  // Secuencia:
+  //   0ms    → página visible normal, anverso rendering
+  //   650ms  → dial aparece con fade-in (el anverso ya tuvo tiempo de pintar)
+  //   cierre → dial se desvanece, anverso ya está listo
 
-  // 2. Abrir el dial con fade-in suave
+  var _dialLandingAbierto = false;
+
   setTimeout(function(){
+    if(_dialLandingAbierto) return;
+    _dialLandingAbierto = true;
+
     abrirDial();
-    // Fade-in del overlay del dial
+
+    // Fade-in del overlay: empieza transparente y sube a 1
     if(_dialOverlay){
       _dialOverlay.style.opacity = '0';
-      _dialOverlay.style.transition = 'opacity 400ms cubic-bezier(.16,1,.3,1)';
+      _dialOverlay.style.transition = 'opacity 500ms cubic-bezier(.16,1,.3,1)';
       requestAnimationFrame(function(){
         requestAnimationFrame(function(){
-          _dialOverlay.style.opacity = '1';
+          if(_dialOverlay) _dialOverlay.style.opacity = '1';
         });
       });
     }
-  }, 80);
+  }, 650);
 
-  // 3. Cuando se cierre el dial, revelar el anverso con fade
+  // Al cerrar: quitar transition del overlay para que futuros opens no tengan fade
   var _origCerrarDial = cerrarDial;
   cerrarDial = function(){
     _origCerrarDial();
-    var anv = document.getElementById('board-anverso');
-    if(anv && anv.style.opacity === '0'){
-      anv.style.transition = 'opacity 350ms ease';
-      anv.style.opacity = '1';
-    }
+    // Después del primer cierre, limpiar la transition para comportamiento normal
+    setTimeout(function(){
+      if(_dialOverlay) _dialOverlay.style.transition = '';
+    }, 300);
   };
 
   setChip('load','Cargando');
