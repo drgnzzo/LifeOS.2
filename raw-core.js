@@ -349,17 +349,19 @@ function _crearDialOverlay(){
     'position:fixed',
     'top:50%',
     'left:calc(50% + min(440px,53vw))',
-    'transform:translateY(-50%)',
-    'display:flex','flex-direction:column','gap:5px',
+    'transform:translateY(-50%) translateX(20px)',
+    'display:none','flex-direction:column','gap:5px',
     'width:200px',
     'z-index:9001',
-    // Panel con borde violeta sutil del design system
     'padding:16px',
     'background:rgba(15,12,28,0.75)',
     'border:1px solid rgba(140,100,220,0.18)',
     'clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)',
     'backdrop-filter:blur(16px)',
     'box-shadow:0 0 0 1px rgba(120,80,200,0.08),0 4px 32px rgba(0,0,0,0.5)',
+    'opacity:0',
+    'visibility:hidden',
+    'transition:opacity 600ms ease-out, transform 600ms cubic-bezier(.16,1,.3,1)',
   ].join(';');
 
   var NAV_ITEMS = [
@@ -987,7 +989,21 @@ function abrirDial(){
     _dialOverlay.style.opacity = '1';
   });
   var navPanel=document.getElementById('dial-nav-panel');
-  if(navPanel) navPanel.style.display=window.innerWidth<900?'none':'flex';
+  if(navPanel && window.innerWidth>=900){
+    // Reset para animación de entrada normal
+    navPanel.style.opacity='0';
+    navPanel.style.visibility='hidden';
+    navPanel.style.transform='translateY(-50%) translateX(20px)';
+    navPanel.style.display='flex';
+    requestAnimationFrame(function(){
+      navPanel.style.transition='opacity 400ms ease-out,transform 400ms cubic-bezier(.16,1,.3,1)';
+      navPanel.style.visibility='visible';
+      navPanel.style.opacity='1';
+      navPanel.style.transform='translateY(-50%) translateX(0)';
+    });
+  } else if(navPanel){
+    navPanel.style.display='none';
+  }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.add('active');
 }
@@ -1237,29 +1253,33 @@ window.addEventListener('DOMContentLoaded',()=>{
       // ── Nav panel: elementos entran uno a uno al azar, DESPUÉS del dial ──
       var navPanel = document.getElementById('dial-nav-panel');
       if(navPanel && window.innerWidth >= 900){
-        navPanel.style.display = 'flex';
-        navPanel.style.opacity = '1';
-
-        // Ocultar todos los hijos y el header del panel
+        // Ocultar hijos antes de mostrar el panel
         var children = Array.prototype.slice.call(navPanel.children);
         children.forEach(function(el){
           el.style.opacity = '0';
-          el.style.transform = 'translateX(18px)';
-          el.style.transition = 'opacity 500ms ease-out, transform 500ms cubic-bezier(.16,1,.3,1)';
+          el.style.transform = 'translateX(12px)';
+          el.style.transition = 'opacity 450ms ease-out, transform 450ms cubic-bezier(.16,1,.3,1)';
         });
 
-        // Barajar orden de aparición
-        var shuffled = children.slice().sort(function(){ return Math.random() - 0.5; });
+        // Paso 1: el contenedor (fondo/border) entra con fade+slide a los 1200ms
+        setTimeout(function(){
+          navPanel.style.display = 'flex';
+          navPanel.style.visibility = 'visible';
+          requestAnimationFrame(function(){
+            navPanel.style.opacity = '1';
+            navPanel.style.transform = 'translateY(-50%) translateX(0)';
+          });
 
-        // Empezar a aparecer cuando el dial ya está ~70% visible (1400ms después)
-        var baseDelay = 1400;
-        shuffled.forEach(function(el, i){
-          var delay = baseDelay + i * 180 + Math.random() * 120;
-          setTimeout(function(){
-            el.style.opacity = '1';
-            el.style.transform = 'translateX(0)';
-          }, delay);
-        });
+          // Paso 2: hijos aparecen al azar 400ms después del contenedor
+          var shuffled = children.slice().sort(function(){ return Math.random() - 0.5; });
+          shuffled.forEach(function(el, i){
+            var delay = 400 + i * 160 + Math.round(Math.random() * 100);
+            setTimeout(function(){
+              el.style.opacity = '1';
+              el.style.transform = 'translateX(0)';
+            }, delay);
+          });
+        }, 1200);
       }
     }, 50);
   });
