@@ -1215,7 +1215,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Dibujar el canvas pero empezar invisible
   _dialDraw();
   _dialCanvas.style.opacity = '0';
-  _dialCanvas.style.transition = 'opacity 350ms cubic-bezier(.16,1,.3,1)';
+  _dialCanvas.style.transition = 'opacity 1100ms ease-out';
 
   // Mostrar el overlay (transparente) para que el canvas sea visible
   _dialOverlay.style.display = 'flex';
@@ -1223,25 +1223,23 @@ window.addEventListener('DOMContentLoaded',()=>{
   _dialVisible = true;
   _dialOverlay.style.pointerEvents = 'auto';
 
-  // Secuencia correcta para el fade:
-  // rAF 1: quitar render-block → browser ve negro del splash
-  // rAF 2: browser pintó el negro → ahora activar fade-in del canvas
+
+  // Negro visible primero, luego fade-in con setTimeout garantizado
   requestAnimationFrame(function(){
     var rb = document.getElementById('render-block');
     if(rb) rb.parentNode.removeChild(rb);
-
-    // Un frame más para que el browser procese el negro antes del fade
-    requestAnimationFrame(function(){
+    // setTimeout 50ms garantiza que el browser pintó el negro y el canvas opacity:0
+    // antes de activar la transición
+    setTimeout(function(){
       _dialCanvas.style.opacity = '1';
-
       var navPanel = document.getElementById('dial-nav-panel');
       if(navPanel){
         navPanel.style.opacity = '0';
-        navPanel.style.transition = 'opacity 400ms cubic-bezier(.16,1,.3,1)';
+        navPanel.style.transition = 'opacity 800ms ease-out';
         navPanel.style.display = window.innerWidth < 900 ? 'none' : 'flex';
-        requestAnimationFrame(function(){ navPanel.style.opacity = '1'; });
+        setTimeout(function(){ navPanel.style.opacity = '1'; }, 16);
       }
-    });
+    }, 50);
   });
 
   // Registrar eventos del dial
@@ -1254,46 +1252,32 @@ window.addEventListener('DOMContentLoaded',()=>{
   cerrarDial = function(){
     if(!_dialLandingUsed){
       _dialLandingUsed = true;
-      // Fade-out del canvas
-      if(_dialCanvas) _dialCanvas.style.opacity = '0';
-      var navPanel = document.getElementById('dial-nav-panel');
-      if(navPanel) navPanel.style.opacity = '0';
-      setTimeout(function(){
-        // Ocultar overlay
-        _dialOverlay.style.display = 'none';
-        _dialVisible = false;
-        _dialActiveSub = -1; _dialCentroHov = false; _detenerPulsoCentro();
-        var btn = document.getElementById('btn-nueva-entrada');
-        if(btn) btn.classList.remove('active');
-        // Limpiar canvas para siguientes aperturas normales
-        _dialCanvas.style.opacity = '';
-        _dialCanvas.style.transition = '';
-        // Restaurar backdrop del overlay para aperturas futuras
-        _dialOverlay.style.background =
-          'radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),' +
-          'radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),' +
-          'rgba(4,4,14,0.6)';
-        _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
-        _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
-        // Mostrar anverso
-        var anv = document.getElementById('board-anverso');
-        if(anv){
-          anv.style.display = '';
-          anv.style.opacity = '0';
-          anv.style.transition = 'opacity 400ms ease';
-          requestAnimationFrame(function(){
-            anv.style.opacity = '1';
-          });
-        }
-        // Desvanecer splash
-        var splash = document.getElementById('splash-dial');
-        if(splash){
-          splash.style.opacity = '0';
-          setTimeout(function(){
-            if(splash.parentNode) splash.parentNode.removeChild(splash);
-          }, 450);
-        }
-      }, 320);
+
+      // Ocultar overlay y mostrar anverso inmediatamente
+      _dialOverlay.style.display = 'none';
+      _dialVisible = false;
+      _dialActiveSub = -1; _dialCentroHov = false; _detenerPulsoCentro();
+      var btn = document.getElementById('btn-nueva-entrada');
+      if(btn) btn.classList.remove('active');
+
+      // Limpiar canvas y restaurar overlay para aperturas futuras
+      _dialCanvas.style.opacity = '';
+      _dialCanvas.style.transition = '';
+      _dialOverlay.style.background =
+        'radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),' +
+        'radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),' +
+        'rgba(4,4,14,0.6)';
+      _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
+      _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
+
+      // Mostrar anverso inmediatamente — sin transición
+      var anv = document.getElementById('board-anverso');
+      if(anv){ anv.style.display = ''; anv.style.opacity = '1'; }
+
+      // Quitar splash inmediatamente
+      var splash = document.getElementById('splash-dial');
+      if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
+
     } else {
       _origCerrarDial();
     }
