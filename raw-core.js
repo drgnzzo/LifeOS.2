@@ -1194,45 +1194,100 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(fechaEl) fechaEl.value=hoy;
   _inyectarToggleModo();
 
-  // ── LANDING: el dial es lo primero que ve el usuario ──
-  // RAWEntry.html ya tiene board-anverso con display:none y un #splash-dial negro.
-  // Secuencia:
-  //   Frame 1 → abrirDial() — el dial Canvas se crea y muestra sobre el splash negro
-  //   Al cerrar → mostrar anverso + desvanecer splash
+  // ── LANDING: negro → dial → anverso ──
+  // El splash negro (#splash-dial) ya está en el HTML cubriendo todo.
+  // El anverso nace con display:none.
+  // Paso 1: el splash es negro, el usuario lo ve.
+  // Paso 2: el dial abre directamente SIN overlay propio — el splash ES el fondo.
+  //         El canvas hace fade-in sobre el negro ya existente.
+  // Paso 3: al cerrar → anverso aparece, splash desaparece.
 
   var _dialLandingUsed = false;
 
-  // Abrir el dial en el primer frame disponible
+  // Montar el canvas del dial DENTRO del splash — así no hay overlay separado
+  _crearDialOverlay();
+  // Hacer el overlay invisible e inerte — el splash ya es el fondo negro
+  _dialOverlay.style.background = 'transparent';
+  _dialOverlay.style.backdropFilter = 'none';
+  _dialOverlay.style.webkitBackdropFilter = 'none';
+  _dialOverlay.style.pointerEvents = 'none'; // temporalmente
+
+  // Dibujar el canvas pero empezar invisible
+  _dialDraw();
+  _dialCanvas.style.opacity = '0';
+  _dialCanvas.style.transition = 'opacity 350ms cubic-bezier(.16,1,.3,1)';
+
+  // Mostrar el overlay (transparente) para que el canvas sea visible
+  _dialOverlay.style.display = 'flex';
+  _dialOverlay.style.opacity = '1';
+  _dialVisible = true;
+  _dialOverlay.style.pointerEvents = 'auto';
+
+  // Fade-in del canvas sobre el splash negro
   requestAnimationFrame(function(){
-    abrirDial();
+    _dialCanvas.style.opacity = '1';
+    // También el nav panel
+    var navPanel = document.getElementById('dial-nav-panel');
+    if(navPanel){
+      navPanel.style.opacity = '0';
+      navPanel.style.transition = 'opacity 350ms cubic-bezier(.16,1,.3,1)';
+      navPanel.style.display = window.innerWidth < 900 ? 'none' : 'flex';
+      requestAnimationFrame(function(){ navPanel.style.opacity = '1'; });
+    }
+  });
+
+  // Registrar eventos del dial
+  _dialOverlay.addEventListener('click', function(e){
+    if(e.target === _dialOverlay) cerrarDial();
   });
 
   // Patch de cerrarDial: primera vez revela el anverso
   var _origCerrarDial = cerrarDial;
   cerrarDial = function(){
-    _origCerrarDial();
     if(!_dialLandingUsed){
       _dialLandingUsed = true;
-      // Mostrar anverso
-      var anv = document.getElementById('board-anverso');
-      if(anv){
-        anv.style.display = '';
-        anv.style.opacity = '0';
-        anv.style.transition = 'opacity 400ms ease';
-        requestAnimationFrame(function(){
+      // Fade-out del canvas
+      if(_dialCanvas) _dialCanvas.style.opacity = '0';
+      var navPanel = document.getElementById('dial-nav-panel');
+      if(navPanel) navPanel.style.opacity = '0';
+      setTimeout(function(){
+        // Ocultar overlay
+        _dialOverlay.style.display = 'none';
+        _dialVisible = false;
+        _dialActiveSub = -1; _dialCentroHov = false; _detenerPulsoCentro();
+        var btn = document.getElementById('btn-nueva-entrada');
+        if(btn) btn.classList.remove('active');
+        // Limpiar canvas para siguientes aperturas normales
+        _dialCanvas.style.opacity = '';
+        _dialCanvas.style.transition = '';
+        // Restaurar backdrop del overlay para aperturas futuras
+        _dialOverlay.style.background =
+          'radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),' +
+          'radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),' +
+          'rgba(4,4,14,0.6)';
+        _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
+        _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
+        // Mostrar anverso
+        var anv = document.getElementById('board-anverso');
+        if(anv){
+          anv.style.display = '';
+          anv.style.opacity = '0';
+          anv.style.transition = 'opacity 400ms ease';
           requestAnimationFrame(function(){
             anv.style.opacity = '1';
           });
-        });
-      }
-      // Desvanecer y quitar el splash negro
-      var splash = document.getElementById('splash-dial');
-      if(splash){
-        splash.style.opacity = '0';
-        setTimeout(function(){
-          if(splash.parentNode) splash.parentNode.removeChild(splash);
-        }, 500);
-      }
+        }
+        // Desvanecer splash
+        var splash = document.getElementById('splash-dial');
+        if(splash){
+          splash.style.opacity = '0';
+          setTimeout(function(){
+            if(splash.parentNode) splash.parentNode.removeChild(splash);
+          }, 450);
+        }
+      }, 320);
+    } else {
+      _origCerrarDial();
     }
   };
 
