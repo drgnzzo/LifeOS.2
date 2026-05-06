@@ -966,9 +966,16 @@ function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   _dialDraw();
-  _dialOverlay.style.display='flex';
-  _dialVisible=true;
-  // Ocultar panel nav en pantallas pequeñas
+  // Fade-in: empieza en 0, llega a 1 en 300ms
+  _dialOverlay.style.opacity = '0';
+  _dialOverlay.style.transition = 'opacity 300ms cubic-bezier(.16,1,.3,1)';
+  _dialOverlay.style.display = 'flex';
+  _dialVisible = true;
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      if(_dialOverlay) _dialOverlay.style.opacity = '1';
+    });
+  });
   var navPanel=document.getElementById('dial-nav-panel');
   if(navPanel) navPanel.style.display=window.innerWidth<900?'none':'flex';
   var btn=document.getElementById('btn-nueva-entrada');
@@ -976,10 +983,16 @@ function abrirDial(){
 }
 
 function cerrarDial(){
-  if(_dialOverlay) _dialOverlay.style.display='none';
-  _dialVisible=false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
+  if(!_dialOverlay){ _dialVisible=false; return; }
+  // Fade-out: 220ms luego ocultar
+  _dialOverlay.style.transition = 'opacity 220ms ease';
+  _dialOverlay.style.opacity = '0';
+  _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
+  setTimeout(function(){
+    if(_dialOverlay && !_dialVisible) _dialOverlay.style.display='none';
+  }, 230);
 }
 
 function abrirFormulario(modo){
