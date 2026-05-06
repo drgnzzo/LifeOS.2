@@ -1171,8 +1171,36 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(fechaEl) fechaEl.value=hoy;
   _inyectarToggleModo();
 
-  // Abrir el dial automáticamente al cargar
-  setTimeout(function(){ abrirDial(); }, 120);
+  // ── Inicio con dial como landing ──
+  // 1. Ocultar el anverso inmediatamente (negro)
+  var _anv = document.getElementById('board-anverso');
+  if(_anv) _anv.style.opacity = '0';
+
+  // 2. Abrir el dial con fade-in suave
+  setTimeout(function(){
+    abrirDial();
+    // Fade-in del overlay del dial
+    if(_dialOverlay){
+      _dialOverlay.style.opacity = '0';
+      _dialOverlay.style.transition = 'opacity 400ms cubic-bezier(.16,1,.3,1)';
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          _dialOverlay.style.opacity = '1';
+        });
+      });
+    }
+  }, 80);
+
+  // 3. Cuando se cierre el dial, revelar el anverso con fade
+  var _origCerrarDial = cerrarDial;
+  cerrarDial = function(){
+    _origCerrarDial();
+    var anv = document.getElementById('board-anverso');
+    if(anv && anv.style.opacity === '0'){
+      anv.style.transition = 'opacity 350ms ease';
+      anv.style.opacity = '1';
+    }
+  };
 
   setChip('load','Cargando');
   api.getAll()
