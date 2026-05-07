@@ -1151,23 +1151,24 @@ function _dialDraw(){
   var breathSin  = (Math.sin(bt * 0.025) * 0.5 + 0.5); // 0→1 lento
   var breathSin2 = (Math.sin(bt * 0.018 + 1.2) * 0.5 + 0.5); // desfasado
 
-  // Halo exterior violeta breathing — más intenso
+  // Halo 1 — anillo violeta breathing, alejado del dial
+  var HALO_OFF = 18; // offset desde R_OUT
   ctx.save();
   ctx.shadowColor = 'rgba(139,92,246,' + (0.5 + breathSin * 0.5) + ')';
-  ctx.shadowBlur  = 50 + breathSin * 40;
+  ctx.shadowBlur  = 60 + breathSin * 40;
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT+3, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(167,139,250,' + (0.18 + breathSin * 0.22) + ')';
-  ctx.lineWidth   = 2.5 + breathSin * 2;
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT + HALO_OFF, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(167,139,250,' + (0.25 + breathSin * 0.30) + ')';
+  ctx.lineWidth   = 2 + breathSin * 2;
   ctx.stroke();
   ctx.restore();
 
-  // Halo exterior secundario — más grande, más tenue, color complementario
+  // Halo 2 — anillo más grande y tenue, desfasado
   ctx.save();
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 22 + breathSin2 * 8, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(120,80,220,' + (0.04 + breathSin2 * 0.08) + ')';
-  ctx.lineWidth   = 10;
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT + HALO_OFF + 16 + breathSin2 * 6, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(120,80,220,' + (0.06 + breathSin2 * 0.10) + ')';
+  ctx.lineWidth   = 8;
   ctx.stroke();
   ctx.restore();
 
@@ -1180,32 +1181,33 @@ function _dialDraw(){
   ctx.shadowColor = 'rgba(34,211,238,' + (0.7 + breathSin * 0.3) + ')';
   ctx.shadowBlur  = 20 + breathSin * 30;
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 2, arcAngle, arcAngle + arcLen);
-  ctx.strokeStyle = 'rgba(34,211,238,' + (0.45 + breathSin * 0.45) + ')';
-  ctx.lineWidth   = 3;
+  var ARC_R = dc.R_OUT + 18; // mismo offset que el halo
+  ctx.arc(dc.CX, dc.CY, ARC_R, arcAngle, arcAngle + arcLen);
+  ctx.strokeStyle = 'rgba(34,211,238,' + (0.55 + breathSin * 0.40) + ')';
+  ctx.lineWidth   = 2.5;
   ctx.lineCap     = 'round';
   ctx.stroke();
 
-  // Glow exterior del arco — blur más amplio
+  // Glow exterior del arco
   ctx.shadowColor = 'rgba(34,211,238,0.5)';
   ctx.shadowBlur  = 40 + breathSin * 20;
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 2, arcAngle, arcAngle + arcLen);
-  ctx.strokeStyle = 'rgba(34,211,238,' + (0.15 + breathSin * 0.2) + ')';
-  ctx.lineWidth   = 8;
+  ctx.arc(dc.CX, dc.CY, ARC_R, arcAngle, arcAngle + arcLen);
+  ctx.strokeStyle = 'rgba(34,211,238,' + (0.12 + breathSin * 0.18) + ')';
+  ctx.lineWidth   = 10;
   ctx.stroke();
 
-  // Arco opuesto violeta — más corto, igualmente brillante
+  // Arco opuesto violeta
   ctx.shadowColor = 'rgba(167,139,250,' + (0.6 + breathSin2 * 0.3) + ')';
   ctx.shadowBlur  = 18 + breathSin2 * 24;
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT+2, arcAngle+Math.PI, arcAngle+Math.PI+arcLen*0.4);
-  ctx.strokeStyle = 'rgba(167,139,250,' + (0.40 + breathSin2 * 0.40) + ')';
-  ctx.lineWidth   = 2.5;
+  ctx.arc(dc.CX, dc.CY, ARC_R, arcAngle+Math.PI, arcAngle+Math.PI+arcLen*0.4);
+  ctx.strokeStyle = 'rgba(167,139,250,' + (0.45 + breathSin2 * 0.40) + ')';
+  ctx.lineWidth   = 2;
   ctx.stroke();
 
-  // Puntos de inicio/fin del arco — pequeños dots brillantes
-  var dotR = dc.R_OUT + 2;
+  // Dots en inicio/fin del arco
+  var dotR = ARC_R;
   [arcAngle, arcAngle+arcLen].forEach(function(a){
     ctx.beginPath();
     ctx.arc(dc.CX+dotR*Math.cos(a), dc.CY+dotR*Math.sin(a), 3, 0, Math.PI*2);
@@ -1309,8 +1311,44 @@ function _dialDraw(){
         var isShov = (j===_dialSubHov);
         var rso    = isShov ? rSOAnim+10*prog : rSOAnim;
 
-        var sfill = isShov ? _DIAL_SHOV : _DIAL_SBASE;
-        _dialDrawSector(ctx,sA,eA,rso,rSIAnim,sfill,sub.accent,isShov);
+        // Subanillo: solo glow/borde — sin fondo sólido
+        // Trazar el path del sector
+        ctx.beginPath();
+        ctx.moveTo(dc.CX+rSIAnim*Math.cos(sA), dc.CY+rSIAnim*Math.sin(sA));
+        ctx.arc(dc.CX, dc.CY, rso, sA, eA);
+        ctx.lineTo(dc.CX+rSIAnim*Math.cos(eA), dc.CY+rSIAnim*Math.sin(eA));
+        ctx.arc(dc.CX, dc.CY, rSIAnim, eA, sA, true);
+        ctx.closePath();
+
+        // Fondo muy sutil — casi transparente con tinte del color
+        var ar2=139,ag2=92,ab2=246;
+        var m2=sub.accent&&sub.accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+        if(m2){ ar2=parseInt(m2[1],16); ag2=parseInt(m2[2],16); ab2=parseInt(m2[3],16); }
+        ctx.fillStyle = isShov
+          ? 'rgba('+ar2+','+ag2+','+ab2+',0.12)'
+          : 'rgba('+ar2+','+ag2+','+ab2+',0.04)';
+        ctx.fill();
+
+        // Borde exterior neón
+        ctx.save();
+        ctx.shadowColor = sub.accent;
+        ctx.shadowBlur  = isShov ? 28 : 14;
+        ctx.beginPath();
+        ctx.arc(dc.CX, dc.CY, rso, sA+0.02, eA-0.02);
+        ctx.strokeStyle = isShov
+          ? sub.accent
+          : 'rgba('+ar2+','+ag2+','+ab2+',0.55)';
+        ctx.lineWidth = isShov ? 3 : 1.5;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        ctx.restore();
+
+        // Borde interior tenue
+        ctx.beginPath();
+        ctx.arc(dc.CX, dc.CY, rSIAnim+1, sA+0.02, eA-0.02);
+        ctx.strokeStyle = 'rgba('+ar2+','+ag2+','+ab2+',0.18)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
 
         // Ícono y label — solo visibles cuando prog > 0.4
         if(prog > 0.35){
@@ -1733,13 +1771,21 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Canvas invisible ANTES de dibujar — así el browser nunca ve el frame visible
   _dialCanvas.style.opacity = '0';
   _dialCanvas.style.transition = 'opacity 2000ms ease-out';
-  _dialDraw();
 
-  // Mostrar el overlay (transparente) para que el canvas sea visible
+  // Mostrar el overlay
   _dialOverlay.style.display = 'flex';
   _dialOverlay.style.opacity = '1';
   _dialVisible = true;
   _dialOverlay.style.pointerEvents = 'auto';
+
+  // Arrancar breathing desde el landing — igual que abrirDial
+  if(!_dialBreathRAF){
+    (function _breathLoopLanding(){
+      _dialBreathT++;
+      _dialDraw();
+      _dialBreathRAF = requestAnimationFrame(_breathLoopLanding);
+    })();
+  }
 
 
   // Negro visible primero, luego fade-in con setTimeout garantizado
