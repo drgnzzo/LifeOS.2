@@ -300,9 +300,14 @@ var _dialHovered   = -1;
 var _dialSubHov    = -1;
 var _dialActiveSub = -1;
 var _dialVisible   = false;
-var _dialCentroHov = false;   // hover sobre botón RAW
-var _dialPulseT    = 0;       // tiempo para animación pulso centro
-var _dialRAF       = null;    // requestAnimationFrame del pulso
+var _dialCentroHov  = false;   // hover sobre botón RAW
+var _dialPulseT     = 0;       // tiempo para animación pulso centro
+var _dialRAF        = null;    // requestAnimationFrame del pulso
+var _subRingProg    = 0;       // progreso 0→1 de la entrada del subanillo
+var _subRingRAF     = null;    // rAF de la animación del subanillo
+var _subRingPrevSub = -1;      // qué sector tenía el subanillo activo
+var _dialBreathT    = 0;       // tiempo continuo para breathing del dial
+var _dialBreathRAF  = null;    // rAF del breathing
 
 // Geometría del dial
 var _DC = {
@@ -898,8 +903,8 @@ function _crearDialOverlay(){
       }
       var subsActivos = item._subsResueltos || item.subs;
       if(subsActivos && subsActivos.length){
-        _dialActiveSub=(_dialActiveSub===h)?-1:h;
-        _dialSubHov=-1; _dialDraw();
+        _dialSubHov=-1;
+        _animarSubRing(h);
       } else {
         _dialPreset={}; cerrarDial(); abrirFormulario(item.id);
       }
@@ -1066,6 +1071,36 @@ function _dialDrawCentro(ctx, dc, isHov, pulseT){
   ctx.restore();
 }
 
+// Animar entrada del subanillo con ease-out
+function _animarSubRing(targetSub){
+  if(_subRingRAF){ cancelAnimationFrame(_subRingRAF); _subRingRAF=null; }
+  // Si es el mismo sector, toggle off con fade rápido
+  if(targetSub === _subRingPrevSub){
+    _dialActiveSub = -1;
+    _subRingPrevSub = -1;
+    _subRingProg = 0;
+    _dialDraw();
+    return;
+  }
+  // Nuevo sector — resetear y animar entrada
+  _dialActiveSub  = targetSub;
+  _subRingPrevSub = targetSub;
+  _subRingProg    = 0;
+  var startTime   = null;
+  var DURATION    = 320; // ms
+  function step(ts){
+    if(!startTime) startTime = ts;
+    var elapsed = ts - startTime;
+    // ease-out cubic
+    var t = Math.min(1, elapsed / DURATION);
+    _subRingProg = 1 - Math.pow(1 - t, 3);
+    _dialDraw();
+    if(t < 1) _subRingRAF = requestAnimationFrame(step);
+    else { _subRingRAF = null; _subRingProg = 1; }
+  }
+  _subRingRAF = requestAnimationFrame(step);
+}
+
 function _iniciarPulsoCentro(){
   if(_dialRAF) return;  // ya corriendo
   function loop(){
@@ -1089,21 +1124,51 @@ function _dialDraw(){
 
   ctx.clearRect(0,0,dc.W,dc.H);
 
-  // Halo exterior del dial completo
+  // ── Breathing del dial — glow exterior vivo ──
+  var bt = typeof _dialBreathT !== 'undefined' ? _dialBreathT : 0;
+  var breathSin  = (Math.sin(bt * 0.025) * 0.5 + 0.5); // 0→1 lento
+  var breathSin2 = (Math.sin(bt * 0.018 + 1.2) * 0.5 + 0.5); // desfasado
+
+  // Halo exterior — glow violeta breathing
   ctx.save();
-  ctx.shadowColor='rgba(120,110,255,0.25)';
-  ctx.shadowBlur=50;
+  ctx.shadowColor = 'rgba(139,92,246,' + (0.3 + breathSin * 0.4) + ')';
+  ctx.shadowBlur  = 40 + breathSin * 30;
   ctx.beginPath();
-  ctx.arc(dc.CX,dc.CY,dc.R_OUT+2,0,Math.PI*2);
-  ctx.strokeStyle='rgba(255,255,255,0.08)';
-  ctx.lineWidth=1.5; ctx.stroke();
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT+3, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(167,139,250,' + (0.08 + breathSin * 0.14) + ')';
+  ctx.lineWidth   = 2 + breathSin * 1.5;
+  ctx.stroke();
   ctx.restore();
-  // Segundo halo — círculo grande muy tenue
+
+  // Halo exterior secundario — más grande, más tenue, color complementario
   ctx.save();
   ctx.beginPath();
-  ctx.arc(dc.CX,dc.CY,dc.R_OUT+18,0,Math.PI*2);
-  ctx.strokeStyle='rgba(120,110,255,0.06)';
-  ctx.lineWidth=8; ctx.stroke();
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 22 + breathSin2 * 8, 0, Math.PI*2);
+  ctx.strokeStyle = 'rgba(120,80,220,' + (0.04 + breathSin2 * 0.08) + ')';
+  ctx.lineWidth   = 10;
+  ctx.stroke();
+  ctx.restore();
+
+  // Arco de acento superior — el borde brillante que rota lentamente
+  ctx.save();
+  var arcAngle = bt * 0.003; // rotación lenta
+  var arcLen   = Math.PI * 0.7;
+  ctx.shadowColor = 'rgba(34,211,238,' + (0.4 + breathSin * 0.4) + ')';
+  ctx.shadowBlur  = 12 + breathSin * 16;
+  ctx.beginPath();
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 3, arcAngle, arcAngle + arcLen);
+  ctx.strokeStyle = 'rgba(34,211,238,' + (0.15 + breathSin * 0.25) + ')';
+  ctx.lineWidth   = 2;
+  ctx.lineCap     = 'round';
+  ctx.stroke();
+  // Arco opuesto más tenue
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(167,139,250,0.3)';
+  ctx.beginPath();
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT+3, arcAngle+Math.PI, arcAngle+Math.PI+arcLen*0.5);
+  ctx.strokeStyle = 'rgba(167,139,250,' + (0.08 + breathSin2 * 0.12) + ')';
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
   ctx.restore();
 
   // ── Anillo principal ──
@@ -1176,45 +1241,61 @@ function _dialDraw(){
     var parent=_DIAL_ITEMS[_dialActiveSub];
     var _subsArr=parent._subsResueltos||parent.subs||[];
     var nSub=_subsArr.length;
+    var prog = typeof _subRingProg !== 'undefined' ? _subRingProg : 1;
     if(nSub>0){
       var pmidA  = Math.PI*2*(_dialActiveSub+0.5)/N - Math.PI/2;
-      var spread = Math.PI*0.48;
-      var subSlice = spread/nSub;
-      var subGap   = 0.020;
-      var subStart = pmidA - spread/2;
+      // El spread se expande con el progreso (sale del sector padre)
+      var spreadFull = Math.PI*0.48;
+      var spread     = spreadFull * prog;
+      var subSlice   = spread/nSub;
+      var subGap     = 0.020 * prog;
+      var subStart   = pmidA - spread/2;
+      // El radio exterior crece con el progreso
+      var rSIAnim = dc.R_SI;
+      var rSOFull = dc.R_SO;
+      var rSOAnim = dc.R_SI + (rSOFull - dc.R_SI) * prog;
 
+      ctx.save();
+      ctx.globalAlpha = prog; // fade-in global del subanillo
       for(var j=0;j<nSub;j++){
-        var sub    = parent.subs[j];
+        var sub    = _subsArr[j];
         var sA     = subStart + j*subSlice + subGap/2;
         var eA     = subStart + (j+1)*subSlice - subGap/2;
         var smA    = (sA+eA)/2;
         var isShov = (j===_dialSubHov);
-        var rso    = isShov ? dc.R_SO+10 : dc.R_SO;
+        var rso    = isShov ? rSOAnim+10*prog : rSOAnim;
 
         var sfill = isShov ? _DIAL_SHOV : _DIAL_SBASE;
-        _dialDrawSector(ctx,sA,eA,rso,dc.R_SI,sfill,sub.accent,isShov);
+        _dialDrawSector(ctx,sA,eA,rso,rSIAnim,sfill,sub.accent,isShov);
 
-        var srMid = dc.R_SI + (rso-dc.R_SI)*0.52;
-        var scx   = dc.CX + srMid*Math.cos(smA);
-        var scy   = dc.CY + srMid*Math.sin(smA);
-        var sicoS = isShov ? 40 : 34;
+        // Ícono y label — solo visibles cuando prog > 0.4
+        if(prog > 0.35){
+          var iconProg = Math.min(1,(prog-0.35)/0.65); // 0→1 en la segunda mitad
+          var srMid = rSIAnim + (rso-rSIAnim)*0.52;
+          var scx   = dc.CX + srMid*Math.cos(smA);
+          var scy   = dc.CY + srMid*Math.sin(smA);
+          var sicoS = (isShov ? 40 : 34) * iconProg;
 
-        ctx.save();
-        ctx.shadowColor=sub.accent;
-        ctx.shadowBlur=isShov?18:7;
-        sub.draw(ctx,scx,scy-7,sicoS,sub.accent);
-        ctx.restore();
+          ctx.save();
+          ctx.globalAlpha = iconProg;
+          ctx.shadowColor=sub.accent;
+          ctx.shadowBlur=isShov?18*iconProg:7*iconProg;
+          sub.draw(ctx,scx,scy-7,sicoS,sub.accent);
+          ctx.restore();
 
-        ctx.save();
-        ctx.font='bold '+(isShov?14:12)+'px -apple-system,BlinkMacSystemFont,sans-serif';
-        ctx.fillStyle='#ffffff';
-        ctx.textAlign='center';
-        ctx.textBaseline='top';
-        ctx.shadowColor='rgba(0,0,0,0.9)';
-        ctx.shadowBlur=5;
-        ctx.fillText(sub.label.toUpperCase(),scx,scy+12);
-        ctx.restore();
+          ctx.save();
+          ctx.globalAlpha = iconProg;
+          ctx.font='bold '+(isShov?14:12)+'px -apple-system,BlinkMacSystemFont,sans-serif';
+          ctx.fillStyle='#ffffff';
+          ctx.textAlign='center';
+          ctx.textBaseline='top';
+          ctx.shadowColor='rgba(0,0,0,0.9)';
+          ctx.shadowBlur=5;
+          ctx.fillText(sub.label.toUpperCase(),scx,scy+12);
+          ctx.restore();
+        }
       }
+      ctx.restore();
     }
   }
 
@@ -1351,7 +1432,14 @@ function toggleEntradaDropdown(){
 function abrirDial(){
   _crearDialOverlay();
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
-  _dialDraw();
+  // Iniciar breathing continuo del dial
+  if(!_dialBreathRAF){
+    (function _breathLoop(){
+      _dialBreathT++;
+      _dialDraw();
+      _dialBreathRAF = requestAnimationFrame(_breathLoop);
+    })();
+  }
 
   // Mostrar overlay con fondo blur siempre
   _dialOverlay.style.opacity = '0';
@@ -1385,6 +1473,7 @@ function cerrarDial(){
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
+  if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
   setTimeout(function(){
@@ -2741,7 +2830,7 @@ document.addEventListener('DOMContentLoaded', function(){
       // ── PANEL WRAPPER ──
       function panelCol(tipo, inner){
         var c = CAT[tipo];
-        return '<div data-panel-tipo="'+tipo+'" style="flex:1;min-width:0;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
+        return '<div data-panel-tipo="'+tipo+'" style="flex:0 0 240px;min-width:220px;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
                'display:flex;flex-direction:column;overflow:hidden;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
           '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px">'+
@@ -2815,7 +2904,7 @@ document.addEventListener('DOMContentLoaded', function(){
       board.innerHTML =
         header +
         '<div style="display:flex;gap:12px;padding:12px;flex:1;overflow:hidden;min-height:0">'+
-          '<div style="display:flex;gap:12px;flex:1;overflow-x:auto;min-width:0">'+
+          '<div style="display:flex;gap:10px;flex:1;overflow-x:auto;min-width:0;padding-bottom:4px">'+
             panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
             panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
             panelCol('libro',       itemList(d.libros||[],   'libro'))+
