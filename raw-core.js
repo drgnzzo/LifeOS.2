@@ -441,186 +441,186 @@ function _crearDialOverlay(){
   window._reposicionarHUD = _reposicionarHUD;
 
 
-  // ── Inyectar keyframes de breathing/scan para los HUD panels ──
+
+  // ── Keyframes HUD ──
   (function(){
     if(document.getElementById('hud-panel-keyframes')) return;
     var ks2 = document.createElement('style');
     ks2.id = 'hud-panel-keyframes';
     ks2.textContent = [
-      // Breathing glow por color (cada panel tiene su --hud-accent)
-      '@keyframes hudBreath{',
-        '0%,100%{box-shadow:0 0 0 1px rgba(140,100,220,0.12),0 8px 40px rgba(0,0,0,0.7),0 0 20px var(--hud-glow,rgba(139,92,246,0.06));}',
-        '50%{box-shadow:0 0 0 1px rgba(140,100,220,0.28),0 8px 48px rgba(0,0,0,0.8),0 0 40px var(--hud-glow,rgba(139,92,246,0.18));}',
-      '}',
-      // Scan line que sube
-      '@keyframes hudScan{',
-        '0%{top:-2px;opacity:0;}',
-        '5%{opacity:1;}',
-        '95%{opacity:1;}',
-        '100%{top:100%;opacity:0;}',
-      '}',
-      // Bar fill animation
-      '@keyframes hudBarIn{from{width:0}to{width:var(--bar-w,0%)}}',
-      // Valor numérico — count up visual (pulse rápido al aparecer)
-      '@keyframes hudValPop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}',
-      // Borde accent superior pulsante
-      '@keyframes hudAccentPulse{',
-        '0%,100%{opacity:.5;filter:blur(0px)}',
-        '50%{opacity:1;filter:blur(1px)}',
-      '}',
+      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 1px rgba(140,100,220,0.10),0 12px 60px rgba(0,0,0,.75),0 0 30px var(--hud-glow,rgba(139,92,246,0.05))}50%{box-shadow:0 0 0 1px rgba(140,100,220,0.30),0 12px 60px rgba(0,0,0,.85),0 0 60px var(--hud-glow,rgba(139,92,246,0.18))}}',
+      '@keyframes hudScan{0%{top:-2px;opacity:0}5%{opacity:.8}95%{opacity:.8}100%{top:100%;opacity:0}}',
+      '@keyframes hudAccPulse{0%,100%{opacity:.4;box-shadow:0 0 4px var(--acc,#A855F7)}50%{opacity:1;box-shadow:0 0 12px var(--acc,#A855F7),0 0 24px var(--acc,#A855F7)44}}',
+      '@keyframes hudValIn{0%{opacity:0;transform:translateY(4px)}100%{opacity:1;transform:none}}',
+      '@keyframes hudBarIn{from{width:0}to{width:var(--bw,0%)}}',
+      '@keyframes hudDotPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.5);opacity:1}}',
+      // Partículas flotantes del fondo de los panels
+      '@keyframes hudFloat{0%,100%{transform:translateY(0) translateX(0);opacity:.3}33%{transform:translateY(-8px) translateX(3px);opacity:.7}66%{transform:translateY(-4px) translateX(-2px);opacity:.5}}',
     ].join('');
     document.head.appendChild(ks2);
   })();
 
-  // ── CSS base de cada panel HUD ──
-  var _hudBase = [
-    'position:fixed','z-index:9001',
-    'background:rgba(12,8,24,0.88)',
-    'border:1px solid rgba(140,100,220,0.22)',
-    'backdrop-filter:blur(20px) saturate(160%)','-webkit-backdrop-filter:blur(20px) saturate(160%)',
-    // Chamfer esquinas: top-left y bottom-right
-    'clip-path:polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)',
-    'opacity:0','visibility:hidden',
-    'transition:opacity 500ms ease-out,box-shadow .3s',
-    'overflow:hidden',
-    'font-family:-apple-system,BlinkMacSystemFont,sans-serif',
-    'animation:hudBreath 4s ease-in-out infinite',
-    // Patrón circuit-board tenue
-    'background-image:linear-gradient(rgba(120,80,200,0.022) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.022) 1px,transparent 1px)',
-    'background-size:28px 28px',
-  ].join(';');
-
-  function _mkP(id, top, left, w){
+  // ── BASE PANEL — posición fija, glassmorphism, chamfer ──
+  function _mkHudPanel(id, side){
     var p = document.createElement('div');
     p.id = id;
-    p.style.cssText = _hudBase;
-    p.style.top     = top;
-    p.style.left    = left;
-    p.style.width   = w + 'px';
-    p.style.maxHeight = '340px';
-    p.style.overflowY = 'auto';
-    p.style.overflowX = 'hidden';
-    p._posTop  = top;
-    p._posLeft = left;
+    // side: 'left' | 'right' — se posiciona con JS dinámicamente
+    p.style.cssText = [
+      'position:fixed','z-index:9001',
+      'background:rgba(10,7,22,0.82)',
+      'border:1px solid rgba(140,100,220,0.20)',
+      'backdrop-filter:blur(24px) saturate(180%)',
+      '-webkit-backdrop-filter:blur(24px) saturate(180%)',
+      'opacity:0','visibility:hidden',
+      'transition:opacity 500ms ease-out',
+      'overflow:hidden',
+      'font-family:-apple-system,BlinkMacSystemFont,sans-serif',
+      'animation:hudBreath 4s ease-in-out infinite',
+      // Circuit-board pattern
+      'background-image:linear-gradient(rgba(120,80,200,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.018) 1px,transparent 1px)',
+      'background-size:32px 32px',
+    ].join(';');
+    p._side = side;
     return p;
   }
 
-  // Reposicionar paneles respecto al canvas real en pantalla
+  // ── Reposicionar — 1 panel izq + 1 panel der, usando todo el espacio ──
   function _reposicionarHUD(){
     if(!_dialCanvas || !window._hudPanels) return;
     var r = _dialCanvas.getBoundingClientRect();
-    var cx = r.left + r.width/2;
-    var cy = r.top  + r.height/2;
-    var hw = r.width/2;
-    var GAP = 20;
-    var positions = [
-      {i:0, side:-1, yOff:-230, w:220},
-      {i:1, side: 1, yOff:-230, w:240},
-      {i:2, side:-1, yOff: -55, w:220},
-      {i:3, side: 1, yOff: -55, w:240},
-      {i:4, side:-1, yOff: 145, w:220},
-      {i:5, side: 1, yOff: 145, w:230},
-    ];
-    positions.forEach(function(pos){
-      var hp = window._hudPanels[pos.i];
+    var cLeft  = r.left;   // borde izq del canvas
+    var cRight = r.right;  // borde der del canvas
+    var cTop   = r.top;
+    var cBot   = r.bottom;
+    var cH     = r.height;
+    var vW     = window.innerWidth;
+    var vH     = window.innerHeight;
+    var GAP    = 16;
+
+    // Panel izquierdo: desde borde izq de pantalla hasta borde izq del canvas
+    var leftW  = Math.max(240, cLeft - GAP*2);
+    var leftX  = GAP;
+    // Panel derecho: desde borde der del canvas hasta borde der de pantalla
+    var rightW = Math.max(240, vW - cRight - GAP*2);
+    var rightX = cRight + GAP;
+
+    // Altura: casi toda la pantalla, centrado verticalmente con el dial
+    var panH   = Math.min(vH - 40, Math.max(cH + 40, 520));
+    var panY   = Math.max(20, (vH - panH) / 2);
+
+    window._hudPanels.forEach(function(hp){
       if(!hp || !hp.el) return;
-      var x = pos.side === -1 ? cx - hw - GAP - pos.w : cx + hw + GAP;
-      var y = cy + pos.yOff;
-      hp.el.style.left  = Math.max(8, x) + 'px';
-      hp.el.style.top   = Math.max(8, y) + 'px';
-      hp.el.style.width = pos.w + 'px';
+      if(hp.el._side === 'left'){
+        hp.el.style.left   = leftX + 'px';
+        hp.el.style.width  = leftW + 'px';
+        hp.el.style.top    = panY + 'px';
+        hp.el.style.height = panH + 'px';
+        hp.el.style.maxHeight = panH + 'px';
+        hp.el.style.overflowY = 'auto';
+        // Chamfer left panel: top-right y bottom-left
+        hp.el.style.clipPath = 'polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px))';
+      } else {
+        hp.el.style.left   = rightX + 'px';
+        hp.el.style.width  = rightW + 'px';
+        hp.el.style.top    = panY + 'px';
+        hp.el.style.height = panH + 'px';
+        hp.el.style.maxHeight = panH + 'px';
+        hp.el.style.overflowY = 'auto';
+        // Chamfer right panel: top-left y bottom-right
+        hp.el.style.clipPath = 'polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px)';
+      }
     });
   }
   window._reposicionarHUD = _reposicionarHUD;
 
-  // ── Helpers de construcción ──
+  // ══════════════════════════════════════
+  //  HELPERS VISUALES
+  // ══════════════════════════════════════
 
-  // Header con acento de color neón en borde superior
-  function _hHdr(label, color, icon){
-    var glow = color + '88';
-    return '<div style="position:relative;display:flex;align-items:center;gap:8px;padding:11px 14px 10px;flex-shrink:0;overflow:hidden">' +
-      // Borde accent superior — línea neón animada
-      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+glow+',0 0 16px '+glow+';animation:hudAccentPulse 3s ease-in-out infinite"></div>' +
-      // Scan line
-      '<div style="position:absolute;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,'+color+'44,transparent);animation:hudScan 4s linear infinite;pointer-events:none"></div>' +
-      '<div style="width:22px;height:22px;border-radius:6px;background:'+color+'18;border:1px solid '+color+'44;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-        '<i class="fas '+icon+'" style="font-size:10px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>' +
+  // Sección header con borde neón superior animado
+  function _sec(label, color, icon){
+    var g = color+'55';
+    return '<div style="position:relative;display:flex;align-items:center;gap:9px;padding:14px 18px 12px;flex-shrink:0">' +
+      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+g+',0 0 20px '+g+';animation:hudAccPulse 3s ease-in-out infinite;--acc:'+color+'"></div>' +
+      '<div style="position:absolute;top:0;left:0;right:0;height:1px;pointer-events:none;animation:hudScan 5s linear infinite;background:linear-gradient(90deg,transparent 0%,'+color+'55 50%,transparent 100%)"></div>' +
+      '<div style="width:26px;height:26px;border-radius:8px;background:'+color+'18;border:1px solid '+color+'40;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px '+color+'22">' +
+        '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 5px '+color+')"></i>' +
       '</div>' +
-      '<span style="font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:'+color+';text-shadow:0 0 8px '+color+'88">'+label+'</span>' +
+      '<span style="font-size:10px;font-weight:800;letter-spacing:.20em;text-transform:uppercase;color:'+color+';text-shadow:0 0 10px '+color+'88">'+label+'</span>' +
     '</div>' +
-    '<div style="height:1px;background:linear-gradient(90deg,'+color+'44,transparent);margin:0 14px 0"></div>';
+    '<div style="height:1px;background:linear-gradient(90deg,'+color+'50,rgba(140,100,220,0.08),transparent);margin:0"></div>';
   }
 
-  // Valor grande con glow y animación pop
-  function _hBigVal(id, color, sublabel){
-    var glow = color + '55';
-    return '<div style="padding:10px 14px 8px">' +
-      '<div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(200,208,230,0.35);margin-bottom:5px">'+sublabel+'</div>' +
-      '<div id="'+id+'" style="font-size:26px;font-weight:800;color:'+color+';letter-spacing:-.02em;line-height:1;text-shadow:0 0 20px '+glow+',0 0 40px '+color+'22;animation:hudValPop .5s ease-out">—</div>' +
-    '</div>';
-  }
-
-  // Fila stat compacta con barra de acento
-  function _hStat(label, valId, color, barId){
-    var glow = color + '66';
-    return '<div style="display:flex;align-items:center;gap:10px;padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
-      '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:10px;color:rgba(200,208,230,0.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</div>' +
-        (barId ? '<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden;margin-top:3px"><div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+glow+';transition:width .8s cubic-bezier(.4,0,.2,1);border-radius:1px"></div></div>' : '') +
-      '</div>' +
-      '<span id="'+valId+'" style="font-size:12px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;flex-shrink:0;text-shadow:0 0 6px '+glow+'">—</span>' +
-    '</div>';
-  }
-
-  // Dos valores lado a lado (Activity hábitos/logros)
-  function _hDual(id1, lbl1, color1, id2, lbl2, color2){
-    return '<div style="display:flex;gap:6px;padding:8px 14px 6px">' +
-      '<div style="flex:1;background:'+color1+'12;border:1px solid '+color1+'33;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);padding:7px 10px;text-align:center">' +
-        '<div id="'+id1+'" style="font-size:22px;font-weight:800;color:'+color1+';line-height:1;text-shadow:0 0 12px '+color1+'66">—</div>' +
-        '<div style="font-size:8px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.1em;margin-top:3px">'+lbl1+'</div>' +
-      '</div>' +
-      '<div style="flex:1;background:'+color2+'12;border:1px solid '+color2+'33;clip-path:polygon(8px 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,0 100%,0 8px);padding:7px 10px;text-align:center">' +
-        '<div id="'+id2+'" style="font-size:22px;font-weight:800;color:'+color2+';line-height:1;text-shadow:0 0 12px '+color2+'66">—</div>' +
-        '<div style="font-size:8px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.1em;margin-top:3px">'+lbl2+'</div>' +
+  // Valor hero — número grande con glow
+  function _hero(id, color, sublabel, unit){
+    return '<div style="padding:14px 18px 10px">' +
+      '<div style="font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(200,208,230,0.30);margin-bottom:6px">'+sublabel+'</div>' +
+      '<div style="display:flex;align-items:baseline;gap:5px">' +
+        '<div id="'+id+'" style="font-size:32px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22;animation:hudValIn .6s ease-out">—</div>' +
+        (unit?'<span style="font-size:12px;color:'+color+'66;font-weight:600">'+unit+'</span>':'') +
       '</div>' +
     '</div>';
   }
 
-  // Barra de necesidad Maslow con dot de color + label + barra + %
-  function _hNecBar(label, valId, barId, color){
-    return '<div style="padding:5px 14px;border-bottom:1px solid rgba(255,255,255,0.03)">' +
-      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">' +
-        '<div style="width:6px;height:6px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudAccentPulse 3s ease-in-out infinite"></div>' +
-        '<span style="font-size:10px;color:rgba(220,220,240,0.6);flex:1">'+label+'</span>' +
-        '<span id="'+valId+'" style="font-size:10px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums">—</span>' +
+  // Fila stat: label izq + barra central + valor der
+  function _row(label, id, color, barId, emoji){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:6px 18px;border-bottom:1px solid rgba(255,255,255,0.04)">' +
+      '<div style="display:flex;align-items:center;gap:5px;width:105px;flex-shrink:0">' +
+        (emoji?'<span style="font-size:11px">'+emoji+'</span>':'<div style="width:6px;height:6px;border-radius:50%;background:'+color+';box-shadow:0 0 5px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>') +
+        '<span style="font-size:10px;color:rgba(200,208,230,0.42);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>' +
       '</div>' +
-      '<div style="height:2px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden">' +
-        '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'66;transition:width .8s ease;border-radius:1px"></div>' +
+      (barId?'<div style="flex:1;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden"><div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'80;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)"></div></div>':'<div style="flex:1"></div>') +
+      '<span id="'+id+'" style="font-size:12px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;flex-shrink:0;text-shadow:0 0 6px '+color+'55;min-width:60px;text-align:right">—</span>' +
+    '</div>';
+  }
+
+  // Bloque duo (2 valores lado a lado)
+  function _duo(id1,lbl1,c1, id2,lbl2,c2){
+    return '<div style="display:flex;gap:8px;padding:10px 18px 8px">' +
+      '<div style="flex:1;background:'+c1+'10;border:1px solid '+c1+'30;padding:10px 12px;position:relative;overflow:hidden">' +
+        '<div style="position:absolute;top:0;left:0;right:0;height:1px;background:'+c1+';opacity:.5;box-shadow:0 0 6px '+c1+'"></div>' +
+        '<div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:'+c1+'80;margin-bottom:5px">'+lbl1+'</div>' +
+        '<div id="'+id1+'" style="font-size:20px;font-weight:800;color:'+c1+';text-shadow:0 0 14px '+c1+'55;line-height:1">—</div>' +
+      '</div>' +
+      '<div style="flex:1;background:'+c2+'10;border:1px solid '+c2+'30;padding:10px 12px;position:relative;overflow:hidden">' +
+        '<div style="position:absolute;top:0;left:0;right:0;height:1px;background:'+c2+';opacity:.5;box-shadow:0 0 6px '+c2+'"></div>' +
+        '<div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:'+c2+'80;margin-bottom:5px">'+lbl2+'</div>' +
+        '<div id="'+id2+'" style="font-size:20px;font-weight:800;color:'+c2+';text-shadow:0 0 14px '+c2+'55;line-height:1">—</div>' +
       '</div>' +
     '</div>';
   }
 
-  // Botón de navegación neón
-  function _hNavBtn(label, icon, color, fn){
-    var b = document.createElement('button');
-    b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:9px 14px;border:none;'+
-      'border-top:1px solid rgba(140,100,220,0.12);width:100%;cursor:pointer;font-family:inherit;'+
-      'font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;'+
-      'color:'+color+';background:transparent;transition:all .15s;position:relative;overflow:hidden';
+  // Barra de nivel Maslow con dot + nombre + barra + monto
+  function _maslow(label, id, barId, color){
+    return '<div style="padding:5px 18px">' +
+      '<div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">' +
+        '<div style="width:7px;height:7px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>' +
+        '<span style="font-size:10px;color:rgba(220,220,240,0.55);flex:1">'+label+'</span>' +
+        '<span id="'+id+'" style="font-size:11px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+color+'66">—</span>' +
+      '</div>' +
+      '<div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;margin-left:14px">' +
+        '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 5px '+color+'80;border-radius:2px;transition:width .9s cubic-bezier(.4,0,.2,1)"></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // Botón navegación full-width
+  function _nav(label, icon, color, fn){
+    var b = document.createElement('div');
+    b.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 18px;cursor:pointer;transition:background .15s;border-bottom:1px solid rgba(255,255,255,0.04);position:relative;overflow:hidden';
     b.innerHTML =
-      '<div style="width:20px;height:20px;border-radius:5px;background:'+color+'18;border:1px solid '+color+'33;display:flex;align-items:center;justify-content:center;flex-shrink:0">' +
-        '<i class="fas '+icon+'" style="font-size:9px;color:'+color+';filter:drop-shadow(0 0 3px '+color+')"></i>' +
-      '</div>'+label+
-      '<i class="fas fa-chevron-right" style="font-size:8px;color:'+color+'66;margin-left:auto"></i>';
+      '<div style="width:28px;height:28px;border-radius:8px;background:'+color+'15;border:1px solid '+color+'35;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px '+color+'20">' +
+        '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>' +
+      '</div>' +
+      '<span style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.75);flex:1;letter-spacing:.04em">'+label+'</span>' +
+      '<i class="fas fa-chevron-right" style="font-size:9px;color:'+color+'60"></i>';
     b.addEventListener('mouseenter',function(){
-      b.style.background = color + '12';
-      b.style.color = '#fff';
-      b.style.borderTopColor = color + '44';
+      b.style.background = color+'12';
+      b.querySelector('span').style.color = '#fff';
     });
     b.addEventListener('mouseleave',function(){
       b.style.background = 'transparent';
-      b.style.color = color;
-      b.style.borderTopColor = 'rgba(140,100,220,0.12)';
+      b.querySelector('span').style.color = 'rgba(220,220,240,0.75)';
     });
     b.addEventListener('click',function(e){
       e.stopPropagation(); cerrarDial();
@@ -629,281 +629,217 @@ function _crearDialOverlay(){
     return b;
   }
 
-  // ── P1: PATRIMONIO (top-izq) ──
-  // Saldo disponible grande + BBVA/BEATS/Efectivo + Apartados + Fondo emergencia
-  var _p1 = _mkP('hud-patrimonio','','',220);
-  _p1.style.setProperty('--hud-glow','rgba(34,197,94,0.15)');
-  _p1.innerHTML =
-    _hHdr('Patrimonio','#22C55E','fa-landmark') +
-    _hBigVal('_hud-saldo','#22C55E','Disponible hoy') +
-    '<div style="height:1px;background:rgba(34,197,94,0.15);margin:0 14px 4px"></div>' +
-    _hStat('BBVA',   '_hud-bbva',   '#4ADE80','_hud-bbva-bar') +
-    _hStat('BEATS',  '_hud-beats',  '#86EFAC','_hud-beats-bar') +
-    _hStat('Efectivo','_hud-efec',  '#FCD34D',null) +
-    _hStat('Apartados','_hud-apart','#F59E0B',null) +
-    '<div style="padding:6px 14px 10px;border-top:1px solid rgba(34,197,94,0.1)">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-        '<span style="font-size:9px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.1em">Fondo emergencia</span>' +
-        '<span id="_hud-fondo-pct" style="font-size:9px;font-weight:700;color:#22C55E">—</span>' +
-      '</div>' +
-      '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">' +
-        '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 6px rgba(34,197,94,.5);transition:width .8s ease;border-radius:2px"></div>' +
-      '</div>' +
+  // Divisor con label
+  function _div(label){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 18px 4px">' +
+      '<div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(140,100,220,0.25),rgba(140,100,220,0.05))"></div>' +
+      '<span style="font-size:8px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(167,139,250,0.35)">'+label+'</span>' +
+      '<div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(140,100,220,0.05),rgba(140,100,220,0.25))"></div>' +
     '</div>';
-  _p1.appendChild(_hNavBtn('Ver Patrimonio','fa-landmark','#22C55E','irABitacora'));
-  _hudPanels.push({el:_p1});
+  }
 
-  // ── P2: FINANCIERO (top-der) ──
-  // Excedente grande + Ingresos/Egresos/Ahorro% + Runway + Proyección
-  var _p2 = _mkP('hud-financiero','','',240);
-  _p2.style.setProperty('--hud-glow','rgba(34,211,238,0.15)');
-  _p2.innerHTML =
-    _hHdr('Financiero','#22D3EE','fa-chart-line') +
-    _hBigVal('_hud-fin-exc','#22D3EE','Excedente del mes') +
-    '<div style="display:flex;gap:0;border-top:1px solid rgba(34,211,238,0.12);border-bottom:1px solid rgba(34,211,238,0.12);margin:4px 0">' +
-      '<div style="flex:1;padding:7px 14px;border-right:1px solid rgba(255,255,255,0.05)">' +
-        '<div style="font-size:8px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Ingresos</div>' +
-        '<div id="_hud-fin-ing" style="font-size:14px;font-weight:700;color:#22C55E;text-shadow:0 0 8px rgba(34,197,94,.5)">—</div>' +
+  // ══════════════════════════════════════
+  //  PANEL IZQUIERDO — Patrimonio + Necesidades + Bitácora
+  // ══════════════════════════════════════
+  var _pLeft = _mkHudPanel('hud-left','left');
+  _pLeft.style.setProperty('--hud-glow','rgba(34,197,94,0.14)');
+
+  // Construir HTML del panel izquierdo
+  var leftHTML =
+    // ── PATRIMONIO ──
+    _sec('Patrimonio','#22C55E','fa-landmark') +
+    _hero('_hud-saldo','#22C55E','Disponible hoy') +
+    // Barra de fondo emergencia
+    '<div style="padding:0 18px 10px">' +
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px">' +
+        '<span style="font-size:9px;color:rgba(200,208,230,0.30);text-transform:uppercase;letter-spacing:.10em">Fondo emergencia</span>' +
+        '<span id="_hud-fondo-pct" style="font-size:9px;font-weight:700;color:#22C55E;text-shadow:0 0 6px rgba(34,197,94,.5)">—</span>' +
       '</div>' +
-      '<div style="flex:1;padding:7px 14px">' +
-        '<div style="font-size:8px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Egresos</div>' +
-        '<div id="_hud-fin-egr" style="font-size:14px;font-weight:700;color:#EF4444;text-shadow:0 0 8px rgba(239,68,68,.5)">—</div>' +
+      '<div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">' +
+        '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(34,197,94,.5);border-radius:2px;transition:width .8s ease"></div>' +
       '</div>' +
     '</div>' +
-    _hStat('Ahorro %','_hud-fin-aho','#FACC15','_hud-aho-bar') +
-    _hStat('Runway','_hud-runway','#22D3EE',null) +
-    _hStat('Gasto/día','_hud-gastoDia','#A78BFA',null);
-  _p2.appendChild(_hNavBtn('Ver Financiero','fa-chart-line','#22D3EE',''));
-  _hudPanels.push({el:_p2});
+    _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','🏦') +
+    _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
+    _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
+    _row('Apartados','_hud-apart', '#F59E0B',null,'🔒') +
 
-  // ── P3: NECESIDADES (mid-izq) ──
-  // 5 niveles con barra de progreso + % de cada uno
-  var _p3 = _mkP('hud-necesidades','','',220);
-  _p3.style.setProperty('--hud-glow','rgba(168,85,247,0.15)');
-  _p3.innerHTML =
-    _hHdr('Necesidades','#A855F7','fa-layer-group') +
-    _hNecBar('Fisiológicas',  '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
-    _hNecBar('Seguridad',     '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
-    _hNecBar('Afiliación',    '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
-    _hNecBar('Reconocimiento','_hud-nec-4','_hud-nec-4-bar','#A855F7') +
-    _hNecBar('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E');
-  _p3.appendChild(_hNavBtn('Ver Necesidades','fa-layer-group','#A855F7','irABitacora'));
-  _hudPanels.push({el:_p3});
+    // ── NECESIDADES ──
+    _div('') +
+    _sec('Necesidades','#A855F7','fa-layer-group') +
+    _maslow('Fisiológicas',  '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
+    _maslow('Seguridad',     '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
+    _maslow('Afiliación',    '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
+    _maslow('Reconocimiento','_hud-nec-4','_hud-nec-4-bar','#A855F7') +
+    _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E') +
 
-  // ── P4: ACTIVITY + LOGROS (mid-der) ──
-  // Dual hábitos/logros + racha con barra + Activity/Logros nav
-  var _p4 = _mkP('hud-activity','','',240);
-  _p4.style.setProperty('--hud-glow','rgba(251,146,60,0.15)');
-  _p4.innerHTML =
-    _hHdr('Activity + Logros','#FB923C','fa-bolt') +
-    _hDual('_hud-act-done','Hábitos','#FB923C','_hud-lgr-done','Logros','#FACC15') +
-    '<div style="padding:5px 14px 8px;border-top:1px solid rgba(251,146,60,0.12)">' +
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">' +
-        '<div style="display:flex;align-items:center;gap:5px">' +
-          '<i class="fas fa-fire" style="font-size:10px;color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>' +
-          '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(200,208,230,0.45)">Racha</span>' +
+    // ── BITÁCORA ──
+    _div('') +
+    _sec('Bitácora','#C084FC','fa-book-open') +
+    _row('Pensamientos', '_hud-pens','#C084FC',null,'💭') +
+    _row('Relaciones',   '_hud-rels','#EC4899',null,'👥') +
+    _row('Salud',        '_hud-sal', '#EF4444',null,'❤️') +
+    _row('Entrenamiento','_hud-ent', '#FB923C',null,'💪');
+
+  _pLeft.innerHTML = leftHTML;
+  _pLeft.appendChild(_nav('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
+  _pLeft.appendChild(_nav('Ver Necesidades','fa-layer-group','#A855F7','irABitacora'));
+
+  // ══════════════════════════════════════
+  //  PANEL DERECHO — Financiero + Activity/Logros + Navegación
+  // ══════════════════════════════════════
+  var _pRight = _mkHudPanel('hud-right','right');
+  _pRight.style.setProperty('--hud-glow','rgba(34,211,238,0.14)');
+
+  var rightHTML =
+    // ── FINANCIERO ──
+    _sec('Financiero','#22D3EE','fa-chart-line') +
+    _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
+    _duo('_hud-fin-ing','Ingresos','#22C55E', '_hud-fin-egr','Egresos','#EF4444') +
+    _row('Ahorro %',  '_hud-fin-aho', '#FACC15','_hud-aho-bar',null) +
+    _row('Runway',    '_hud-runway',  '#22D3EE',null,'🛫') +
+    _row('Gasto/día', '_hud-gastoDia','#A78BFA',null,'📊') +
+
+    // ── ACTIVITY + LOGROS ──
+    _div('') +
+    _sec('Activity + Logros','#FB923C','fa-bolt') +
+    _duo('_hud-act-done','Hábitos hoy','#FB923C', '_hud-lgr-done','Logros','#FACC15') +
+    // Racha con barra
+    '<div style="padding:6px 18px 10px">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<i class="fas fa-fire" style="font-size:13px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>' +
+          '<span style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(200,208,230,0.35)">Racha</span>' +
         '</div>' +
-        '<span id="_hud-racha" style="font-size:13px;font-weight:800;color:#FB923C;text-shadow:0 0 8px rgba(251,146,60,.6)">—</span>' +
+        '<span id="_hud-racha" style="font-size:16px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">—</span>' +
       '</div>' +
-      '<div style="height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden">' +
-        '<div id="_hud-racha-bar" style="height:100%;width:30%;background:linear-gradient(90deg,#FB923C,#FBBF24);box-shadow:0 0 6px rgba(251,146,60,.5);border-radius:2px"></div>' +
+      '<div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden">' +
+        '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:2px"></div>' +
       '</div>' +
-    '</div>';
-  _p4.appendChild(_hNavBtn('Activity','fa-bolt','#FB923C','irAActivity'));
-  _p4.appendChild(_hNavBtn('Logros','fa-trophy','#FACC15','irALogros'));
-  _hudPanels.push({el:_p4});
+    '</div>' +
 
-  // ── P5: BITÁCORA (bot-izq) ──
-  // Pensamientos/Relaciones/Salud/Entrenamiento con conteo real
-  var _p5 = _mkP('hud-bitacora','','',220);
-  _p5.style.setProperty('--hud-glow','rgba(192,132,252,0.15)');
-  _p5.innerHTML =
-    _hHdr('Bitácora','#C084FC','fa-book-open') +
-    _hStat('💭 Pensamientos', '_hud-pens', '#C084FC', null) +
-    _hStat('👥 Relaciones',   '_hud-rels', '#EC4899', null) +
-    _hStat('❤️ Salud',        '_hud-sal',  '#EF4444', null) +
-    _hStat('💪 Entrenamiento','_hud-ent',  '#FB923C', null);
-  _p5.appendChild(_hNavBtn('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
-  _hudPanels.push({el:_p5});
+    // ── NAVEGACIÓN ──
+    _div('');
 
-  // ── P6: NAVEGACIÓN (bot-der) ──
-  // Accesos directos dinámicos con estilo neón
-  var _p6 = _mkP('hud-nav','','',230);
-  _p6.style.setProperty('--hud-glow','rgba(167,139,250,0.12)');
-  _p6.innerHTML = _hHdr('Navegación','#A78BFA','fa-compass');
+  _pRight.innerHTML = rightHTML;
+
+  // Nav links
   [
-    {label:'Activity',   icon:'fa-bolt',         fn:'irAActivity',  color:'#FB923C'},
-    {label:'Logros',     icon:'fa-trophy',        fn:'irALogros',    color:'#FACC15'},
-    {label:'Nutrición',  icon:'fa-leaf',          fn:'irANutricion', color:'#4ADE80'},
-    {label:'Bitácora',   icon:'fa-book-open',     fn:'irABitacora',  color:'#C084FC'},
-    {label:'RAW Sheet',  icon:'fa-table',         fn:'irASheets',    color:'#A5B4FC'},
-    {label:'Actualizar', icon:'fa-rotate-right',  fn:'refreshTodo',  color:'#94A3B8'},
-  ].forEach(function(nav){ _p6.appendChild(_hNavBtn(nav.label, nav.icon, nav.color, nav.fn)); });
-  _hudPanels.push({el:_p6});
+    {label:'Activity Check', icon:'fa-bolt',        fn:'irAActivity',  color:'#FB923C'},
+    {label:'Logros',         icon:'fa-trophy',       fn:'irALogros',    color:'#FACC15'},
+    {label:'Nutrición',      icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
+    {label:'Bitácora',       icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
+    {label:'RAW Sheet',      icon:'fa-table',        fn:'irASheets',    color:'#A5B4FC'},
+    {label:'Actualizar',     icon:'fa-rotate-right', fn:'refreshTodo',  color:'#64748B'},
+  ].forEach(function(n){ _pRight.appendChild(_nav(n.label, n.icon, n.color, n.fn)); });
+
+  // Registrar ambos panels
+  var _hudPanels = [{el:_pLeft},{el:_pRight}];
 
   // Canvas al overlay, panels al body
   _dialOverlay.appendChild(_dialCanvas);
   document.body.appendChild(_dialOverlay);
   _hudPanels.forEach(function(hp){ document.body.appendChild(hp.el); });
 
-
   window._hudPanels = _hudPanels;
-  var _navPanel = _p6;
+  var _navPanel = _pRight;
 
-  // ── Actualizar paneles con datos reales del API ──
+  // ── Actualizar paneles con datos reales ──
   window._refrescarEspejos = function(datos){
-    function fmt(v,abs){
+    function fmt(v){
       if(v===null||v===undefined||v==='') return '—';
       var n=Number(v); if(isNaN(n)) return String(v);
-      var s = abs ? Math.abs(n) : n;
-      return '$ '+Math.abs(s).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
+      return '$ '+Math.abs(n).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
     }
     function fmt2(v){ if(v===null||v===undefined||v==='') return '—'; var n=Number(v); if(isNaN(n)) return '—'; return '$ '+Math.abs(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-    function pct(v){ return (v!==null&&v!==undefined&&!isNaN(Number(v))) ? Math.round(Number(v))+'%' : '—'; }
-    function set(id,v){ var e=document.getElementById(id); if(e && v!==undefined) { e.textContent=v; } }
-    function setBar(id,pctV){
-      var e=document.getElementById(id);
-      if(e) { var w=Math.min(100,Math.max(0,parseFloat(pctV)||0)); e.style.width=w+'%'; }
-    }
+    function set(id,v){ var e=document.getElementById(id); if(e&&v!==undefined&&v!==null) e.textContent=v; }
+    function setW(id,pct){ var e=document.getElementById(id); if(e){ e.style.width=Math.min(100,Math.max(0,parseFloat(pct)||0))+'%'; } }
 
     var d = datos || window._hudDatos || {};
 
-    // ── P1: Patrimonio ──
-    // Saldo del DOM (ya calculado por renderPatrimonio/renderEntes)
+    // Patrimonio
     var sv = document.getElementById('saldo-val');
-    if(sv && sv.textContent && sv.textContent!=='…') set('_hud-saldo', sv.textContent);
+    if(sv && sv.textContent && sv.textContent.trim()!=='...') set('_hud-saldo', sv.textContent.trim());
 
-    // BBVA / BEATS — leer de _fijosData
     var fijos = window._fijosData || [];
-    var maxFijo = fijos.reduce(function(m,f){ return f.nombre!=='P'?(m.monto||0)+(f.monto||0):m; }, 0);
-    var totalFijos = 0;
+    var maxMonto = fijos.reduce(function(m,f){ return f.nombre!=='P'?Math.max(m,Math.abs(f.monto||0)):m; },1);
+    var bbvaSet=false, beatsSet=false;
     fijos.forEach(function(fi){
       if(fi.nombre==='P') return;
-      totalFijos += (fi.monto||0);
-      if(fi.nombre.indexOf('BBVA')>=0||fi.nombre.toLowerCase().indexOf('bbva')>=0){
+      var nl = (fi.nombre||'').toLowerCase();
+      if(!bbvaSet && (nl.indexOf('bbva')>=0||nl.indexOf('banco')>=0||nl.indexOf('santan')>=0)){
         set('_hud-bbva', fmt2(fi.monto));
-        setBar('_hud-bbva-bar', maxFijo>0?(fi.monto||0)/maxFijo*100:0);
-      }
-      if(fi.nombre.indexOf('BEATS')>=0||fi.nombre.toLowerCase().indexOf('beats')>=0){
+        setW('_hud-bbva-bar', Math.abs(fi.monto||0)/maxMonto*100);
+        bbvaSet=true;
+      } else if(!beatsSet && (nl.indexOf('beats')>=0||nl.indexOf('nu')>=0||nl.indexOf('hey')>=0||nl.indexOf('spin')>=0)){
         set('_hud-beats', fmt2(fi.monto));
-        setBar('_hud-beats-bar', maxFijo>0?(fi.monto||0)/maxFijo*100:0);
-      }
-    });
-    // Si no encontró BBVA/BEATS específicos, mostrar primeros 2 bancos
-    var bancos = fijos.filter(function(f){ return f.nombre!=='P'; });
-    if(bancos.length>0 && !document.getElementById('_hud-bbva').textContent.replace('—','').trim()){
-      set('_hud-bbva', fmt2(bancos[0].monto));
-    }
-    if(bancos.length>1 && !document.getElementById('_hud-beats').textContent.replace('—','').trim()){
-      set('_hud-beats', fmt2(bancos[1].monto));
-    }
-
-    // Apartados
-    set('_hud-apart', fmt(d.totalApartado || ((window._apartadosData||[]).reduce(function(s,a){ return s+(a.estado&&a.estado.toLowerCase()==='usado'?0:(a.monto||0)); },0))));
-
-    // Efectivo — si hay en _fijosData
-    fijos.forEach(function(fi){
-      if(fi.nombre.toLowerCase().indexOf('efectivo')>=0||fi.nombre.toLowerCase().indexOf('cash')>=0){
+        setW('_hud-beats-bar', Math.abs(fi.monto||0)/maxMonto*100);
+        beatsSet=true;
+      } else if(nl.indexOf('efectivo')>=0||nl.indexOf('cash')>=0){
         set('_hud-efec', fmt2(fi.monto));
       }
     });
+    var bancos = fijos.filter(function(f){ return f.nombre!=='P'; });
+    if(!bbvaSet && bancos[0]){ set('_hud-bbva', fmt2(bancos[0].monto)); setW('_hud-bbva-bar', Math.abs(bancos[0].monto||0)/maxMonto*100); }
+    if(!beatsSet && bancos[1]){ set('_hud-beats', fmt2(bancos[1].monto)); setW('_hud-beats-bar', Math.abs(bancos[1].monto||0)/maxMonto*100); }
 
-    // Fondo emergencia desde patrimonio si está disponible
-    var pat = d.patrimonio || {};
-    if(pat.fondo && pat.fondo.avance!=null){
-      set('_hud-fondo-pct', pat.fondo.avance+'%');
-      setBar('_hud-fondo-bar', pat.fondo.avance);
+    var totalAp = (window._apartadosData||[]).reduce(function(s,a){
+      return a.estado&&a.estado.toLowerCase()==='usado'?s:s+(a.monto||0);
+    },0);
+    set('_hud-apart', fmt(d.totalApartado || totalAp));
+
+    if(window._patrimonioData && window._patrimonioData.fondo){
+      set('_hud-fondo-pct', (window._patrimonioData.fondo.avance||0)+'%');
+      setW('_hud-fondo-bar', window._patrimonioData.fondo.avance||0);
     }
 
-    // ── P2: Financiero ──
-    var fin = d.financiero || {};
-    var mes = fin.mes || {};
-    var met = fin.metricas || {};
-    // Leer desde DOM si están disponibles
-    var excEl = document.getElementById('_hud-fin-exc');
-    var excDom = null;
-    // Desde _finData si existe
-    if(window._finData && window._finData.mes){
-      var m = window._finData.mes;
-      set('_hud-fin-exc', fmt(m.excedente));
-      set('_hud-fin-ing', fmt(m.ingresos));
-      set('_hud-fin-egr', fmt(m.egresos,true));
-      var aho = window._finData.metricas && window._finData.metricas.porcentajeAhorro;
+    // Financiero
+    var finD = window._finData;
+    if(finD && finD.mes){
+      set('_hud-fin-exc', fmt(finD.mes.excedente));
+      set('_hud-fin-ing', fmt(finD.mes.ingresos));
+      set('_hud-fin-egr', fmt(finD.mes.egresos));
+      var aho = finD.metricas && finD.metricas.porcentajeAhorro;
       set('_hud-fin-aho', aho!=null ? Math.round(aho)+'%' : '—');
-      setBar('_hud-aho-bar', aho!=null ? Math.min(100,Math.max(0,aho)) : 0);
-      var run = window._finData.metricas && window._finData.metricas.runwayDias;
-      set('_hud-runway', run!=null ? run+' días' : '—');
-      var gd = window._finData.metricas && window._finData.metricas.gastoPorDiaPromedio;
-      set('_hud-gastoDia', gd!=null ? fmt(gd) : '—');
-    } else {
-      // Fallback desde d.financiero
-      set('_hud-fin-exc', fmt(mes.excedente || fin.excedente));
-      set('_hud-fin-ing', fmt(mes.ingresos  || fin.ingresos));
-      set('_hud-fin-egr', fmt(mes.egresos   || fin.egresos, true));
-      set('_hud-fin-aho', pct(met.porcentajeAhorro || fin.tasaAhorro));
-      set('_hud-runway',  met.runwayDias!=null ? met.runwayDias+' días' : '—');
-      set('_hud-gastoDia', fmt(met.gastoPorDiaPromedio));
+      setW('_hud-aho-bar', Math.min(100,Math.max(0,aho||0)));
+      var run = finD.metricas && finD.metricas.runwayDias;
+      set('_hud-runway', run!=null ? run+' dias' : '—');
+      var gd = finD.metricas && finD.metricas.gastoPorDiaPromedio;
+      set('_hud-gastoDia', gd ? fmt(gd) : '—');
     }
 
-    // ── P3: Necesidades ──
+    // Necesidades
     var nec = d.necesidades || {};
     var niveles = nec.niveles || [];
-    // Calcular total para porcentajes
-    var totalNec = 0;
-    niveles.forEach(function(n){ totalNec += Math.abs(n.total||0); });
+    var totalNec = niveles.reduce(function(s,n){ return s+Math.abs(n.total||0); },0);
     [1,2,3,4,5].forEach(function(n){
       var nv = niveles[n-1] || {total:0};
       var abs = Math.abs(nv.total||0);
-      var pctV = totalNec>0 ? Math.round(abs/totalNec*100) : 0;
-      // Mostrar monto si hay, si no el %
       set('_hud-nec-'+n, abs>0 ? fmt(abs) : '—');
-      setBar('_hud-nec-'+n+'-bar', pctV);
+      setW('_hud-nec-'+n+'-bar', totalNec>0 ? abs/totalNec*100 : 0);
     });
 
-    // ── P4: Activity + Logros ──
+    // Activity + Logros
     if(window._actData){
       var a = window._actData;
-      var totH = (a.habitosPersonal||[]).length + (a.habitosElectronics||[]).length;
-      var doneH = (a.habitosPersonal||[]).filter(function(h){
-        return h.checks && Object.values(h.checks).some(Boolean);
-      }).length + (a.habitosElectronics||[]).filter(function(h){
-        return h.checks && Object.values(h.checks).some(Boolean);
-      }).length;
+      var totH = (a.habitosPersonal||[]).length+(a.habitosElectronics||[]).length;
+      var doneH = (a.habitosPersonal||[]).filter(function(h){ return h.checks&&Object.values(h.checks).some(Boolean); }).length +
+                  (a.habitosElectronics||[]).filter(function(h){ return h.checks&&Object.values(h.checks).some(Boolean); }).length;
       set('_hud-act-done', doneH+'/'+totH);
     }
     if(window._logrosData){
-      var items = window._logrosData.items || [];
-      var done  = items.filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length;
-      set('_hud-lgr-done', done+'/'+items.length);
+      var items = window._logrosData.items||[];
+      var doneL = items.filter(function(l){ return l.completado==='Si'||l.completado==='Si'||l.completado===true; }).length;
+      set('_hud-lgr-done', doneL+'/'+items.length);
     }
-    // Racha — leer del DOM si está
-    var rv = document.getElementById('racha-val') || document.querySelector('[id*="racha"]');
-    if(rv && rv.textContent && rv.textContent.trim()!=='—') set('_hud-racha', rv.textContent.trim());
-    else set('_hud-racha', '—');
 
-    // ── P5: Bitácora ──
-    var pens = document.querySelectorAll('#pensamientos-body .pens-item,[id="pensamientos-body"] > div');
-    set('_hud-pens', pens.length ? pens.length+' registros' : '—');
-    var rels = document.querySelectorAll('#relaciones-body .rel-item');
-    set('_hud-rels', rels.length ? rels.length+' personas' : '—');
-    var sals = document.querySelectorAll('#salud-body .salud-item');
-    set('_hud-sal',  sals.length ? sals.length+' registros' : '—');
-    var ents = document.querySelectorAll('#entrenamiento-body [class*="item"]');
-    set('_hud-ent',  ents.length ? ents.length+' sesiones' : '—');
-
-    // Fallback desde datos si DOM no tiene nada
-    if(window._pensamientosData && window._pensamientosData.items){
-      var p = window._pensamientosData.items.length;
-      if(p) set('_hud-pens', p+' pensamientos');
-    }
-    if(window._relacionesData && window._relacionesData.items){
-      var r = window._relacionesData.items.length;
-      if(r) set('_hud-rels', r+' personas');
-    }
+    // Bitacora
+    if(window._pensamientosData && window._pensamientosData.items)
+      set('_hud-pens', window._pensamientosData.items.length+' pensamientos');
+    if(window._relacionesData && window._relacionesData.items)
+      set('_hud-rels', window._relacionesData.items.length+' personas');
   };
-
-    window._hudPanels = _hudPanels;
-  var _navPanel = _hudPanels[5].el;
+  
 
 
   _dialOverlay.addEventListener('click',function(e){ if(e.target===_dialOverlay) cerrarDial(); });
@@ -1772,7 +1708,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       api.getRelaciones().then(r=>{ if(typeof renderRelaciones==='function') renderRelaciones(r); }).catch(()=>{});
       api.getSalud().then(r=>{ if(typeof renderSalud==='function') renderSalud(r); }).catch(()=>{});
       if(typeof cargarScore==='function') cargarScore();
-      api.getPatrimonio().then(r=>{ if(typeof renderPatrimonio==='function') renderPatrimonio(r); }).catch(()=>{});
+      api.getPatrimonio().then(r=>{ window._patrimonioData=r; if(typeof renderPatrimonio==='function') renderPatrimonio(r); }).catch(()=>{});
       if(typeof cargarRevision==='function') cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
       // Pasar datos directamente a los paneles HUD
       window._hudDatos = {
@@ -2988,4 +2924,112 @@ document.addEventListener('DOMContentLoaded', function(){
     };
   }
 
-});
+});  window._refrescarEspejos = function(datos){
+    function fmt(v){
+      if(v===null||v===undefined||v==='') return '—';
+      var n=Number(v); if(isNaN(n)) return String(v);
+      return '$ '+Math.abs(n).toLocaleString('es-MX',{minimumFractionDigits:0,maximumFractionDigits:0});
+    }
+    function fmt2(v){ if(v===null||v===undefined||v==='') return '—'; var n=Number(v); if(isNaN(n)) return '—'; return '$ '+Math.abs(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+    function set(id,v){ var e=document.getElementById(id); if(e&&v!==undefined&&v!==null) e.textContent=v; }
+    function setW(id,pct){ var e=document.getElementById(id); if(e){ e.style.width=Math.min(100,Math.max(0,parseFloat(pct)||0))+'%'; } }
+
+    var d = datos || window._hudDatos || {};
+
+    // ── Patrimonio ──
+    var sv = document.getElementById('saldo-val');
+    if(sv && sv.textContent && sv.textContent.replace(/[—\s]/,'')) set('_hud-saldo', sv.textContent.trim());
+
+    var fijos = window._fijosData || [];
+    var maxMonto = fijos.reduce(function(m,f){ return f.nombre!=='P'?Math.max(m,Math.abs(f.monto||0)):m; },1);
+    var bbvaSet=false, beatsSet=false;
+    fijos.forEach(function(fi){
+      if(fi.nombre==='P') return;
+      var nl = (fi.nombre||'').toLowerCase();
+      if(!bbvaSet && (nl.indexOf('bbva')>=0||nl.indexOf('banco')>=0)){
+        set('_hud-bbva', fmt2(fi.monto));
+        setW('_hud-bbva-bar', Math.abs(fi.monto||0)/maxMonto*100);
+        bbvaSet=true;
+      } else if(!beatsSet && (nl.indexOf('beats')>=0||nl.indexOf('nu')>=0||nl.indexOf('hey')>=0||nl.indexOf('spin')>=0)){
+        set('_hud-beats', fmt2(fi.monto));
+        setW('_hud-beats-bar', Math.abs(fi.monto||0)/maxMonto*100);
+        beatsSet=true;
+      } else if(nl.indexOf('efectivo')>=0||nl.indexOf('cash')>=0||nl.indexOf('billetera')>=0){
+        set('_hud-efec', fmt2(fi.monto));
+      }
+    });
+    // Fallback: primeros 2 bancos si no se encontraron por nombre
+    var bancos = fijos.filter(function(f){ return f.nombre!=='P'; });
+    if(!bbvaSet && bancos[0]){ set('_hud-bbva', fmt2(bancos[0].monto)); setW('_hud-bbva-bar', Math.abs(bancos[0].monto||0)/maxMonto*100); }
+    if(!beatsSet && bancos[1]){ set('_hud-beats', fmt2(bancos[1].monto)); setW('_hud-beats-bar', Math.abs(bancos[1].monto||0)/maxMonto*100); }
+
+    var totalAp = (window._apartadosData||[]).reduce(function(s,a){
+      return a.estado&&a.estado.toLowerCase()==='usado'?s:s+(a.monto||0);
+    },0);
+    set('_hud-apart', fmt(d.totalApartado || totalAp));
+
+    // Fondo emergencia desde patrimonio
+    if(window._patrimonioData && window._patrimonioData.fondo){
+      var fondo = window._patrimonioData.fondo;
+      set('_hud-fondo-pct', (fondo.avance||0)+'%');
+      setW('_hud-fondo-bar', fondo.avance||0);
+    }
+
+    // ── Financiero ──
+    var finD = window._finData;
+    if(finD && finD.mes){
+      set('_hud-fin-exc', fmt(finD.mes.excedente));
+      set('_hud-fin-ing', fmt(finD.mes.ingresos));
+      set('_hud-fin-egr', fmt(finD.mes.egresos));
+      var aho = finD.metricas && finD.metricas.porcentajeAhorro;
+      set('_hud-fin-aho', aho!=null ? Math.round(aho)+'%' : '—');
+      setW('_hud-aho-bar', Math.min(100,Math.max(0,aho||0)));
+      var run = finD.metricas && finD.metricas.runwayDias;
+      set('_hud-runway', run!=null ? run+' días' : '—');
+      var gd = finD.metricas && finD.metricas.gastoPorDiaPromedio;
+      set('_hud-gastoDia', gd ? fmt(gd) : '—');
+    }
+
+    // ── Necesidades ──
+    var nec = d.necesidades || {};
+    var niveles = nec.niveles || [];
+    var totalNec = niveles.reduce(function(s,n){ return s+Math.abs(n.total||0); },0);
+    [1,2,3,4,5].forEach(function(n){
+      var nv = niveles[n-1] || {total:0};
+      var abs = Math.abs(nv.total||0);
+      set('_hud-nec-'+n, abs>0 ? fmt(abs) : '—');
+      setW('_hud-nec-'+n+'-bar', totalNec>0 ? abs/totalNec*100 : 0);
+    });
+
+    // ── Activity + Logros ──
+    if(window._actData){
+      var a = window._actData;
+      var totH = (a.habitosPersonal||[]).length+(a.habitosElectronics||[]).length;
+      var doneH = (a.habitosPersonal||[]).filter(function(h){ return h.checks&&Object.values(h.checks).some(Boolean); }).length +
+                  (a.habitosElectronics||[]).filter(function(h){ return h.checks&&Object.values(h.checks).some(Boolean); }).length;
+      set('_hud-act-done', doneH+'/'+totH);
+    }
+    if(window._logrosData){
+      var items = window._logrosData.items||[];
+      var doneL = items.filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length;
+      set('_hud-lgr-done', doneL+'/'+items.length);
+    }
+    // Racha
+    var rv = document.querySelector('#_hud-racha');
+    if(rv && rv.textContent==='—') set('_hud-racha', '—');
+
+    // ── Bitácora — contar desde datos si DOM vacío ──
+    if(window._pensamientosData && window._pensamientosData.items){
+      set('_hud-pens', window._pensamientosData.items.length+' pensamientos');
+    } else {
+      var pEl = document.querySelectorAll('#pensamientos-body > div');
+      if(pEl.length) set('_hud-pens', pEl.length+' registros');
+    }
+    if(window._relacionesData && window._relacionesData.items){
+      set('_hud-rels', window._relacionesData.items.length+' personas');
+    }
+    var salEl = document.querySelectorAll('#salud-body .salud-item');
+    if(salEl.length) set('_hud-sal', salEl.length+' registros');
+    var entEl = document.querySelectorAll('#entrenamiento-body > div');
+    if(entEl.length) set('_hud-ent', entEl.length+' sesiones');
+  };
