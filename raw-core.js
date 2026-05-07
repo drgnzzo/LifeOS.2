@@ -397,8 +397,47 @@ function _crearDialOverlay(){
     p.style.width   = w + 'px';
     p.style.maxHeight = '310px';
     p.style.overflowY = 'auto';
+    // Guardar offsets para reposicionamiento dinámico
+    p._posTop  = top;
+    p._posLeft = left;
     return p;
   }
+
+  // Reposicionar paneles respecto al canvas real en pantalla
+  function _reposicionarHUD(){
+    if(!_dialCanvas || !window._hudPanels) return;
+    var r = _dialCanvas.getBoundingClientRect();
+    var cx = r.left + r.width/2;   // centro X del canvas en pantalla
+    var cy = r.top  + r.height/2;  // centro Y del canvas en pantalla
+    var hw = r.width/2;            // mitad del ancho del canvas
+    var GAP = 18;                  // espacio entre canvas y panel
+
+    var positions = [
+      // [panelIndex, xFactor, yOffset, ancho]
+      // xFactor: -1=izquierda, +1=derecha
+      // yOffset: offset desde el centro Y
+      {i:0, side:-1, yOff:-230, w:200}, // Patrimonio   top-izq
+      {i:1, side: 1, yOff:-230, w:220}, // Financiero   top-der
+      {i:2, side:-1, yOff: -60, w:200}, // Necesidades  mid-izq
+      {i:3, side: 1, yOff: -60, w:220}, // Activity     mid-der
+      {i:4, side:-1, yOff: 130, w:200}, // Bitácora     bot-izq
+      {i:5, side: 1, yOff: 130, w:210}, // Navegación   bot-der
+    ];
+
+    positions.forEach(function(pos){
+      var hp = window._hudPanels[pos.i];
+      if(!hp || !hp.el) return;
+      var panelW = pos.w;
+      var x = pos.side === -1
+        ? cx - hw - GAP - panelW  // izquierda del canvas
+        : cx + hw + GAP;           // derecha del canvas
+      var y = cy + pos.yOff;
+      hp.el.style.left = Math.max(8, x) + 'px';
+      hp.el.style.top  = Math.max(8, y) + 'px';
+      hp.el.style.width = panelW + 'px';
+    });
+  }
+  window._reposicionarHUD = _reposicionarHUD;
 
   function _hTitle(label, color, icon){
     return '<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 9px;border-bottom:1px solid rgba(140,100,220,0.18);flex-shrink:0">' +
@@ -438,7 +477,7 @@ function _crearDialOverlay(){
   // Bot row:   top = calc(50% + 140px)
 
   // P1 TOP-LEFT — Patrimonio
-  var _p1 = _mkP('hud-patrimonio','calc(50% - 300px)','calc(50% - min(505px,61vw))',210);
+  var _p1 = _mkP('hud-patrimonio','calc(50% - min(470px,56vw))','calc(50% - min(500px,60vw))',200);
   _p1.innerHTML = _hTitle('Patrimonio','#22C55E','fa-landmark') +
     '<div style="padding:10px 14px 6px">' +
       '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Disponible hoy</div>' +
@@ -450,7 +489,7 @@ function _crearDialOverlay(){
   _hudPanels.push({el:_p1});
 
   // P2 TOP-RIGHT — Financiero
-  var _p2 = _mkP('hud-financiero','calc(50% - 300px)','calc(50% + min(265px,32vw))',230);
+  var _p2 = _mkP('hud-financiero','calc(50% - min(470px,56vw))','calc(50% + min(260px,31vw))',220);
   _p2.innerHTML = _hTitle('Financiero','#22D3EE','fa-chart-line') +
     '<div style="padding:10px 14px 6px">' +
       '<div style="font-size:9px;color:#7A8499;font-weight:600;text-transform:uppercase;letter-spacing:.10em;margin-bottom:3px">Excedente del mes</div>' +
@@ -463,7 +502,7 @@ function _crearDialOverlay(){
   _hudPanels.push({el:_p2});
 
   // P3 MID-LEFT — Necesidades
-  var _p3 = _mkP('hud-necesidades','calc(50% - 80px)','calc(50% - min(505px,61vw))',210);
+  var _p3 = _mkP('hud-necesidades','calc(50% - min(140px,17vw))','calc(50% - min(500px,60vw))',200);
   _p3.innerHTML = _hTitle('Necesidades','#A855F7','fa-layer-group') +
     _hRow('Fisiológicas','_hud-nec-1','#EF4444') +
     _hRow('Seguridad','_hud-nec-2','#F59E0B') +
@@ -474,7 +513,7 @@ function _crearDialOverlay(){
   _hudPanels.push({el:_p3});
 
   // P4 MID-RIGHT — Activity + Logros
-  var _p4 = _mkP('hud-activity','calc(50% - 80px)','calc(50% + min(265px,32vw))',230);
+  var _p4 = _mkP('hud-activity','calc(50% - min(140px,17vw))','calc(50% + min(260px,31vw))',220);
   _p4.innerHTML = _hTitle('Activity + Logros','#FB923C','fa-bolt') +
     '<div style="padding:10px 14px 8px">' +
       '<div style="font-size:9px;color:#7A8499;text-transform:uppercase;letter-spacing:.10em;margin-bottom:8px">Hoy</div>' +
@@ -495,7 +534,7 @@ function _crearDialOverlay(){
   _hudPanels.push({el:_p4});
 
   // P5 BOT-LEFT — Bitácora
-  var _p5 = _mkP('hud-bitacora','calc(50% + 140px)','calc(50% - min(505px,61vw))',210);
+  var _p5 = _mkP('hud-bitacora','calc(50% + min(200px,24vw))','calc(50% - min(500px,60vw))',200);
   _p5.innerHTML = _hTitle('Bitácora','#C084FC','fa-book-open') +
     _hRow('Pensamientos','_hud-pens','#C8D0E0') +
     _hRow('Relaciones','_hud-rels','#EC4899') +
@@ -505,7 +544,7 @@ function _crearDialOverlay(){
   _hudPanels.push({el:_p5});
 
   // P6 BOT-RIGHT — Navegación
-  var _p6 = _mkP('hud-nav','calc(50% + 140px)','calc(50% + min(265px,32vw))',220);
+  var _p6 = _mkP('hud-nav','calc(50% + min(200px,24vw))','calc(50% + min(260px,31vw))',210);
   _p6.innerHTML = _hTitle('Navegación','#A78BFA','fa-compass');
   [
     {label:'Nutrición',  icon:'fa-leaf',         fn:'irANutricion', color:'#86efac'},
@@ -1127,7 +1166,8 @@ function abrirDial(){
     _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
-  // Actualizar paneles HUD al abrir
+  // Posicionar y actualizar paneles HUD al abrir
+  if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
   if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
   if(window._hudPanels && window.innerWidth>=900){
     window._hudPanels.forEach(function(hp, i){
@@ -1382,6 +1422,9 @@ window.addEventListener('DOMContentLoaded',()=>{
     // setTimeout 50ms garantiza que el browser pintó el negro y el canvas opacity:0
     // antes de activar la transición
     setTimeout(function(){
+      // ── Posicionar paneles respecto al canvas real ──
+      if(typeof _reposicionarHUD==='function') _reposicionarHUD();
+
       // ── Fade-in del canvas del dial ──
       _dialCanvas.style.opacity = '1';
 
@@ -1402,6 +1445,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Registrar eventos del dial
   _dialOverlay.addEventListener('click', function(e){
     if(e.target === _dialOverlay) cerrarDial();
+  });
+  // Re-posicionar paneles en resize
+  window.addEventListener('resize', function(){
+    if(_dialVisible && typeof _reposicionarHUD==='function') _reposicionarHUD();
   });
 
   // Patch de cerrarDial: primera vez revela el anverso
