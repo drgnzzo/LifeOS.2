@@ -330,16 +330,18 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(850px,88vw);height:min(850px,88vw);position:relative';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(850px,88vw);height:min(850px,88vw);position:relative;pointer-events:auto;z-index:1';
   _dialCtx = _dialCanvas.getContext('2d');
 
   // Overlay del dial
   _dialOverlay.style.cssText = [
     'position:fixed','inset:0','z-index:9000',
-    'display:none','align-items:center','justify-content:center',
-    'opacity:0',
+    'display:flex','align-items:center','justify-content:center',
+    'opacity:0','pointer-events:none',
     'background:transparent',
   ].join(';');
+  // El canvas maneja sus propios pointer-events
+  // display empieza como flex pero opacity:0 lo hace invisible
 
   // ── Partículas ambientales y glow de breathing ──
   var _glowEl = document.createElement('div');
@@ -514,10 +516,11 @@ function _crearDialOverlay(){
   });
   _hudPanels.push({el:_p6});
 
-  // Montar en el overlay
+  // Canvas va DENTRO del overlay
+  // Paneles HUD van DIRECTAMENTE al body — así no los tapa el overlay
   _dialOverlay.appendChild(_dialCanvas);
-  _hudPanels.forEach(function(hp){ _dialOverlay.appendChild(hp.el); });
   document.body.appendChild(_dialOverlay);
+  _hudPanels.forEach(function(hp){ document.body.appendChild(hp.el); });
 
   window._hudPanels = _hudPanels;
   var _navPanel = _p6;
@@ -1118,6 +1121,7 @@ function abrirDial(){
 
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
+  _dialOverlay.style.pointerEvents = 'auto'; // activar para capturar click-outside
   _dialVisible = true;
   requestAnimationFrame(function(){
     _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
@@ -1143,13 +1147,16 @@ function cerrarDial(){
   // Fade-out: 220ms luego ocultar
   _dialOverlay.style.transition = 'opacity 220ms ease';
   _dialOverlay.style.opacity = '0';
+  _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
   setTimeout(function(){
     if(_dialOverlay && !_dialVisible) _dialOverlay.style.display='none';
-    // Resetear paneles para próxima apertura
-    if(window._hudPanels){ window._hudPanels.forEach(function(hp){ hp.el.style.opacity='0'; hp.el.style.visibility='hidden'; }); }
+    if(window._hudPanels){ window._hudPanels.forEach(function(hp){
+      hp.el.style.opacity='0';
+      hp.el.style.visibility='hidden';
+    }); }
   }, 230);
 }
 
@@ -1354,7 +1361,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   _dialOverlay.style.background = 'transparent';
   _dialOverlay.style.backdropFilter = 'none';
   _dialOverlay.style.webkitBackdropFilter = 'none';
-  _dialOverlay.style.pointerEvents = 'none'; // temporalmente
+  _dialOverlay.style.pointerEvents = 'none'; // empieza inerte
 
   // Canvas invisible ANTES de dibujar — así el browser nunca ve el frame visible
   _dialCanvas.style.opacity = '0';
