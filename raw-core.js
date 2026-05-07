@@ -945,42 +945,64 @@ function _dialHitTest(mx,my,ring){
 // Dibuja un sector con borde iluminado en el arco exterior (efecto 3D de referencia)
 function _dialDrawSector(ctx,startA,endA,rOut,rIn,fill,accent,isActive){
   var dc=_DC;
-  // Fondo del sector
+  // Centroide del sector para el gradiente
+  var midA = (startA+endA)/2;
+  var rMid = rIn + (rOut-rIn)*0.65;
+  var gx   = dc.CX + rMid*Math.cos(midA);
+  var gy   = dc.CY + rMid*Math.sin(midA);
+
+  // Fondo del sector — gradiente radial con tinte del accent
   ctx.beginPath();
   ctx.moveTo(dc.CX+rIn*Math.cos(startA),dc.CY+rIn*Math.sin(startA));
   ctx.arc(dc.CX,dc.CY,rOut,startA,endA);
   ctx.lineTo(dc.CX+rIn*Math.cos(endA),dc.CY+rIn*Math.sin(endA));
   ctx.arc(dc.CX,dc.CY,rIn,endA,startA,true);
   ctx.closePath();
-  ctx.fillStyle=fill; ctx.fill();
-  // Borde lateral (separadores entre sectores)
-  ctx.strokeStyle='rgba(255,255,255,0.10)'; ctx.lineWidth=1; ctx.stroke();
 
-  // Borde exterior iluminado — el efecto "3D" de la referencia
-  var glowA = isActive ? accent : 'rgba(255,255,255,0.28)';
-  var glowW = isActive ? 3.5 : 2;
+  // Gradiente: centro del sector con tinte de color, bordes oscuros
+  var grad = ctx.createRadialGradient(gx, gy, 0, gx, gy, (rOut-rIn)*1.1);
+  // Parsear accent para extraer RGB — fallback a violeta
+  var ar=139,ag=92,ab=246;
+  var m=accent&&accent.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if(m){ ar=parseInt(m[1],16); ag=parseInt(m[2],16); ab=parseInt(m[3],16); }
+  var tint  = isActive ? 0.18 : 0.08;
+  var tint2 = isActive ? 0.06 : 0.02;
+  grad.addColorStop(0,   'rgba('+ar+','+ag+','+ab+','+tint+')');
+  grad.addColorStop(0.5, 'rgba('+ar+','+ag+','+ab+','+tint2+')');
+  grad.addColorStop(1,   fill);
+
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Borde lateral separador
+  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.stroke();
+
+  // Borde exterior iluminado
+  var glowA = isActive ? accent : ('rgba('+ar+','+ag+','+ab+',0.35)');
+  var glowW = isActive ? 3.5 : 1.5;
   ctx.save();
-  ctx.shadowColor = isActive ? accent : 'rgba(255,255,255,0.4)';
-  ctx.shadowBlur  = isActive ? 24 : 10;
+  ctx.shadowColor = isActive ? accent : ('rgba('+ar+','+ag+','+ab+',0.5)');
+  ctx.shadowBlur  = isActive ? 28 : 12;
   ctx.beginPath();
   ctx.arc(dc.CX,dc.CY,rOut,startA+0.01,endA-0.01);
   ctx.strokeStyle=glowA; ctx.lineWidth=glowW; ctx.stroke();
   ctx.restore();
-  // Segundo pass para más intensidad
+
+  // Segundo pass glow en activo/hover
   if(isActive){
     ctx.save();
-    ctx.globalAlpha=0.4;
-    ctx.shadowColor=accent; ctx.shadowBlur=40;
+    ctx.globalAlpha=0.5;
+    ctx.shadowColor=accent; ctx.shadowBlur=50;
     ctx.beginPath();
     ctx.arc(dc.CX,dc.CY,rOut,startA+0.01,endA-0.01);
-    ctx.strokeStyle=accent; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.strokeStyle=accent; ctx.lineWidth=2; ctx.stroke();
     ctx.restore();
   }
 
-  // Borde interior (el que da el efecto de anillo biselado interior)
+  // Borde interior biselado con tinte
   ctx.beginPath();
   ctx.arc(dc.CX,dc.CY,rIn+1,startA+0.01,endA-0.01);
-  ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=1; ctx.stroke();
+  ctx.strokeStyle='rgba('+ar+','+ag+','+ab+',0.15)'; ctx.lineWidth=1; ctx.stroke();
 }
 
 // ── Dibuja el centro RAW con hover y animación de pulso ──
@@ -1129,14 +1151,14 @@ function _dialDraw(){
   var breathSin  = (Math.sin(bt * 0.025) * 0.5 + 0.5); // 0→1 lento
   var breathSin2 = (Math.sin(bt * 0.018 + 1.2) * 0.5 + 0.5); // desfasado
 
-  // Halo exterior — glow violeta breathing
+  // Halo exterior violeta breathing — más intenso
   ctx.save();
-  ctx.shadowColor = 'rgba(139,92,246,' + (0.3 + breathSin * 0.4) + ')';
-  ctx.shadowBlur  = 40 + breathSin * 30;
+  ctx.shadowColor = 'rgba(139,92,246,' + (0.5 + breathSin * 0.5) + ')';
+  ctx.shadowBlur  = 50 + breathSin * 40;
   ctx.beginPath();
   ctx.arc(dc.CX, dc.CY, dc.R_OUT+3, 0, Math.PI*2);
-  ctx.strokeStyle = 'rgba(167,139,250,' + (0.08 + breathSin * 0.14) + ')';
-  ctx.lineWidth   = 2 + breathSin * 1.5;
+  ctx.strokeStyle = 'rgba(167,139,250,' + (0.18 + breathSin * 0.22) + ')';
+  ctx.lineWidth   = 2.5 + breathSin * 2;
   ctx.stroke();
   ctx.restore();
 
@@ -1149,26 +1171,48 @@ function _dialDraw(){
   ctx.stroke();
   ctx.restore();
 
-  // Arco de acento superior — el borde brillante que rota lentamente
+  // Arco de acento — rota lentamente, brillante
   ctx.save();
-  var arcAngle = bt * 0.003; // rotación lenta
-  var arcLen   = Math.PI * 0.7;
-  ctx.shadowColor = 'rgba(34,211,238,' + (0.4 + breathSin * 0.4) + ')';
-  ctx.shadowBlur  = 12 + breathSin * 16;
+  var arcAngle = bt * 0.003;
+  var arcLen   = Math.PI * 0.65;
+
+  // Arco principal cyan — brillante y cercano al dial
+  ctx.shadowColor = 'rgba(34,211,238,' + (0.7 + breathSin * 0.3) + ')';
+  ctx.shadowBlur  = 20 + breathSin * 30;
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 3, arcAngle, arcAngle + arcLen);
-  ctx.strokeStyle = 'rgba(34,211,238,' + (0.15 + breathSin * 0.25) + ')';
-  ctx.lineWidth   = 2;
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 2, arcAngle, arcAngle + arcLen);
+  ctx.strokeStyle = 'rgba(34,211,238,' + (0.45 + breathSin * 0.45) + ')';
+  ctx.lineWidth   = 3;
   ctx.lineCap     = 'round';
   ctx.stroke();
-  // Arco opuesto más tenue
-  ctx.shadowBlur = 8;
-  ctx.shadowColor = 'rgba(167,139,250,0.3)';
+
+  // Glow exterior del arco — blur más amplio
+  ctx.shadowColor = 'rgba(34,211,238,0.5)';
+  ctx.shadowBlur  = 40 + breathSin * 20;
   ctx.beginPath();
-  ctx.arc(dc.CX, dc.CY, dc.R_OUT+3, arcAngle+Math.PI, arcAngle+Math.PI+arcLen*0.5);
-  ctx.strokeStyle = 'rgba(167,139,250,' + (0.08 + breathSin2 * 0.12) + ')';
-  ctx.lineWidth   = 1.5;
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT + 2, arcAngle, arcAngle + arcLen);
+  ctx.strokeStyle = 'rgba(34,211,238,' + (0.15 + breathSin * 0.2) + ')';
+  ctx.lineWidth   = 8;
   ctx.stroke();
+
+  // Arco opuesto violeta — más corto, igualmente brillante
+  ctx.shadowColor = 'rgba(167,139,250,' + (0.6 + breathSin2 * 0.3) + ')';
+  ctx.shadowBlur  = 18 + breathSin2 * 24;
+  ctx.beginPath();
+  ctx.arc(dc.CX, dc.CY, dc.R_OUT+2, arcAngle+Math.PI, arcAngle+Math.PI+arcLen*0.4);
+  ctx.strokeStyle = 'rgba(167,139,250,' + (0.40 + breathSin2 * 0.40) + ')';
+  ctx.lineWidth   = 2.5;
+  ctx.stroke();
+
+  // Puntos de inicio/fin del arco — pequeños dots brillantes
+  var dotR = dc.R_OUT + 2;
+  [arcAngle, arcAngle+arcLen].forEach(function(a){
+    ctx.beginPath();
+    ctx.arc(dc.CX+dotR*Math.cos(a), dc.CY+dotR*Math.sin(a), 3, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(34,211,238,' + (0.7+breathSin*0.3) + ')';
+    ctx.shadowColor = '#22D3EE'; ctx.shadowBlur = 12;
+    ctx.fill();
+  });
   ctx.restore();
 
   // ── Anillo principal ──
