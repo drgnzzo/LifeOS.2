@@ -1592,7 +1592,7 @@ function abrirFormulario(modo){
   }
   var inner=document.getElementById('sec-entrada');
   if(inner){
-    inner.style.cssText='background:rgba(14,14,22,0.97);border:1px solid rgba(255,255,255,0.10);border-radius:16px;box-shadow:0 8px 48px rgba(0,0,0,0.7),0 0 0 1px rgba(120,110,240,0.15);width:420px;max-width:94vw;max-height:88vh;overflow-y:auto;display:flex;flex-direction:column';
+    inner.style.cssText='width:440px;max-width:96vw;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column';
   }
   if(typeof _inyectarToggleModo==='function') _inyectarToggleModo();
   var tabs=document.getElementById('toggle-modo-wrap');
@@ -2306,6 +2306,193 @@ function irASheets(sheetId){
 // ══════════════════════════════════════════
 function _inyectarToggleModo(){
   if(document.getElementById('toggle-modo-wrap'))return;
+  // ── CSS UNIFICADO DE FORMS ──
+  if(!document.getElementById('form-hud-styles')){
+    var fs = document.createElement('style');
+    fs.id = 'form-hud-styles';
+    fs.textContent = [
+      // Contenedor principal del form
+      '#sec-entrada{',
+        'background:rgba(10,7,22,0.97)!important;',
+        'border:1px solid rgba(140,100,220,0.28)!important;',
+        'border-radius:16px!important;',
+        'box-shadow:0 0 0 1px rgba(140,100,220,0.10),0 24px 80px rgba(0,0,0,0.85),0 0 60px rgba(139,92,246,0.10)!important;',
+        'backdrop-filter:blur(28px) saturate(180%)!important;',
+        '-webkit-backdrop-filter:blur(28px) saturate(180%)!important;',
+        'background-image:linear-gradient(rgba(120,80,200,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.018) 1px,transparent 1px)!important;',
+        'background-size:32px 32px!important;',
+        'width:440px!important;max-width:96vw!important;',
+      '}',
+      // Header del form
+      '#entrada-paso2-header{',
+        'display:flex;align-items:center;gap:12px;',
+        'padding:16px 20px 14px;',
+        'border-bottom:1px solid rgba(140,100,220,0.18);',
+        'background:rgba(18,10,36,0.8);',
+        'position:relative;overflow:hidden;',
+      '}',
+      '#entrada-paso2-header::before{',
+        'content:"";position:absolute;top:0;left:0;right:0;height:2px;',
+        'background:linear-gradient(90deg,#7C3AED,#A855F7,#22D3EE);',
+        'box-shadow:0 0 12px rgba(139,92,246,0.6),0 0 24px rgba(139,92,246,0.3);',
+        'animation:hudAccentPulse 3s ease-in-out infinite;',
+      '}',
+      '#entrada-paso2-titulo{',
+        'font-size:14px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;',
+        'color:#C4B5FD;text-shadow:0 0 12px rgba(139,92,246,0.5);',
+        'flex:1;',
+      '}',
+      // Tabs de navegación
+      '#toggle-modo-wrap{',
+        'display:flex;gap:2px;padding:10px 16px 0;',
+        'border-bottom:1px solid rgba(140,100,220,0.12);',
+        'background:rgba(10,6,22,0.5);',
+        'overflow-x:auto;',
+      '}',
+      '#toggle-modo-wrap::-webkit-scrollbar{display:none}',
+      '.tab-entrada{',
+        'padding:6px 12px;border:none;border-radius:8px 8px 0 0;',
+        'background:transparent;',
+        'color:rgba(200,208,230,0.40);',
+        'font-family:inherit;font-size:11px;font-weight:600;letter-spacing:.06em;',
+        'cursor:pointer;transition:all .15s;white-space:nowrap;',
+        'border-bottom:2px solid transparent;',
+      '}',
+      '.tab-entrada:hover{color:rgba(200,208,230,0.75);background:rgba(139,92,246,0.08);}',
+      '.tab-entrada.on{',
+        'color:#C4B5FD;border-bottom-color:#A855F7;',
+        'background:rgba(139,92,246,0.12);',
+        'text-shadow:0 0 8px rgba(139,92,246,0.4);',
+      '}',
+      // Wrapper de campos
+      '.fwrap{padding:16px 20px;display:flex;flex-direction:column;gap:12px;}',
+      // Label de campo
+      '.flbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;color:rgba(167,139,250,0.55);margin-bottom:5px;}',
+      // Input/textarea unificado
+      '.fi{',
+        'width:100%;box-sizing:border-box;',
+        'background:rgba(20,12,40,0.7);',
+        'border:1px solid rgba(140,100,220,0.22);',
+        'border-radius:10px;',
+        'color:#E2E8F0;font-family:inherit;font-size:14px;',
+        'padding:11px 14px;',
+        'outline:none;',
+        'transition:border-color .15s,box-shadow .15s;',
+        '-webkit-appearance:none;',
+      '}',
+      '.fi:focus{',
+        'border-color:rgba(167,139,250,0.55);',
+        'box-shadow:0 0 0 3px rgba(139,92,246,0.12),inset 0 0 12px rgba(139,92,246,0.04);',
+      '}',
+      '.fi::placeholder{color:rgba(200,208,230,0.22);}',
+      // Opts (botones de selección)
+      '.fo{display:flex;flex-wrap:wrap;gap:6px;}',
+      '.fopt{',
+        'padding:6px 13px;border-radius:8px;',
+        'background:rgba(20,12,40,0.6);',
+        'border:1px solid rgba(140,100,220,0.20);',
+        'color:rgba(200,208,230,0.55);',
+        'font-family:inherit;font-size:11px;font-weight:600;',
+        'cursor:pointer;transition:all .15s;',
+        'letter-spacing:.04em;',
+      '}',
+      '.fopt:hover{border-color:rgba(167,139,250,0.45);color:rgba(220,220,240,0.85);background:rgba(139,92,246,0.10);}',
+      '.fopt.on{',
+        'background:rgba(139,92,246,0.22);',
+        'border-color:rgba(167,139,250,0.55);',
+        'color:#C4B5FD;',
+        'box-shadow:0 0 8px rgba(139,92,246,0.20);',
+        'text-shadow:0 0 6px rgba(167,139,250,0.4);',
+      '}',
+      // Botón guardar
+      '.fguardar{',
+        'display:flex;align-items:center;justify-content:center;gap:8px;',
+        'padding:13px 20px;border:none;border-radius:10px;',
+        'background:linear-gradient(135deg,rgba(109,40,217,0.9),rgba(139,92,246,0.85));',
+        'border:1px solid rgba(167,139,250,0.4);',
+        'color:#fff;font-family:inherit;font-size:13px;font-weight:700;',
+        'letter-spacing:.08em;text-transform:uppercase;',
+        'cursor:pointer;width:100%;',
+        'box-shadow:0 4px 20px rgba(139,92,246,0.3);',
+        'transition:all .15s;',
+      '}',
+      '.fguardar:hover{',
+        'background:linear-gradient(135deg,rgba(124,58,237,1),rgba(167,139,250,0.9));',
+        'box-shadow:0 4px 28px rgba(139,92,246,0.5);',
+        'transform:translateY(-1px);',
+      '}',
+      '.fguardar:active{transform:translateY(0);}',
+      // Grid 2 columnas
+      '.fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}',
+      '.fg3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}',
+      // Resultado
+      '.fres{font-size:12px;text-align:center;min-height:18px;color:rgba(200,208,230,0.4);}',
+      '.fres.ok{color:#4ADE80;text-shadow:0 0 8px rgba(74,222,128,0.4);}',
+      '.fres.err{color:#EF4444;}',
+      // Divisor
+      '.fdiv{height:1px;background:linear-gradient(90deg,rgba(139,92,246,0.25),rgba(139,92,246,0.05));margin:2px 0;}',
+      // Form actions (guardar/cancelar del form base)
+      '.form-actions{',
+        'padding:12px 20px 16px!important;',
+        'border-top:1px solid rgba(140,100,220,0.12)!important;',
+        'background:rgba(8,4,18,0.5)!important;',
+        'gap:8px!important;',
+      '}',
+      // Botón guardar base
+      '#btnG{',
+        'background:linear-gradient(135deg,rgba(109,40,217,0.9),rgba(139,92,246,0.85))!important;',
+        'border:1px solid rgba(167,139,250,0.4)!important;',
+        'box-shadow:0 4px 20px rgba(139,92,246,0.3)!important;',
+        'border-radius:10px!important;',
+        'color:#fff!important;font-weight:700!important;letter-spacing:.06em!important;',
+      '}',
+      '#btnG:hover{box-shadow:0 4px 28px rgba(139,92,246,0.5)!important;transform:translateY(-1px)!important;}',
+      // Campos base heredados
+      '.campo-field,.finput{',
+        'background:rgba(20,12,40,0.7)!important;',
+        'border:1px solid rgba(140,100,220,0.22)!important;',
+        'border-radius:10px!important;',
+        'color:#E2E8F0!important;',
+      '}',
+      '.campo-field:focus,.finput:focus{',
+        'border-color:rgba(167,139,250,0.55)!important;',
+        'box-shadow:0 0 0 3px rgba(139,92,246,0.12)!important;',
+        'outline:none!important;',
+      '}',
+      '.campo-label,.campo-lbl{color:rgba(167,139,250,0.55)!important;font-size:9px!important;font-weight:700!important;letter-spacing:.16em!important;text-transform:uppercase!important;}',
+      // Opts legacy
+      '.opts{display:flex;flex-wrap:wrap;gap:5px!important;}',
+      '.opt{',
+        'background:rgba(20,12,40,0.6)!important;',
+        'border:1px solid rgba(140,100,220,0.20)!important;',
+        'border-radius:8px!important;',
+        'color:rgba(200,208,230,0.55)!important;',
+        'font-size:11px!important;font-weight:600!important;',
+        'padding:6px 12px!important;',
+        'transition:all .15s!important;',
+      '}',
+      '.opt:hover{border-color:rgba(167,139,250,0.45)!important;color:rgba(220,220,240,0.9)!important;background:rgba(139,92,246,0.10)!important;}',
+      '.opt.on{',
+        'background:rgba(139,92,246,0.22)!important;',
+        'border-color:rgba(167,139,250,0.55)!important;',
+        'color:#C4B5FD!important;',
+        'box-shadow:0 0 8px rgba(139,92,246,0.20)!important;',
+      '}',
+      // Scroll del form
+      '#sec-entrada::-webkit-scrollbar{width:4px;}',
+      '#sec-entrada::-webkit-scrollbar-thumb{background:rgba(139,92,246,0.3);border-radius:2px;}',
+      // Cerrar btn
+      '#btn-cerrar-entrada,#btnCerrar{',
+        'background:rgba(30,15,50,0.7)!important;',
+        'border:1px solid rgba(140,100,220,0.25)!important;',
+        'border-radius:8px!important;',
+        'color:rgba(167,139,250,0.7)!important;',
+        'transition:all .15s!important;',
+      '}',
+      '#btn-cerrar-entrada:hover,#btnCerrar:hover{color:#fff!important;border-color:rgba(167,139,250,0.5)!important;background:rgba(139,92,246,0.15)!important;}',
+    ].join('');
+    document.head.appendChild(fs);
+  }
   const wrap=document.createElement('div');
   wrap.id='toggle-modo-wrap';
   wrap.innerHTML=`
@@ -2394,23 +2581,25 @@ function _renderTabEntrada(tab){
 //  FORMULARIOS DE TABS (sin cambios)
 // ══════════════════════════════════════════
 function _renderActivityForm(wrap){
-  var SIMS_OPTS=['energia','hambre','cuerpo','higiene','mental','disfrute','entorno'];
-  var RECS=['Diario','Semanal','Eventual'];
-  wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:10px">
-    <div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">¿Qué quieres agregar?</div>
-    <div class="opts" id="act-col-opts">
-      <button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-col-opts');_onActColChange('personal')">👤 Personal</button>
-      <button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-col-opts');_onActColChange('electronics')">💼 Trabajo</button>
-      <button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-col-opts');_onActColChange('libro')">📚 Libro</button>
-      <button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-col-opts');_onActColChange('movie')">🎬 Movie</button>
-      <button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-col-opts');_onActColChange('norut')">📌 Pendiente</button>
-    </div>
-    <input type="hidden" id="act-col-tipo" value="">
-    <div id="act-col-extra" style="display:flex;flex-direction:column;gap:8px"></div>
-    <button onclick="_guardarActivityForm()" class="btn-save" style="border-radius:var(--rad-pill);display:none" id="act-btn-guardar"><i class="fas fa-floppy-disk"></i> Agregar</button>
-    <div id="act-res" style="font-size:12px;text-align:center;color:var(--m)"></div>
-  </div>`;
+  var cols=[
+    {id:'personal',   label:'👤 Personal',   color:'#FB923C'},
+    {id:'electronics',label:'💼 Trabajo',     color:'#22D3EE'},
+    {id:'libro',      label:'📚 Libro',       color:'#60A5FA'},
+    {id:'movie',      label:'🎬 Movie',       color:'#F59E0B'},
+    {id:'norut',      label:'📌 Pendiente',   color:'#A855F7'},
+  ];
+  var colBtns=cols.map(function(c){ return '<button class="fopt" style="border-color:'+c.color+'44;color:'+c.color+'88" onclick="event.stopPropagation();document.querySelectorAll(\'#act-col-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');_onActColChange(\''+c.id+'\')">'+c.label+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">⚡ ¿Qué quieres agregar?</div>'+
+    '<div class="fo" id="act-col-opts">'+colBtns+'</div>'+
+    '<input type="hidden" id="act-col-tipo" value="">'+
+    '<div id="act-col-extra" style="display:flex;flex-direction:column;gap:10px"></div>'+
+    '<button onclick="_guardarActivityForm()" class="fguardar" style="display:none" id="act-btn-guardar"><i class="fas fa-bolt" style="color:#FB923C"></i> Agregar</button>'+
+    '<div id="act-res" class="fres"></div>'+
+    '</div>';
 }
+
 function _onActColChange(tipo){
   document.getElementById('act-col-tipo').value=tipo;
   var extra=document.getElementById('act-col-extra');
@@ -2420,9 +2609,9 @@ function _onActColChange(tipo){
   var RECS=['Diario','Semanal','Eventual'];
   var recHtml='<div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Recurrencia</div><div class="opts" id="act-rec-opts">'+RECS.map(r=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-rec-opts');document.getElementById('act-rec').value='${r}'">${r}</button>`).join('')+'</div><input type="hidden" id="act-rec" value="Diario"></div>';
   if(tipo==='personal'){
-    extra.innerHTML='<input type="text" id="act-nombre" class="finput" placeholder="Nombre del hábito" style="font-size:14px;padding:10px 14px">'+recHtml+'<div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Categoría Sims</div><div class="opts" id="act-sims-opts">'+SIMS_OPTS.map(s=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-sims-opts');document.getElementById('act-sims').value='${s}'">${s}</button>`).join('')+'</div><input type="hidden" id="act-sims" value=""></div>';
+    extra.innerHTML='<input type="text" id="act-nombre" class="fi" placeholder="Nombre del hábito…" style="font-size:14px">'+recHtml+'<div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Categoría Sims</div><div class="opts" id="act-sims-opts">'+SIMS_OPTS.map(s=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'act-sims-opts');document.getElementById('act-sims').value='${s}'">${s}</button>`).join('')+'</div><input type="hidden" id="act-sims" value=""></div>';
   } else if(tipo==='electronics'){
-    extra.innerHTML='<input type="text" id="act-nombre" class="finput" placeholder="Nombre del check de trabajo" style="font-size:14px;padding:10px 14px">'+recHtml;
+    extra.innerHTML='<input type="text" id="act-nombre" class="fi" placeholder="Nombre del check de trabajo…" style="font-size:14px">'+recHtml;
   } else {
     var label=tipo==='libro'?'Título del libro':tipo==='movie'?'Título de la película/serie':'Descripción del pendiente';
     extra.innerHTML='<input type="text" id="act-nombre" class="finput" placeholder="'+label+'" style="font-size:14px;padding:10px 14px">';
@@ -2470,30 +2659,196 @@ function _guardarEntrenamiento(){
   }).catch(function(){res.textContent='Error';res.style.color='var(--err)';});
 }
 
-function _renderLibroForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Marcar libro como leído</div><input type="text" id="libro-nombre" class="finput" placeholder="Título del libro" style="font-size:14px;padding:10px 14px"><input type="text" id="libro-autor" class="finput" placeholder="Autor (opcional)" style="font-size:14px;padding:10px 14px"><button onclick="_guardarLibroForm()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-book"></i> Guardar libro</button><div id="libro-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
+function _renderLibroForm(wrap){
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">📚 Agregar libro</div>'+
+    '<input type="text" id="libro-nombre" class="fi" placeholder="Título del libro" style="font-size:15px">'+
+    '<input type="text" id="libro-autor" class="fi" placeholder="Autor (opcional)" style="font-size:13px">'+
+    '<div><div class="flbl">Estado</div><div class="fo" id="libro-estado-opts">'+
+      ['Leyendo','Completado','En pausa','Quiero leer'].map(function(s){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#libro-estado-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'libro-estado\').value=\''+s+'\'">'+s+'</button>'; }).join('')+
+    '</div><input type="hidden" id="libro-estado" value="Completado"></div>'+
+    '<button onclick="_guardarLibroForm()" class="fguardar"><i class="fas fa-book-open" style="color:#60A5FA"></i> Guardar libro</button>'+
+    '<div id="libro-res" class="fres"></div>'+
+    '</div>';
+}
 function _guardarLibroForm(){var nombre=document.getElementById('libro-nombre')?.value?.trim();if(!nombre){showToast('Escribe el título del libro',false);return;}var res=document.getElementById('libro-res');if(res)res.textContent='Guardando…';api.marcarActivityItem('libro',nombre,true).then(function(r){if(res)res.textContent=r.ok?'✓ Libro guardado':'Error: '+r.mensaje;if(r.ok){document.getElementById('libro-nombre').value='';if(document.getElementById('libro-autor'))document.getElementById('libro-autor').value='';}}).catch(function(){if(res)res.textContent='Error al guardar';});}
 
-function _renderMovieForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Registrar película / serie</div><input type="text" id="movie-nombre" class="finput" placeholder="Título de la película o serie" style="font-size:14px;padding:10px 14px"><button onclick="_guardarMovieForm()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-film"></i> Guardar</button><div id="movie-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
+function _renderMovieForm(wrap){
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">🎬 Registrar película / serie</div>'+
+    '<input type="text" id="movie-nombre" class="fi" placeholder="Título de la película o serie" style="font-size:15px">'+
+    '<div><div class="flbl">Estado</div><div class="fo" id="movie-estado-opts">'+
+      ['Completado','Viendo','Quiero ver','Abandonado'].map(function(s){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#movie-estado-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'movie-estado\').value=\''+s+'\'">'+s+'</button>'; }).join('')+
+    '</div><input type="hidden" id="movie-estado" value="Completado"></div>'+
+    '<button onclick="_guardarMovieForm()" class="fguardar"><i class="fas fa-film" style="color:#F59E0B"></i> Guardar película</button>'+
+    '<div id="movie-res" class="fres"></div>'+
+    '</div>';
+}
 function _guardarMovieForm(){var nombre=document.getElementById('movie-nombre')?.value?.trim();if(!nombre){showToast('Escribe el título',false);return;}var res=document.getElementById('movie-res');if(res)res.textContent='Guardando…';api.marcarActivityItem('movie',nombre,true).then(function(r){if(res)res.textContent=r.ok?'✓ Guardado':'Error: '+r.mensaje;if(r.ok)document.getElementById('movie-nombre').value='';}).catch(function(){if(res)res.textContent='Error al guardar';});}
 
-function _renderNoRutForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Agregar pendiente</div><input type="text" id="norut-nombre" class="finput" placeholder="Nombre de la tarea o pendiente" style="font-size:14px;padding:10px 14px"><textarea id="norut-nota" class="finput" placeholder="Notas opcionales" rows="3" style="font-size:13px;padding:10px 14px;resize:none"></textarea><button onclick="_guardarNoRutForm()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-thumbtack"></i> Guardar pendiente</button><div id="norut-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
+function _renderNoRutForm(wrap){
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">📌 Agregar pendiente</div>'+
+    '<input type="text" id="norut-nombre" class="fi" placeholder="¿Qué hay que hacer?" style="font-size:15px">'+
+    '<div><div class="flbl">Notas</div><textarea id="norut-nota" class="fi" placeholder="Detalles opcionales…" rows="3" style="font-size:13px;resize:none"></textarea></div>'+
+    '<button onclick="_guardarNoRutForm()" class="fguardar"><i class="fas fa-thumbtack" style="color:#FBBF24"></i> Agregar pendiente</button>'+
+    '<div id="norut-res" class="fres"></div>'+
+    '</div>';
+}
 function _guardarNoRutForm(){var nombre=document.getElementById('norut-nombre')?.value?.trim();if(!nombre){showToast('Escribe el nombre del pendiente',false);return;}var res=document.getElementById('norut-res');if(res)res.textContent='Guardando…';api.marcarActivityItem('norut',nombre,false).then(function(r){if(res)res.textContent=r.ok?'✓ Pendiente guardado':'Error: '+r.mensaje;if(r.ok){document.getElementById('norut-nombre').value='';if(document.getElementById('norut-nota'))document.getElementById('norut-nota').value='';}}).catch(function(){if(res)res.textContent='Error al guardar';});}
 
 function _renderBancosForm(wrap){
-  wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Registrar en Bancos</div><input type="text" id="banco-nombre" class="finput" placeholder="Nombre del banco (BBVA, BEATS…)" style="font-size:14px;padding:10px 14px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Monto</div><input type="number" id="banco-monto" class="finput" placeholder="0.00" step="0.01" inputmode="decimal" style="font-size:16px;padding:10px 12px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Fecha</div><input type="date" id="banco-fecha" class="finput" style="font-size:13px;padding:9px 12px"></div></div><button onclick="_guardarBancosForm()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Guardar en Bancos</button><div id="banco-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;
-  const fechaEl=document.getElementById('banco-fecha'); if(fechaEl)fechaEl.value=fmtD(new Date());
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">🏛️ Registrar pago / banco</div>'+
+    '<input type="text" id="ban-concepto" class="fi" placeholder="Concepto del pago" style="font-size:15px">'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Monto ($)</div><input type="number" id="ban-monto" class="fi" placeholder="0.00" step="0.01" style="font-size:20px;font-weight:700;text-align:center;color:#22D3EE"></div>'+
+      '<div><div class="flbl">Fecha</div><input type="date" id="ban-fecha" class="fi" style="font-size:13px;color-scheme:dark"></div>'+
+    '</div>'+
+    '<button onclick="_guardarBanco()" class="fguardar"><i class="fas fa-building-columns" style="color:#22D3EE"></i> Registrar pago</button>'+
+    '<div id="ban-res" class="fres"></div>'+
+    '</div>';
+  // Set fecha hoy
+  setTimeout(function(){
+    var f=document.getElementById('ban-fecha');
+    if(f&&!f.value){var h=new Date();f.value=h.getFullYear()+'-'+String(h.getMonth()+1).padStart(2,'0')+'-'+String(h.getDate()).padStart(2,'0');}
+  },50);
 }
-function _guardarBancosForm(){
-  const nombre=document.getElementById('banco-nombre').value.trim();
-  const monto=parseFloat(document.getElementById('banco-monto').value);
-  const fecha=document.getElementById('banco-fecha').value;
-  const res=document.getElementById('banco-res');
-  if(!nombre||isNaN(monto)||!fecha){res.textContent='Completa todos los campos';res.style.color='var(--err)';return;}
-  res.textContent='Guardando…';res.style.color='var(--m)';
-  api.guardarEnBancos(nombre,monto,fecha).then(r=>{
-    res.textContent=r.ok?'✓ Guardado':'✗ '+(r.mensaje||'Error');res.style.color=r.ok?'var(--ok)':'var(--err)';
-    if(r.ok){showToast('✓ Banco guardado');var sb=document.querySelector('.btn-save');if(sb){sb.classList.add('saved');setTimeout(function(){sb.classList.remove('saved');},1200);}  document.getElementById('banco-nombre').value='';document.getElementById('banco-monto').value='';document.getElementById('banco-fecha').value=fmtD(new Date());api.getFijos().then(renderEntes);setTimeout(cerrarEntrada,800);}
-  }).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});
+
+function _renderNutricionForm(wrap){
+  var momentos=['Ayuno','Desayuno','Almuerzo','Comida','Merienda','Cena','Snack'];
+  var momBtns=momentos.map(function(m){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#nut-mom-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'nut-momento\').value=\''+m+'\'">'+m+'</button>'; }).join('');
+  var fastBtns=[0,12,14,16,18,20].map(function(h){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#nut-fast-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'nut-fast\').value='+h+'">'+(h?h+'h':'Sin ayuno')+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">🥗 ¿Qué comiste?</div>'+
+    '<input type="text" id="nut-comida" class="fi" placeholder="Ej. Huevos con aguacate y café" style="font-size:15px">'+
+    '<div><div class="flbl">Momento del día</div><div class="fo" id="nut-mom-opts">'+momBtns+'</div><input type="hidden" id="nut-momento" value=""></div>'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Calorías (kcal)</div><input type="number" id="nut-cal" class="fi" placeholder="0" style="font-size:18px;font-weight:700;text-align:center"></div>'+
+      '<div><div class="flbl">Proteína (g)</div><input type="number" id="nut-prot" class="fi" placeholder="0" style="font-size:18px;font-weight:700;text-align:center"></div>'+
+    '</div>'+
+    '<div class="fg3">'+
+      '<div><div class="flbl">Carbos (g)</div><input type="number" id="nut-carbos" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Grasa (g)</div><input type="number" id="nut-grasa" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Agua (L)</div><input type="number" id="nut-agua" class="fi" placeholder="0.0" step="0.1" style="text-align:center"></div>'+
+    '</div>'+
+    '<div><div class="flbl">Fasting (horas)</div><div class="fo" id="nut-fast-opts">'+fastBtns+'</div><input type="hidden" id="nut-fast" value="0"></div>'+
+    '<input type="text" id="nut-notas" class="fi" placeholder="Notas…" style="font-size:13px">'+
+    '<button onclick="_guardarNutricion()" class="fguardar"><i class="fas fa-leaf" style="color:#4ADE80"></i> Guardar nutrición</button>'+
+    '<div id="nut-res" class="fres"></div>'+
+    '</div>';
+}
+function _renderEntrenamientoForm(wrap){
+  var tipos=['Fuerza','Cardio','HIIT','Flexibilidad','Deporte','Caminata'];
+  var tipoBtns=tipos.map(function(t){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#ent-tipo-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'ent-tipo\').value=\''+t+'\'">'+t+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">💪 Registrar sesión</div>'+
+    '<div><div class="flbl">Tipo de entrenamiento</div><div class="fo" id="ent-tipo-opts">'+tipoBtns+'</div><input type="hidden" id="ent-tipo" value=""></div>'+
+    '<input type="text" id="ent-ejercicio" class="fi" placeholder="Ejercicio (ej. Press banca, Caminata 5km)" style="font-size:14px">'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Duración (min)</div><input type="number" id="ent-dur" class="fi" placeholder="0" style="font-size:20px;font-weight:700;text-align:center"></div>'+
+      '<div><div class="flbl">Distancia (km)</div><input type="number" id="ent-dist" class="fi" placeholder="0.0" step="0.1" style="font-size:20px;font-weight:700;text-align:center"></div>'+
+    '</div>'+
+    '<div class="fg3">'+
+      '<div><div class="flbl">Series</div><input type="number" id="ent-series" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Reps</div><input type="number" id="ent-reps" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Peso (kg)</div><input type="number" id="ent-peso" class="fi" placeholder="0" step="0.5" style="text-align:center"></div>'+
+    '</div>'+
+    '<input type="text" id="ent-notas" class="fi" placeholder="Notas de la sesión…" style="font-size:13px">'+
+    '<button onclick="_guardarEntrenamiento()" class="fguardar"><i class="fas fa-dumbbell" style="color:#FB923C"></i> Guardar sesión</button>'+
+    '<div id="ent-res" class="fres"></div>'+
+    '</div>';
+}
+
+function _renderPensamientoForm(wrap){
+  var cats=['Emoción','Idea','Reflexión','Decisión','Sueño'];
+  var catColors={'Emoción':'#EC4899','Idea':'#3B82F6','Reflexión':'#8B5CF6','Decisión':'#F59E0B','Sueño':'#06B6D4'};
+  var catBtns=cats.map(function(c){
+    return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#p-cat-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'p-cat\').value=\''+c+'\'" style="border-color:'+catColors[c]+'33;color:'+catColors[c]+'88">'+c+'</button>';
+  }).join('');
+  var enBtns=[1,2,3,4,5].map(function(n){
+    var col=n<=2?'#EF4444':n<=3?'#F59E0B':'#4ADE80';
+    return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#p-en-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'p-energia\').value='+n+'" style="border-color:'+col+'44;color:'+col+'88;min-width:36px;text-align:center">'+n+'</button>';
+  }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">💭 ¿En qué estás pensando?</div>'+
+    '<textarea id="p-texto" class="fi" rows="4" placeholder="Escribe aquí tu pensamiento…" style="resize:none;line-height:1.6"></textarea>'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Categoría</div><div class="fo" id="p-cat-opts">'+catBtns+'</div><input type="hidden" id="p-cat" value=""></div>'+
+      '<div><div class="flbl">Energía ⚡</div><div class="fo" id="p-en-opts">'+enBtns+'</div><input type="hidden" id="p-energia" value=""></div>'+
+    '</div>'+
+    '<div><div class="flbl">Etiquetas</div><input type="text" id="p-etiquetas" class="fi" placeholder="trabajo, familia, proyecto…" style="font-size:13px;padding:9px 14px"></div>'+
+    '<button onclick="_guardarPensamiento()" class="fguardar"><i class="fas fa-brain" style="color:#C4B5FD"></i> Guardar pensamiento</button>'+
+    '<div id="p-res" class="fres"></div>'+
+    '</div>';
+}
+function _guardarPensamiento(){const texto=document.getElementById('p-texto').value.trim();const categoria=document.getElementById('p-cat').value;const energia=document.getElementById('p-energia').value;const etiquetas=document.getElementById('p-etiquetas').value.trim();const res=document.getElementById('p-res');if(!texto){res.textContent='Escribe algo primero';res.style.color='var(--err)';return;}res.textContent='Guardando…';res.style.color='var(--m)';api.guardarPensamiento({texto,categoria,energia:energia||null,etiquetas,fecha:fmtD(new Date())}).then(r=>{res.textContent=r.ok?'✓ Guardado':'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Pensamiento guardado');document.getElementById('p-texto').value='';document.getElementById('p-etiquetas').value='';document.querySelectorAll('#p-cat-opts .opt,#p-energia-opts .opt').forEach(b=>b.classList.remove('on'));document.getElementById('p-cat').value='';document.getElementById('p-energia').value='';setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});}
+
+function _renderPersonaForm(wrap){
+  var tipos=['Familia','Amigo','Pareja','Trabajo','Médico','Otro'];
+  var tipoBtns=tipos.map(function(t){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-tipo-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-tipo\').value=\''+t+'\'">'+t+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">👥 ¿Con quién interactuaste?</div>'+
+    '<input type="text" id="per-nombre" class="fi" placeholder="Nombre de la persona" style="font-size:15px">'+
+    '<div><div class="flbl">Tipo de relación</div><div class="fo" id="per-tipo-opts">'+tipoBtns+'</div><input type="hidden" id="per-tipo" value=""></div>'+
+    '<div><div class="flbl">Energía de la interacción</div>'+
+    '<div class="fo" id="per-energia-opts">'+
+      '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-energia-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-energia\').value=1" style="border-color:#22C55E44;color:#22C55E88">⚡ Positiva</button>'+
+      '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-energia-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-energia\').value=0">— Neutral</button>'+
+      '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-energia-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-energia\').value=-1" style="border-color:#EF444444;color:#EF444488">↓ Negativa</button>'+
+    '</div><input type="hidden" id="per-energia" value=""></div>'+
+    '<div><div class="flbl">Notas</div><textarea id="per-notas" class="fi" rows="2" placeholder="¿De qué hablaron? ¿Cómo se sintió?" style="resize:none;font-size:13px"></textarea></div>'+
+    '<button onclick="_guardarPersona()" class="fguardar"><i class="fas fa-user-check" style="color:#EC4899"></i> Registrar interacción</button>'+
+    '<div id="per-res" class="fres"></div>'+
+    '</div>';
+}
+function _guardarPersona(){const nombre=document.getElementById('per-nombre').value.trim();const tipo=document.getElementById('per-tipo').value;const energia=document.getElementById('per-energia').value;const notas=document.getElementById('per-notas').value.trim();const res=document.getElementById('per-res');if(!nombre){res.textContent='Escribe un nombre';res.style.color='var(--err)';return;}res.textContent='Guardando…';res.style.color='var(--m)';api.guardarInteraccion({nombre,tipo,energia:energia!==''?Number(energia):0,notas}).then(r=>{res.textContent=r.ok?'✓ '+r.mensaje:'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Interacción guardada');document.getElementById('per-nombre').value='';document.getElementById('per-notas').value='';document.querySelectorAll('#per-tipo-opts .opt,#per-energia-opts .opt').forEach(b=>b.classList.remove('on'));document.getElementById('per-tipo').value='';document.getElementById('per-energia').value='';setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});}
+
+function _renderSaludForm(wrap){
+  var tipos=['Cita','Síntoma','Medicamento','Resultado','Vacuna','Chequeo'];
+  var tipoBtns=tipos.map(function(t){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#sal-tipo-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'sal-tipo\').value=\''+t+'\'">'+t+'</button>'; }).join('');
+  var estados=['Pendiente','Completado','Cancelado'];
+  var estBtns=estados.map(function(e){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#sal-est-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'sal-estado\').value=\''+e+'\'">'+e+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">🏥 Registro de salud</div>'+
+    '<div><div class="flbl">Tipo</div><div class="fo" id="sal-tipo-opts">'+tipoBtns+'</div><input type="hidden" id="sal-tipo" value=""></div>'+
+    '<input type="text" id="sal-desc" class="fi" placeholder="Descripción (ej. Cita con Dr. García)" style="font-size:14px">'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Doctor / Especialista</div><input type="text" id="sal-doctor" class="fi" placeholder="Opcional" style="font-size:13px"></div>'+
+      '<div><div class="flbl">Próxima cita</div><input type="date" id="sal-proxima" class="fi" style="font-size:13px;color-scheme:dark"></div>'+
+    '</div>'+
+    '<div><div class="flbl">Estado</div><div class="fo" id="sal-est-opts">'+estBtns+'</div><input type="hidden" id="sal-estado" value="Pendiente"></div>'+
+    '<input type="text" id="sal-notas" class="fi" placeholder="Notas…" style="font-size:13px">'+
+    '<button onclick="_guardarSalud()" class="fguardar"><i class="fas fa-heart-pulse" style="color:#EF4444"></i> Guardar registro</button>'+
+    '<div id="sal-res" class="fres"></div>'+
+    '</div>';
+}
+
+function _renderApartadoForm(wrap){
+  var bancos=['BBVA','BEATS','Efectivo','Otro'];
+  var bancoBtns=bancos.map(function(b){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#ap-banco-opts .fopt\').forEach(function(b2){b2.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'ap-banco\').value=\''+b+'\'">'+b+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">💰 Nuevo apartado</div>'+
+    '<input type="text" id="ap-nombre" class="fi" placeholder="¿Para qué es este apartado?" style="font-size:15px">'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Monto ($)</div><input type="number" id="ap-monto" class="fi" placeholder="0.00" step="0.01" style="font-size:20px;font-weight:700;text-align:center;color:#FBBF24"></div>'+
+      '<div><div class="flbl">Meta (fecha)</div><input type="date" id="ap-meta" class="fi" style="font-size:13px;color-scheme:dark"></div>'+
+    '</div>'+
+    '<div><div class="flbl">Banco / Origen</div><div class="fo" id="ap-banco-opts">'+bancoBtns+'</div><input type="hidden" id="ap-banco" value=""></div>'+
+    '<input type="text" id="ap-cat" class="fi" placeholder="Categoría (viaje, emergencia, compra…)" style="font-size:13px">'+
+    '<button onclick="_guardarApartado()" class="fguardar"><i class="fas fa-lock" style="color:#FBBF24"></i> Crear apartado</button>'+
+    '<div id="ap-res" class="fres"></div>'+
+    '</div>';
 }
 
 function _renderPatrimonioForm(wrap){
@@ -2512,18 +2867,119 @@ function _guardarPatrimonio(){
   promise.then(r=>{res.textContent=r.ok?'✓ Guardado':'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Patrimonio guardado');api.getPatrimonio().then(r=>{if(typeof renderPatrimonio==='function')renderPatrimonio(r);}).catch(()=>{});setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});
 }
 
-function _renderNutricionForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:10px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Registrar comida / día</div><input type="text" id="nut-comida" class="finput" placeholder="Ej. Desayuno: huevos + aguacate" style="font-size:14px;padding:10px 14px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Calorías (kcal)</div><input type="number" id="nut-cal" class="finput" placeholder="0" style="font-size:16px;padding:10px 12px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Proteína (g)</div><input type="number" id="nut-prot" class="finput" placeholder="0" style="font-size:16px;padding:10px 12px"></div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Carbos</div><input type="number" id="nut-carbos" class="finput" placeholder="0" style="padding:9px 10px;font-size:13px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Grasa</div><input type="number" id="nut-grasa" class="finput" placeholder="0" style="padding:9px 10px;font-size:13px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Agua (L)</div><input type="number" id="nut-agua" class="finput" placeholder="0.0" step="0.1" style="padding:9px 10px;font-size:13px"></div></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Fasting (horas)</div><div class="opts" id="nut-fast-opts">${[0,12,14,16,18,20].map(h=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'nut-fast-opts');document.getElementById('nut-fast').value=${h}">${h?h+'h':'Sin ayuno'}</button>`).join('')}</div><input type="hidden" id="nut-fast" value="0"></div><input type="text" id="nut-notas" class="finput" placeholder="Notas opcionales" style="font-size:13px;padding:9px 12px"><button onclick="_guardarNutricion()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Guardar</button><div id="nut-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
+function _renderNutricionForm(wrap){
+  var momentos=['Ayuno','Desayuno','Almuerzo','Comida','Merienda','Cena','Snack'];
+  var momBtns=momentos.map(function(m){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#nut-mom-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'nut-momento\').value=\''+m+'\'">'+m+'</button>'; }).join('');
+  var fastBtns=[0,12,14,16,18,20].map(function(h){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#nut-fast-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'nut-fast\').value='+h+'">'+(h?h+'h':'Sin ayuno')+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">🥗 ¿Qué comiste?</div>'+
+    '<input type="text" id="nut-comida" class="fi" placeholder="Ej. Huevos con aguacate y café" style="font-size:15px">'+
+    '<div><div class="flbl">Momento del día</div><div class="fo" id="nut-mom-opts">'+momBtns+'</div><input type="hidden" id="nut-momento" value=""></div>'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Calorías (kcal)</div><input type="number" id="nut-cal" class="fi" placeholder="0" style="font-size:18px;font-weight:700;text-align:center"></div>'+
+      '<div><div class="flbl">Proteína (g)</div><input type="number" id="nut-prot" class="fi" placeholder="0" style="font-size:18px;font-weight:700;text-align:center"></div>'+
+    '</div>'+
+    '<div class="fg3">'+
+      '<div><div class="flbl">Carbos (g)</div><input type="number" id="nut-carbos" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Grasa (g)</div><input type="number" id="nut-grasa" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Agua (L)</div><input type="number" id="nut-agua" class="fi" placeholder="0.0" step="0.1" style="text-align:center"></div>'+
+    '</div>'+
+    '<div><div class="flbl">Fasting (horas)</div><div class="fo" id="nut-fast-opts">'+fastBtns+'</div><input type="hidden" id="nut-fast" value="0"></div>'+
+    '<input type="text" id="nut-notas" class="fi" placeholder="Notas…" style="font-size:13px">'+
+    '<button onclick="_guardarNutricion()" class="fguardar"><i class="fas fa-leaf" style="color:#4ADE80"></i> Guardar nutrición</button>'+
+    '<div id="nut-res" class="fres"></div>'+
+    '</div>';
+}
+function _renderEntrenamientoForm(wrap){
+  var tipos=['Fuerza','Cardio','HIIT','Flexibilidad','Deporte','Caminata'];
+  var tipoBtns=tipos.map(function(t){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#ent-tipo-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'ent-tipo\').value=\''+t+'\'">'+t+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">💪 Registrar sesión</div>'+
+    '<div><div class="flbl">Tipo de entrenamiento</div><div class="fo" id="ent-tipo-opts">'+tipoBtns+'</div><input type="hidden" id="ent-tipo" value=""></div>'+
+    '<input type="text" id="ent-ejercicio" class="fi" placeholder="Ejercicio (ej. Press banca, Caminata 5km)" style="font-size:14px">'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Duración (min)</div><input type="number" id="ent-dur" class="fi" placeholder="0" style="font-size:20px;font-weight:700;text-align:center"></div>'+
+      '<div><div class="flbl">Distancia (km)</div><input type="number" id="ent-dist" class="fi" placeholder="0.0" step="0.1" style="font-size:20px;font-weight:700;text-align:center"></div>'+
+    '</div>'+
+    '<div class="fg3">'+
+      '<div><div class="flbl">Series</div><input type="number" id="ent-series" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Reps</div><input type="number" id="ent-reps" class="fi" placeholder="0" style="text-align:center"></div>'+
+      '<div><div class="flbl">Peso (kg)</div><input type="number" id="ent-peso" class="fi" placeholder="0" step="0.5" style="text-align:center"></div>'+
+    '</div>'+
+    '<input type="text" id="ent-notas" class="fi" placeholder="Notas de la sesión…" style="font-size:13px">'+
+    '<button onclick="_guardarEntrenamiento()" class="fguardar"><i class="fas fa-dumbbell" style="color:#FB923C"></i> Guardar sesión</button>'+
+    '<div id="ent-res" class="fres"></div>'+
+    '</div>';
+}
 
-function _renderEntrenamientoForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:10px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Registrar sesión</div><div><div style="font-size:10px;color:var(--m);margin-bottom:6px">Tipo</div><div class="opts" id="ent-tipo-opts">${['Fuerza','Cardio','HIIT','Flexibilidad','Deporte'].map(t=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'ent-tipo-opts');document.getElementById('ent-tipo').value='${t}'">${t}</button>`).join('')}</div><input type="hidden" id="ent-tipo" value=""></div><input type="text" id="ent-ejercicio" class="finput" placeholder="Ejercicio (ej. Press banca, Caminata)" style="font-size:14px;padding:10px 14px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Duración (min)</div><input type="number" id="ent-dur" class="finput" placeholder="0" style="font-size:16px;padding:10px 12px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Distancia (km)</div><input type="number" id="ent-dist" class="finput" placeholder="0.0" step="0.1" style="font-size:16px;padding:10px 12px"></div></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Series</div><input type="number" id="ent-series" class="finput" placeholder="0" style="padding:9px 10px;font-size:13px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Reps</div><input type="number" id="ent-reps" class="finput" placeholder="0" style="padding:9px 10px;font-size:13px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Peso (kg)</div><input type="number" id="ent-peso" class="finput" placeholder="0" step="0.5" style="padding:9px 10px;font-size:13px"></div></div><input type="text" id="ent-notas" class="finput" placeholder="Notas" style="font-size:13px;padding:9px 12px"><button onclick="_guardarEntrenamiento()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Guardar sesión</button><div id="ent-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
-
-function _renderPensamientoForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">¿En qué estás pensando?</div><textarea id="p-texto" class="finput" rows="4" placeholder="Escribe aquí tu pensamiento…" style="resize:none;line-height:1.5;font-size:14px"></textarea><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Categoría</div><div class="opts" id="p-cat-opts">${['Emoción','Idea','Reflexión','Decisión','Sueño'].map(c=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'p-cat-opts');document.getElementById('p-cat').value='${c}'">${c}</button>`).join('')}</div><input type="hidden" id="p-cat" value=""></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Energía</div><div class="opts" id="p-energia-opts">${[1,2,3,4,5].map(n=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'p-energia-opts');document.getElementById('p-energia').value=${n}" style="padding:8px 10px">${n}</button>`).join('')}</div><input type="hidden" id="p-energia" value=""></div></div><input type="text" id="p-etiquetas" class="finput" placeholder="Etiquetas (trabajo, familia…)" style="font-size:13px;padding:9px 12px"><button onclick="_guardarPensamiento()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Guardar pensamiento</button><div id="p-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
+function _renderPensamientoForm(wrap){
+  var cats=['Emoción','Idea','Reflexión','Decisión','Sueño'];
+  var catColors={'Emoción':'#EC4899','Idea':'#3B82F6','Reflexión':'#8B5CF6','Decisión':'#F59E0B','Sueño':'#06B6D4'};
+  var catBtns=cats.map(function(c){
+    return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#p-cat-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'p-cat\').value=\''+c+'\'" style="border-color:'+catColors[c]+'33;color:'+catColors[c]+'88">'+c+'</button>';
+  }).join('');
+  var enBtns=[1,2,3,4,5].map(function(n){
+    var col=n<=2?'#EF4444':n<=3?'#F59E0B':'#4ADE80';
+    return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#p-en-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'p-energia\').value='+n+'" style="border-color:'+col+'44;color:'+col+'88;min-width:36px;text-align:center">'+n+'</button>';
+  }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">💭 ¿En qué estás pensando?</div>'+
+    '<textarea id="p-texto" class="fi" rows="4" placeholder="Escribe aquí tu pensamiento…" style="resize:none;line-height:1.6"></textarea>'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Categoría</div><div class="fo" id="p-cat-opts">'+catBtns+'</div><input type="hidden" id="p-cat" value=""></div>'+
+      '<div><div class="flbl">Energía ⚡</div><div class="fo" id="p-en-opts">'+enBtns+'</div><input type="hidden" id="p-energia" value=""></div>'+
+    '</div>'+
+    '<div><div class="flbl">Etiquetas</div><input type="text" id="p-etiquetas" class="fi" placeholder="trabajo, familia, proyecto…" style="font-size:13px;padding:9px 14px"></div>'+
+    '<button onclick="_guardarPensamiento()" class="fguardar"><i class="fas fa-brain" style="color:#C4B5FD"></i> Guardar pensamiento</button>'+
+    '<div id="p-res" class="fres"></div>'+
+    '</div>';
+}
 function _guardarPensamiento(){const texto=document.getElementById('p-texto').value.trim();const categoria=document.getElementById('p-cat').value;const energia=document.getElementById('p-energia').value;const etiquetas=document.getElementById('p-etiquetas').value.trim();const res=document.getElementById('p-res');if(!texto){res.textContent='Escribe algo primero';res.style.color='var(--err)';return;}res.textContent='Guardando…';res.style.color='var(--m)';api.guardarPensamiento({texto,categoria,energia:energia||null,etiquetas,fecha:fmtD(new Date())}).then(r=>{res.textContent=r.ok?'✓ Guardado':'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Pensamiento guardado');document.getElementById('p-texto').value='';document.getElementById('p-etiquetas').value='';document.querySelectorAll('#p-cat-opts .opt,#p-energia-opts .opt').forEach(b=>b.classList.remove('on'));document.getElementById('p-cat').value='';document.getElementById('p-energia').value='';setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});}
 
-function _renderPersonaForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">¿Con quién interactuaste?</div><input type="text" id="per-nombre" class="finput" placeholder="Nombre" style="font-size:14px;padding:10px 14px"><div><div style="font-size:10px;color:var(--m);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Tipo</div><div class="opts" id="per-tipo-opts">${['Familia','Amigo','Pareja','Trabajo','Médico','Otro'].map(t=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'per-tipo-opts');document.getElementById('per-tipo').value='${t}'">${t}</button>`).join('')}</div><input type="hidden" id="per-tipo" value=""></div><div><div style="font-size:10px;color:var(--m);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Energía</div><div class="opts" id="per-energia-opts"><button class="opt" onclick="event.stopPropagation();_selOpt(this,'per-energia-opts');document.getElementById('per-energia').value=1" style="color:var(--ok)">+ Positiva</button><button class="opt" onclick="event.stopPropagation();_selOpt(this,'per-energia-opts');document.getElementById('per-energia').value=0">Neutral</button><button class="opt" onclick="event.stopPropagation();_selOpt(this,'per-energia-opts');document.getElementById('per-energia').value=-1" style="color:var(--err)">− Negativa</button></div><input type="hidden" id="per-energia" value=""></div><textarea id="per-notas" class="finput" rows="2" placeholder="Notas de la interacción…" style="resize:none;font-size:13px"></textarea><button onclick="_guardarPersona()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Registrar interacción</button><div id="per-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
+function _renderPersonaForm(wrap){
+  var tipos=['Familia','Amigo','Pareja','Trabajo','Médico','Otro'];
+  var tipoBtns=tipos.map(function(t){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-tipo-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-tipo\').value=\''+t+'\'">'+t+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">👥 ¿Con quién interactuaste?</div>'+
+    '<input type="text" id="per-nombre" class="fi" placeholder="Nombre de la persona" style="font-size:15px">'+
+    '<div><div class="flbl">Tipo de relación</div><div class="fo" id="per-tipo-opts">'+tipoBtns+'</div><input type="hidden" id="per-tipo" value=""></div>'+
+    '<div><div class="flbl">Energía de la interacción</div>'+
+    '<div class="fo" id="per-energia-opts">'+
+      '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-energia-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-energia\').value=1" style="border-color:#22C55E44;color:#22C55E88">⚡ Positiva</button>'+
+      '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-energia-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-energia\').value=0">— Neutral</button>'+
+      '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#per-energia-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'per-energia\').value=-1" style="border-color:#EF444444;color:#EF444488">↓ Negativa</button>'+
+    '</div><input type="hidden" id="per-energia" value=""></div>'+
+    '<div><div class="flbl">Notas</div><textarea id="per-notas" class="fi" rows="2" placeholder="¿De qué hablaron? ¿Cómo se sintió?" style="resize:none;font-size:13px"></textarea></div>'+
+    '<button onclick="_guardarPersona()" class="fguardar"><i class="fas fa-user-check" style="color:#EC4899"></i> Registrar interacción</button>'+
+    '<div id="per-res" class="fres"></div>'+
+    '</div>';
+}
 function _guardarPersona(){const nombre=document.getElementById('per-nombre').value.trim();const tipo=document.getElementById('per-tipo').value;const energia=document.getElementById('per-energia').value;const notas=document.getElementById('per-notas').value.trim();const res=document.getElementById('per-res');if(!nombre){res.textContent='Escribe un nombre';res.style.color='var(--err)';return;}res.textContent='Guardando…';res.style.color='var(--m)';api.guardarInteraccion({nombre,tipo,energia:energia!==''?Number(energia):0,notas}).then(r=>{res.textContent=r.ok?'✓ '+r.mensaje:'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Interacción guardada');document.getElementById('per-nombre').value='';document.getElementById('per-notas').value='';document.querySelectorAll('#per-tipo-opts .opt,#per-energia-opts .opt').forEach(b=>b.classList.remove('on'));document.getElementById('per-tipo').value='';document.getElementById('per-energia').value='';setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});}
 
-function _renderSaludForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Registro de salud</div><div><div style="font-size:10px;color:var(--m);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Tipo</div><div class="opts" id="sal-tipo-opts">${['Cita','Síntoma','Medicamento','Resultado','Vacuna','Check-in'].map(t=>`<button class="opt" onclick="event.stopPropagation();_selOpt(this,'sal-tipo-opts');document.getElementById('sal-tipo').value='${t}'">${t}</button>`).join('')}</div><input type="hidden" id="sal-tipo" value=""></div><input type="text" id="sal-desc" class="finput" placeholder="Descripción" style="font-size:14px;padding:10px 14px"><input type="text" id="sal-doctor" class="finput" placeholder="Doctor (opcional)" style="font-size:13px;padding:9px 12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Fecha</div><input type="date" id="sal-fecha" class="finput" style="font-size:13px;padding:9px 12px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Próxima cita</div><input type="date" id="sal-proxima" class="finput" style="font-size:13px;padding:9px 12px"></div></div><textarea id="sal-notas" class="finput" rows="2" placeholder="Notas…" style="resize:none;font-size:13px"></textarea><button onclick="_guardarSalud()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Guardar registro</button><div id="sal-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;document.getElementById('sal-fecha').value=fmtD(new Date());}
-function _guardarSalud(){const tipo=document.getElementById('sal-tipo').value;const desc=document.getElementById('sal-desc').value.trim();const doctor=document.getElementById('sal-doctor').value.trim();const fecha=document.getElementById('sal-fecha').value;const prox=document.getElementById('sal-proxima').value;const notas=document.getElementById('sal-notas').value.trim();const res=document.getElementById('sal-res');if(!desc){res.textContent='Agrega una descripción';res.style.color='var(--err)';return;}res.textContent='Guardando…';res.style.color='var(--m)';api.guardarSalud({tipo,descripcion:desc,doctor,fecha,proxima:prox||null,notas,estado:'Pendiente'}).then(r=>{res.textContent=r.ok?'✓ Guardado':'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Salud guardada');document.getElementById('sal-desc').value='';document.getElementById('sal-doctor').value='';document.getElementById('sal-proxima').value='';document.getElementById('sal-notas').value='';document.querySelectorAll('#sal-tipo-opts .opt').forEach(b=>b.classList.remove('on'));document.getElementById('sal-tipo').value='';setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});}
+function _renderSaludForm(wrap){
+  var tipos=['Cita','Síntoma','Medicamento','Resultado','Vacuna','Chequeo'];
+  var tipoBtns=tipos.map(function(t){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#sal-tipo-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'sal-tipo\').value=\''+t+'\'">'+t+'</button>'; }).join('');
+  var estados=['Pendiente','Completado','Cancelado'];
+  var estBtns=estados.map(function(e){ return '<button class="fopt" onclick="event.stopPropagation();document.querySelectorAll(\'#sal-est-opts .fopt\').forEach(function(b){b.classList.remove(\'on\')});this.classList.add(\'on\');document.getElementById(\'sal-estado\').value=\''+e+'\'">'+e+'</button>'; }).join('');
+  wrap.innerHTML=
+    '<div class="fwrap">'+
+    '<div class="flbl">🏥 Registro de salud</div>'+
+    '<div><div class="flbl">Tipo</div><div class="fo" id="sal-tipo-opts">'+tipoBtns+'</div><input type="hidden" id="sal-tipo" value=""></div>'+
+    '<input type="text" id="sal-desc" class="fi" placeholder="Descripción (ej. Cita con Dr. García)" style="font-size:14px">'+
+    '<div class="fg2">'+
+      '<div><div class="flbl">Doctor / Especialista</div><input type="text" id="sal-doctor" class="fi" placeholder="Opcional" style="font-size:13px"></div>'+
+      '<div><div class="flbl">Próxima cita</div><input type="date" id="sal-proxima" class="fi" style="font-size:13px;color-scheme:dark"></div>'+
+    '</div>'+
+    '<div><div class="flbl">Estado</div><div class="fo" id="sal-est-opts">'+estBtns+'</div><input type="hidden" id="sal-estado" value="Pendiente"></div>'+
+    '<input type="text" id="sal-notas" class="fi" placeholder="Notas…" style="font-size:13px">'+
+    '<button onclick="_guardarSalud()" class="fguardar"><i class="fas fa-heart-pulse" style="color:#EF4444"></i> Guardar registro</button>'+
+    '<div id="sal-res" class="fres"></div>'+
+    '</div>';
+}
 
 function _renderApartadoForm(wrap){wrap.innerHTML=`<div style="padding:16px var(--pad);display:flex;flex-direction:column;gap:12px"><div style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m)">Nuevo apartado</div><input type="text" id="ap-nombre" class="finput" placeholder="Nombre del apartado" style="font-size:14px;padding:10px 14px"><input type="text" id="ap-categoria" class="finput" placeholder="Categoría (Renta, Viaje, Emergencia…)" style="font-size:13px;padding:9px 12px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Monto</div><input type="number" id="ap-monto" class="finput" placeholder="0.00" step="0.01" inputmode="decimal" style="font-size:16px;padding:10px 12px"></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Banco</div><input type="text" id="ap-banco" class="finput" placeholder="BBVA, BEATS…" style="font-size:13px;padding:9px 12px"></div></div><div><div style="font-size:10px;color:var(--m);margin-bottom:4px">Fecha meta</div><input type="date" id="ap-meta" class="finput" style="font-size:13px;padding:9px 12px"></div><textarea id="ap-notas" class="finput" rows="2" placeholder="Notas…" style="resize:none;font-size:13px"></textarea><button onclick="_guardarApartado()" class="btn-save" style="border-radius:var(--rad-pill)"><i class="fas fa-floppy-disk"></i> Guardar apartado</button><div id="ap-res" style="font-size:12px;text-align:center;color:var(--m)"></div></div>`;}
 function _guardarApartado(){const nombre=document.getElementById('ap-nombre').value.trim();const categoria=document.getElementById('ap-categoria').value.trim();const monto=parseFloat(document.getElementById('ap-monto').value);const banco=document.getElementById('ap-banco').value.trim();const meta=document.getElementById('ap-meta').value;const notas=document.getElementById('ap-notas').value.trim();const res=document.getElementById('ap-res');if(!nombre||isNaN(monto)){res.textContent='Nombre y monto requeridos';res.style.color='var(--err)';return;}res.textContent='Guardando…';res.style.color='var(--m)';api.guardarApartado({nombre,categoria,monto,banco,meta:meta||null,notas,estado:'Activo'}).then(r=>{res.textContent=r.ok?'✓ Guardado':'✗ '+r.mensaje;res.style.color=r.ok?'var(--ok)':'var(--err)';if(r.ok){showToast('✓ Apartado guardado');document.getElementById('ap-nombre').value='';document.getElementById('ap-categoria').value='';document.getElementById('ap-monto').value='';document.getElementById('ap-banco').value='';document.getElementById('ap-meta').value='';document.getElementById('ap-notas').value='';setTimeout(cerrarEntrada,800);}}).catch(()=>{res.textContent='Error';res.style.color='var(--err)';});}
