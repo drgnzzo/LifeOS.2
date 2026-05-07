@@ -1420,9 +1420,10 @@ window.addEventListener('DOMContentLoaded',()=>{
       _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
       _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
 
-      // Mostrar anverso inmediatamente
+      // Mostrar anverso — quitar display:none y visibility
       var anv = document.getElementById('board-anverso');
       if(anv){
+        anv.style.display = '';
         anv.style.visibility = '';
         anv.style.opacity = '1';
       }
