@@ -336,12 +336,13 @@ function _crearDialOverlay(){
   // Overlay del dial
   _dialOverlay.style.cssText = [
     'position:fixed','inset:0','z-index:9000',
-    'display:flex','align-items:center','justify-content:center',
+    'display:none','align-items:center','justify-content:center',
     'opacity:0','pointer-events:none',
-    'background:transparent',
+    // Fondo atmosférico — viñeta radial + tinte violeta + blur
+    'background:radial-gradient(ellipse at center,rgba(80,40,140,0.15) 0%,rgba(4,4,14,0.65) 100%)',
+    'backdrop-filter:blur(28px) saturate(160%) brightness(0.68)',
+    '-webkit-backdrop-filter:blur(28px) saturate(160%) brightness(0.68)',
   ].join(';');
-  // El canvas maneja sus propios pointer-events
-  // display empieza como flex pero opacity:0 lo hace invisible
 
   // ── Partículas ambientales y glow de breathing ──
   var _glowEl = document.createElement('div');
@@ -1142,25 +1143,10 @@ function abrirDial(){
   _dialHovered=-1; _dialSubHov=-1; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   _dialDraw();
 
-  // Si el splash ya fue removido (segunda apertura), poner el fondo blur de nuevo
-  var splashGone = !document.getElementById('splash-dial');
-  if(splashGone){
-    _dialOverlay.style.background =
-      'radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),' +
-      'radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),' +
-      'rgba(4,4,14,0.6)';
-    _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
-    _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
-  } else {
-    // Primera vez: splash negro es el fondo, overlay transparente
-    _dialOverlay.style.background = 'transparent';
-    _dialOverlay.style.backdropFilter = 'none';
-    _dialOverlay.style.webkitBackdropFilter = 'none';
-  }
-
+  // Mostrar overlay con fondo blur siempre
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
-  _dialOverlay.style.pointerEvents = 'auto'; // activar para capturar click-outside
+  _dialOverlay.style.pointerEvents = 'auto';
   _dialVisible = true;
   requestAnimationFrame(function(){
     _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
@@ -1397,10 +1383,8 @@ window.addEventListener('DOMContentLoaded',()=>{
 
   // Montar el canvas del dial DENTRO del splash — así no hay overlay separado
   _crearDialOverlay();
-  // Hacer el overlay invisible e inerte — el splash ya es el fondo negro
-  _dialOverlay.style.background = 'transparent';
-  _dialOverlay.style.backdropFilter = 'none';
-  _dialOverlay.style.webkitBackdropFilter = 'none';
+  // El splash (z-index:8999) tapa el overlay mientras el dial hace fade-in
+  // El overlay ya tiene su fondo blur real — no necesita ser transparente
   _dialOverlay.style.pointerEvents = 'none'; // empieza inerte
 
   // Canvas invisible ANTES de dibujar — así el browser nunca ve el frame visible
@@ -1464,15 +1448,9 @@ window.addEventListener('DOMContentLoaded',()=>{
       var btn = document.getElementById('btn-nueva-entrada');
       if(btn) btn.classList.remove('active');
 
-      // Limpiar canvas y restaurar overlay para aperturas futuras
+      // Limpiar canvas para aperturas futuras
       _dialCanvas.style.opacity = '';
       _dialCanvas.style.transition = '';
-      _dialOverlay.style.background =
-        'radial-gradient(ellipse at center,transparent 35%,rgba(0,0,8,0.55) 100%),' +
-        'radial-gradient(ellipse at center,rgba(80,40,140,0.12) 0%,transparent 55%),' +
-        'rgba(4,4,14,0.6)';
-      _dialOverlay.style.backdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
-      _dialOverlay.style.webkitBackdropFilter = 'blur(26px) saturate(160%) brightness(0.72)';
 
       // Mostrar anverso — quitar display:none y visibility
       var anv = document.getElementById('board-anverso');
