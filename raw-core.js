@@ -3159,13 +3159,19 @@ document.addEventListener('DOMContentLoaded', function(){
       // ── HTML helpers ──
       function chkCircle(fila, dia, checked, tipo){
         var c = CAT[tipo]; var esH=(dia===diaKey);
+        // checked puede ser true/false o un objeto {v:true, fecha:'HH:mm'}
+        var isChecked = checked===true || (checked&&checked.v);
+        var fechaHora = (checked&&checked.fecha) ? checked.fecha : null;
+        var tooltip   = isChecked && fechaHora ? 'title="'+fechaHora+'"' : '';
         return '<div class="_act-chk" data-fila="'+fila+'" data-dia="'+dia+'" data-tipo="'+tipo+'"'+
-          ' style="width:22px;height:22px;min-width:22px;border-radius:50%;cursor:pointer;transition:all 200ms;'+
-          'border:1.5px solid '+(checked?c.color:esH?'rgba(255,255,255,.35)':'#26304A')+';'+
-          'background:'+(checked?c.color:'transparent')+';'+
-          'box-shadow:'+(checked?'0 0 8px '+c.glow+',0 0 4px '+c.glow:'none')+';'+
-          'display:flex;align-items:center;justify-content:center">'+
-          (checked?'<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none"></i>':'')+
+          ' '+tooltip+
+          ' style="position:relative;width:22px;height:22px;min-width:22px;border-radius:50%;cursor:pointer;transition:all 200ms;'+
+          'border:1.5px solid '+(isChecked?c.color:esH?'rgba(255,255,255,.35)':'rgba(100,80,160,0.3)')+';'+
+          'background:'+(isChecked?c.color:'transparent')+';'+
+          'box-shadow:'+(isChecked?'0 0 8px '+c.glow+',0 0 4px '+c.glow:'none')+';'+
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">'+
+          (isChecked?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'')+
+          (isChecked&&fechaHora?'<span style="font-size:5px;color:rgba(255,255,255,0.75);pointer-events:none;line-height:1;letter-spacing:0;font-weight:600">'+fechaHora+'</span>':'')+
         '</div>';
       }
 
@@ -3550,10 +3556,20 @@ document.addEventListener('DOMContentLoaded', function(){
           var nowChk = !ok;
           var tipo = c.dataset.tipo;
           var cat  = CAT[tipo];
-          c.style.borderColor = nowChk?cat.color:'#26304A';
+          var ahora = new Date();
+          var horaStr = String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0');
+          c.style.borderColor = nowChk?cat.color:'rgba(100,80,160,0.3)';
           c.style.background  = nowChk?cat.color:'transparent';
           c.style.boxShadow   = nowChk?'0 0 8px '+cat.glow+',0 0 4px '+cat.glow:'none';
-          c.innerHTML = nowChk?'<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none"></i>':'';
+          if(nowChk){
+            c.setAttribute('title', horaStr);
+            c.innerHTML = '<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>'+
+              '<span style="font-size:5px;color:rgba(255,255,255,0.75);pointer-events:none;line-height:1;font-weight:600">'+horaStr+'</span>';
+            c.style.flexDirection='column';c.style.gap='1px';
+          } else {
+            c.removeAttribute('title');
+            c.innerHTML='';
+          }
           // Highlight fila si todos marcados
           var row = c.closest('tr');
           if(row){
