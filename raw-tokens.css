@@ -1,0 +1,218 @@
+/* ═══════════════════════════════════════════════════════════════════
+   LIFEOS — DESIGN TOKENS v1.0
+   Fuente única de verdad del lenguaje visual del dial.
+   Importar ANTES de raw-app.css.
+
+   Convenciones:
+   --hud-*    → tokens del sistema HUD (paneles, secciones, dial)
+   --pc-*     → panel-color override por instancia (lo setea JS o CSS)
+   --acc-*    → paleta de acentos del dial (un color por sector/sección)
+═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Fondos & superficies ─────────────────────────────────────── */
+  --hud-bg-base:       #020810;
+  --hud-bg-deep:       #010509;
+  --hud-panel-bg:      rgba(10, 7, 22, 0.90);
+  --hud-panel-bg-hov:  rgba(14, 10, 28, 0.94);
+  --hud-panel-bg-act:  rgba(18, 12, 36, 0.97);
+  --hud-form-bg:       rgba(12, 10, 24, 0.97);
+
+  /* ── Bordes ────────────────────────────────────────────────────── */
+  --hud-border:        rgba(140, 100, 220, 0.20);
+  --hud-border-hov:    rgba(167, 139, 250, 0.40);
+  --hud-border-strong: rgba(167, 139, 250, 0.55);
+
+  /* ── Glow / breathing color por defecto (violeta del dial) ─── */
+  --hud-glow:          rgba(139, 92, 246, 0.18);
+  --hud-glow-strong:   rgba(139, 92, 246, 0.30);
+  --hud-glow-soft:     rgba(139, 92, 246, 0.06);
+
+  /* ── Tipografía base ──────────────────────────────────────────── */
+  --hud-text:          #f0f4f8;
+  --hud-text-mid:      rgba(220, 220, 240, 0.75);
+  --hud-text-dim:      rgba(200, 210, 220, 0.45);
+  --hud-text-faint:    rgba(200, 210, 220, 0.25);
+
+  /* ── Estados semánticos ────────────────────────────────────────── */
+  --hud-ok:            #4ADE80;
+  --hud-ok-glow:       rgba(74, 222, 128, 0.4);
+  --hud-warn:          #F59E0B;
+  --hud-warn-glow:     rgba(245, 158, 11, 0.4);
+  --hud-err:           #EF4444;
+  --hud-err-glow:      rgba(239, 68, 68, 0.4);
+
+  /* ══════════════════════════════════════════════════════════════
+     PALETA DE ACENTOS — cada sector del dial / sección del HOME
+     tiene un color propio. Mantener consistencia entre dial,
+     paneles HUD y secciones del anverso.
+  ══════════════════════════════════════════════════════════════ */
+  --acc-violet:        #8B5CF6;   /* Patrimonio — fondo emergencia */
+  --acc-violet-glow:   rgba(139, 92, 246, 0.35);
+  --acc-cyan:          #22D3EE;   /* Financiero — flujo */
+  --acc-cyan-glow:     rgba(34, 211, 238, 0.35);
+  --acc-green:         #4ADE80;   /* Patrimonio total / OK */
+  --acc-green-glow:    rgba(74, 222, 128, 0.35);
+  --acc-amber:         #F59E0B;   /* Bancos / Variables / Apartados */
+  --acc-amber-glow:    rgba(245, 158, 11, 0.35);
+  --acc-orange:        #FB923C;   /* Activity / Entrenamiento */
+  --acc-orange-glow:   rgba(251, 146, 60, 0.35);
+  --acc-pink:          #EC4899;   /* Salud / Persona */
+  --acc-pink-glow:     rgba(236, 72, 153, 0.35);
+  --acc-rose:          #FCA5A5;   /* Salud (suave) */
+  --acc-rose-glow:     rgba(252, 165, 165, 0.35);
+  --acc-indigo:        #A5B4FC;   /* Variables / Editar */
+  --acc-indigo-glow:   rgba(165, 180, 252, 0.35);
+  --acc-mint:          #86EFAC;   /* Nutrición */
+  --acc-mint-glow:     rgba(134, 239, 172, 0.35);
+  --acc-purple:        #C4B5FD;   /* Pensamiento / Patrimonio */
+  --acc-purple-glow:   rgba(196, 181, 253, 0.35);
+  --acc-fuchsia:       #F0ABFC;   /* Pensamiento (vivo) */
+  --acc-fuchsia-glow:  rgba(240, 171, 252, 0.35);
+  --acc-blue:          #93C5FD;   /* Persona / Relaciones */
+  --acc-blue-glow:     rgba(147, 197, 253, 0.35);
+  --acc-yellow:        #FACC15;   /* Logros XP */
+  --acc-yellow-glow:   rgba(250, 204, 21, 0.35);
+
+  /* ── Geometría ─────────────────────────────────────────────────── */
+  --hud-rad:           0px;       /* esquinas rectas — lenguaje del dial */
+  --hud-rad-pill:      2px;       /* pseudo-pill */
+  --hud-chamfer:       12px;      /* tamaño del corte del chamfer */
+  --hud-corner-size:   8px;       /* tamaño de las esquinas decorativas */
+  --hud-corner-thick:  1.5px;     /* grosor de las esquinas decorativas */
+
+  /* ── Sombras ───────────────────────────────────────────────────── */
+  --hud-shadow:        0 0 0 1px rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.5);
+  --hud-shadow-md:     0 0 0 1px rgba(255,255,255,0.13), 0 8px 32px rgba(0,0,0,0.65);
+
+  /* ── Timing del breathing ─────────────────────────────────────── */
+  --hud-breath-dur:    4s;
+  --hud-breath-easing: ease-in-out;
+  --hud-pulse-dur:     2.5s;
+
+  /* ── Patrón circuit-board (background sutil) ──────────────────── */
+  --hud-grid-color:    rgba(120, 80, 200, 0.025);
+  --hud-grid-size:     32px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   KEYFRAMES UNIFICADOS
+   Reusables por cualquier panel / sección / botón.
+   La intensidad del glow se controla via --pc-glow (panel color)
+   que cada sección setea individualmente.
+═══════════════════════════════════════════════════════════════════ */
+
+/* Breathing principal — para .section, paneles HUD y formularios.
+   Usa --pc-glow (override por sección) con fallback a --hud-glow. */
+@keyframes hudBreath {
+  0%, 100% {
+    border-color: var(--pc-border-dim, var(--hud-border));
+    box-shadow:
+      0 0 0 1px var(--pc-border-dim, var(--hud-border)),
+      0 4px 20px rgba(0, 0, 0, 0.45),
+      0 0 18px var(--pc-glow, var(--hud-glow-soft));
+  }
+  50% {
+    border-color: var(--pc-border-mid, var(--hud-border-hov));
+    box-shadow:
+      0 0 0 1px var(--pc-border-mid, var(--hud-border-hov)),
+      0 4px 28px rgba(0, 0, 0, 0.55),
+      0 0 36px var(--pc-glow, var(--hud-glow));
+  }
+}
+
+/* Línea superior pulsante — para indicadores de color en secciones */
+@keyframes hudTopPulse {
+  0%, 100% { opacity: 0.5; filter: blur(0); }
+  50%      { opacity: 1;   filter: blur(0.5px); }
+}
+
+/* Scan line vertical — para formularios y paneles importantes */
+@keyframes hudScan {
+  0%   { top: -2px; opacity: 0; }
+  3%   { opacity: 0.6; }
+  97%  { opacity: 0.6; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Pulso de esquinas decorativas (corner brackets) */
+@keyframes hudCornerPulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.95; }
+}
+
+/* Pulso de dot/punto — usado en chips, indicadores de estado */
+@keyframes hudDotPulse {
+  0%, 100% { transform: scale(1);    opacity: 0.7; }
+  50%      { transform: scale(1.35); opacity: 1; }
+}
+
+/* Aparición suave de valores numéricos */
+@keyframes hudValIn {
+  from { opacity: 0; transform: translateY(3px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Glow pulsante de barras de progreso */
+@keyframes hudBarGlow {
+  0%, 100% { box-shadow: 0 0 4px var(--pc-glow, var(--hud-glow-soft)); }
+  50%      { box-shadow: 0 0 12px var(--pc-glow, var(--hud-glow)),
+                         0 0 24px var(--pc-glow, var(--hud-glow-soft)); }
+}
+
+/* Shine que cruza una barra de progreso */
+@keyframes hudBarShine {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(200%); }
+}
+
+/* Hero glow — para la barra superior */
+@keyframes hudHeroGlow {
+  0%, 100% { border-bottom-color: rgba(255, 255, 255, 0.07); }
+  50%      { border-bottom-color: rgba(255, 255, 255, 0.18); }
+}
+
+/* Field separator pulse — divisores horizontales que respiran */
+@keyframes hudFieldPulse {
+  0%, 100% { border-bottom-color: rgba(255, 255, 255, 0.04); }
+  50%      { border-bottom-color: rgba(255, 255, 255, 0.10); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MIXINS COMO CLASES UTILITARIAS
+   Aplicar a cualquier elemento que requiera el lenguaje HUD.
+═══════════════════════════════════════════════════════════════════ */
+
+/* Aplicar a un panel para que tenga el background circuit-board */
+.hud-circuit-bg {
+  background-image:
+    linear-gradient(var(--hud-grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-grid-color) 1px, transparent 1px);
+  background-size: var(--hud-grid-size) var(--hud-grid-size);
+}
+
+/* Esquinas decorativas top-left + bottom-right (estilo dial) */
+.hud-corners {
+  position: relative;
+}
+.hud-corners::before,
+.hud-corners::after {
+  content: '';
+  position: absolute;
+  width: var(--hud-corner-size);
+  height: var(--hud-corner-size);
+  pointer-events: none;
+  z-index: 2;
+  animation: hudCornerPulse var(--hud-breath-dur) var(--hud-breath-easing) infinite;
+}
+.hud-corners::before {
+  top: 0; left: 0;
+  border-top:  var(--hud-corner-thick) solid var(--pc-accent, var(--hud-border-hov));
+  border-left: var(--hud-corner-thick) solid var(--pc-accent, var(--hud-border-hov));
+}
+.hud-corners::after {
+  bottom: 0; right: 0;
+  border-bottom: var(--hud-corner-thick) solid var(--pc-accent, var(--hud-border-hov));
+  border-right:  var(--hud-corner-thick) solid var(--pc-accent, var(--hud-border-hov));
+  animation-delay: calc(var(--hud-breath-dur) / 2);
+}
