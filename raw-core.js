@@ -2312,16 +2312,63 @@ function _inyectarToggleModo(){
     fs.id = 'form-hud-styles';
     fs.textContent = [
       // Contenedor principal del form
+      // Keyframe breathing específico para el form
+      '@keyframes formBreath{',
+        '0%,100%{',
+          'box-shadow:',
+            '0 0 0 1px rgba(140,100,220,0.20),',
+            '0 0 30px rgba(139,92,246,0.12),',
+            '0 0 60px rgba(139,92,246,0.06),',
+            '0 24px 80px rgba(0,0,0,0.85);',
+        '}',
+        '33%{',
+          'box-shadow:',
+            '0 0 0 1px rgba(167,139,250,0.45),',
+            '0 0 40px rgba(139,92,246,0.30),',
+            '0 0 80px rgba(139,92,246,0.14),',
+            '0 24px 80px rgba(0,0,0,0.90);',
+        '}',
+        '66%{',
+          'box-shadow:',
+            '0 0 0 1px rgba(34,211,238,0.30),',
+            '0 0 35px rgba(34,211,238,0.18),',
+            '0 0 70px rgba(34,211,238,0.08),',
+            '0 24px 80px rgba(0,0,0,0.90);',
+        '}',
+      '}',
+      // Borde superior que cambia de color
+      '@keyframes formBorderGlow{',
+        '0%,100%{background:linear-gradient(90deg,#7C3AED,#A855F7,#22D3EE);box-shadow:0 0 12px rgba(139,92,246,0.7),0 0 24px rgba(139,92,246,0.3);}',
+        '33%{background:linear-gradient(90deg,#A855F7,#22D3EE,#4ADE80);box-shadow:0 0 12px rgba(34,211,238,0.7),0 0 24px rgba(34,211,238,0.3);}',
+        '66%{background:linear-gradient(90deg,#22D3EE,#7C3AED,#A855F7);box-shadow:0 0 12px rgba(167,139,250,0.7),0 0 24px rgba(167,139,250,0.3);}',
+      '}',
+      // Scan line vertical que sube por el form
+      '@keyframes formScan{',
+        '0%{top:-2px;opacity:0}',
+        '3%{opacity:0.6}',
+        '97%{opacity:0.6}',
+        '100%{top:100%;opacity:0}',
+      '}',
+
       '#sec-entrada{',
         'background:rgba(10,7,22,0.97)!important;',
-        'border:1px solid rgba(140,100,220,0.28)!important;',
+        'border:1px solid rgba(140,100,220,0.25)!important;',
         'border-radius:16px!important;',
-        'box-shadow:0 0 0 1px rgba(140,100,220,0.10),0 24px 80px rgba(0,0,0,0.85),0 0 60px rgba(139,92,246,0.10)!important;',
         'backdrop-filter:blur(28px) saturate(180%)!important;',
         '-webkit-backdrop-filter:blur(28px) saturate(180%)!important;',
         'background-image:linear-gradient(rgba(120,80,200,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.018) 1px,transparent 1px)!important;',
         'background-size:32px 32px!important;',
         'width:440px!important;max-width:96vw!important;',
+        'animation:formBreath 4s ease-in-out infinite!important;',
+        'position:relative!important;',
+        'overflow:hidden!important;',
+      '}',
+      // Scan line sobre el form completo
+      '#sec-entrada::after{',
+        'content:"";',
+        'position:absolute;left:0;right:0;height:2px;pointer-events:none;z-index:10;',
+        'background:linear-gradient(90deg,transparent,rgba(167,139,250,0.4),rgba(34,211,238,0.4),transparent);',
+        'animation:formScan 6s linear infinite;',
       '}',
       // Header del form
       '#entrada-paso2-header{',
@@ -2333,9 +2380,7 @@ function _inyectarToggleModo(){
       '}',
       '#entrada-paso2-header::before{',
         'content:"";position:absolute;top:0;left:0;right:0;height:2px;',
-        'background:linear-gradient(90deg,#7C3AED,#A855F7,#22D3EE);',
-        'box-shadow:0 0 12px rgba(139,92,246,0.6),0 0 24px rgba(139,92,246,0.3);',
-        'animation:hudAccentPulse 3s ease-in-out infinite;',
+        'animation:formBorderGlow 4s ease-in-out infinite;',
       '}',
       '#entrada-paso2-titulo{',
         'font-size:14px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;',
@@ -3376,7 +3421,7 @@ document.addEventListener('DOMContentLoaded', function(){
       // ── PANEL WRAPPER ──
       function panelCol(tipo, inner){
         var c = CAT[tipo];
-        return '<div data-panel-tipo="'+tipo+'" style="flex:0 0 240px;min-width:220px;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
+        return '<div data-panel-tipo="'+tipo+'" style="flex:1 1 220px;min-width:200px;max-width:320px;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
                'display:flex;flex-direction:column;overflow:hidden;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
           '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px">'+
@@ -3449,8 +3494,8 @@ document.addEventListener('DOMContentLoaded', function(){
 
       board.innerHTML =
         header +
-        '<div style="display:flex;gap:12px;padding:12px;flex:1;overflow:hidden;min-height:0">'+
-          '<div style="display:flex;gap:10px;flex:1;overflow-x:auto;min-width:0;padding-bottom:4px">'+
+        '<div style="display:flex;gap:12px;padding:12px;flex:1;overflow:hidden;min-height:0;align-items:stretch">'+
+          '<div style="display:flex;gap:10px;flex:1;overflow-x:auto;overflow-y:hidden;min-width:0;padding-bottom:6px;align-items:stretch">'+
             panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
             panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
             panelCol('libro',       itemList(d.libros||[],   'libro'))+
