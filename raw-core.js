@@ -410,40 +410,7 @@ function _crearDialOverlay(){
   }
 
   // Reposicionar paneles respecto al canvas real en pantalla
-  function _reposicionarHUD(){
-    if(!_dialCanvas || !window._hudPanels) return;
-    var r = _dialCanvas.getBoundingClientRect();
-    var cx = r.left + r.width/2;   // centro X del canvas en pantalla
-    var cy = r.top  + r.height/2;  // centro Y del canvas en pantalla
-    var hw = r.width/2;            // mitad del ancho del canvas
-    var GAP = 18;                  // espacio entre canvas y panel
-
-    var positions = [
-      // [panelIndex, xFactor, yOffset, ancho]
-      // xFactor: -1=izquierda, +1=derecha
-      // yOffset: offset desde el centro Y
-      {i:0, side:-1, yOff:-230, w:200}, // Patrimonio   top-izq
-      {i:1, side: 1, yOff:-230, w:220}, // Financiero   top-der
-      {i:2, side:-1, yOff: -60, w:200}, // Necesidades  mid-izq
-      {i:3, side: 1, yOff: -60, w:220}, // Activity     mid-der
-      {i:4, side:-1, yOff: 130, w:200}, // Bitácora     bot-izq
-      {i:5, side: 1, yOff: 130, w:210}, // Navegación   bot-der
-    ];
-
-    positions.forEach(function(pos){
-      var hp = window._hudPanels[pos.i];
-      if(!hp || !hp.el) return;
-      var panelW = pos.w;
-      var x = pos.side === -1
-        ? cx - hw - GAP - panelW  // izquierda del canvas
-        : cx + hw + GAP;           // derecha del canvas
-      var y = cy + pos.yOff;
-      hp.el.style.left = Math.max(8, x) + 'px';
-      hp.el.style.top  = Math.max(8, y) + 'px';
-      hp.el.style.width = panelW + 'px';
-    });
-  }
-  window._reposicionarHUD = _reposicionarHUD;
+  // _reposicionarHUD v1 eliminado
 
 
 
@@ -490,53 +457,7 @@ function _crearDialOverlay(){
   }
 
   // ── Reposicionar — 1 panel izq + 1 panel der, usando todo el espacio ──
-  function _reposicionarHUD(){
-    if(!_dialCanvas || !window._hudPanels) return;
-    var r = _dialCanvas.getBoundingClientRect();
-    var cLeft  = r.left;   // borde izq del canvas
-    var cRight = r.right;  // borde der del canvas
-    var cTop   = r.top;
-    var cBot   = r.bottom;
-    var cH     = r.height;
-    var vW     = window.innerWidth;
-    var vH     = window.innerHeight;
-    var GAP    = 16;
-
-    // Panel izquierdo: desde borde izq de pantalla hasta borde izq del canvas
-    var leftW  = Math.max(240, cLeft - GAP*2);
-    var leftX  = GAP;
-    // Panel derecho: desde borde der del canvas hasta borde der de pantalla
-    var rightW = Math.max(240, vW - cRight - GAP*2);
-    var rightX = cRight + GAP;
-
-    // Altura: casi toda la pantalla, centrado verticalmente con el dial
-    var panH   = Math.min(vH - 40, Math.max(cH + 40, 520));
-    var panY   = Math.max(20, (vH - panH) / 2);
-
-    window._hudPanels.forEach(function(hp){
-      if(!hp || !hp.el) return;
-      if(hp.el._side === 'left'){
-        hp.el.style.left   = leftX + 'px';
-        hp.el.style.width  = leftW + 'px';
-        hp.el.style.top    = panY + 'px';
-        hp.el.style.height = panH + 'px';
-        hp.el.style.maxHeight = panH + 'px';
-        hp.el.style.overflowY = 'auto';
-        // Chamfer left panel: top-right y bottom-left
-        hp.el.style.clipPath = 'polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px))';
-      } else {
-        hp.el.style.left   = rightX + 'px';
-        hp.el.style.width  = rightW + 'px';
-        hp.el.style.top    = panY + 'px';
-        hp.el.style.height = panH + 'px';
-        hp.el.style.maxHeight = panH + 'px';
-        hp.el.style.overflowY = 'auto';
-        // Chamfer right panel: top-left y bottom-right
-        hp.el.style.clipPath = 'polygon(18px 0,100% 0,100% calc(100% - 18px),calc(100% - 18px) 100%,0 100%,0 18px)';
-      }
-    });
-  }
-  window._reposicionarHUD = _reposicionarHUD;
+  // _reposicionarHUD viejo eliminado — se usa la versión de 6 panels
 
   // ══════════════════════════════════════
   //  HELPERS VISUALES — v3: panels independientes con breathing
@@ -841,29 +762,47 @@ function _crearDialOverlay(){
     var vW  = window.innerWidth;
     var vH  = window.innerHeight;
     var GAP = 14;
-    var leftX  = GAP;
-    var leftW  = Math.min(Math.max(180, r.left - GAP*2), Math.floor((r.left - GAP*2) * 0.78));
-    var rightX = r.right + GAP;
-    var rightW = Math.min(Math.max(180, vW - r.right - GAP*2), Math.floor((vW - r.right - GAP*2) * 0.78));
+    // Espacio disponible a cada lado del dial
+    var leftSpace  = r.left;           // píxeles desde borde izq pantalla hasta borde izq del dial
+    var rightSpace = vW - r.right;     // píxeles desde borde der del dial hasta borde der pantalla
+
+    // Ancho de panel: 78% del espacio disponible, mínimo 180px
+    var leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.78));
+    var rightW = Math.min(Math.max(180, rightSpace - GAP*2), Math.floor(rightSpace * 0.78));
+
+    // Centrar horizontalmente en el espacio disponible (igual que derecha)
+    var leftX  = Math.floor((leftSpace  - leftW)  / 2);   // centrado en zona izquierda
+    var rightX = r.right + Math.floor((rightSpace - rightW) / 2); // centrado en zona derecha
 
     // Recoger alturas reales de cada panel para distribuirlos sin solaparse
     var leftPanels  = window._hudPanels.filter(function(hp){ return hp.el._side==='left';  });
     var rightPanels = window._hudPanels.filter(function(hp){ return hp.el._side==='right'; });
 
     function positionCol(panels, x, w){
-      var totalH  = panels.reduce(function(s,hp){ return s + hp.el.offsetHeight + GAP; },0) - GAP;
-      var startY  = Math.max(GAP, (vH - totalH)/2);
-      var curY    = startY;
       panels.sort(function(a,b){ return a.el._order - b.el._order; });
+      // Medir alturas reales: poner visibility:hidden pero display:block temporalmente
       panels.forEach(function(hp){
-        hp.el.style.left  = x + 'px';
-        hp.el.style.width = w + 'px';
-        hp.el.style.top   = curY + 'px';
-        // chamfer según lado
-        hp.el.style.clipPath = x < vW/2
-          ? 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))'
-          : 'polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)';
-        curY += hp.el.offsetHeight + GAP;
+        hp.el.style.width    = w + 'px';
+        hp.el.style.left     = x + 'px';
+        hp.el.style.top      = '-9999px'; // fuera de pantalla para medir
+        hp.el.style.visibility = 'hidden';
+        hp.el.style.opacity    = '0';
+      });
+      // Leer alturas reales ahora que tienen ancho asignado
+      var totalH = panels.reduce(function(s,hp){
+        return s + (hp.el.scrollHeight || hp.el.offsetHeight || 200) + GAP;
+      },0) - GAP;
+      var startY = Math.max(GAP, (vH - totalH) / 2);
+      var curY   = startY;
+      var isLeft = x < vW/2;
+      var chamfer = isLeft
+        ? 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))'
+        : 'polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)';
+      panels.forEach(function(hp){
+        var h = hp.el.scrollHeight || hp.el.offsetHeight || 200;
+        hp.el.style.top      = curY + 'px';
+        hp.el.style.clipPath = chamfer;
+        curY += h + GAP;
       });
     }
 
@@ -891,9 +830,16 @@ function _crearDialOverlay(){
 
     var d = datos || window._hudDatos || {};
 
-    // Patrimonio
+    // Patrimonio — calcular disponible directo de _fijosData
+    var fijosAll = window._fijosData || [];
+    var totalDisp = fijosAll.reduce(function(s,f){ return f.nombre==='P'?s:s+(f.monto||0); },0);
+    var totalApD  = (window._apartadosData||[]).reduce(function(s,a){
+      return a.estado&&a.estado.toLowerCase()==='usado'?s:s+(a.monto||0);
+    },0);
+    if(totalDisp !== 0) set('_hud-saldo', fmt2(totalDisp - totalApD));
+    // Fallback desde DOM si hay
     var sv = document.getElementById('saldo-val');
-    if(sv && sv.textContent && sv.textContent.trim()!=='...') set('_hud-saldo', sv.textContent.trim());
+    if(sv && sv.textContent && sv.textContent.trim().length>2 && sv.textContent.trim()!=='—') set('_hud-saldo', sv.textContent.trim());
 
     var fijos = window._fijosData || [];
     var maxMonto = fijos.reduce(function(m,f){ return f.nombre!=='P'?Math.max(m,Math.abs(f.monto||0)):m; },1);
@@ -942,8 +888,8 @@ function _crearDialOverlay(){
       set('_hud-gastoDia', gd ? fmt(gd) : '—');
     }
 
-    // Necesidades
-    var nec = d.necesidades || {};
+    // Necesidades — buscar en todas las fuentes posibles
+    var nec = d.necesidades || window._necData || {};
     var niveles = nec.niveles || [];
     var totalNec = niveles.reduce(function(s,n){ return s+Math.abs(n.total||0); },0);
     [1,2,3,4,5].forEach(function(n){
@@ -968,10 +914,19 @@ function _crearDialOverlay(){
     }
 
     // Bitacora
-    if(window._pensamientosData && window._pensamientosData.items)
-      set('_hud-pens', window._pensamientosData.items.length+' pensamientos');
-    if(window._relacionesData && window._relacionesData.items)
-      set('_hud-rels', window._relacionesData.items.length+' personas');
+    if(window._pensamientosData && window._pensamientosData.items){
+      var np = window._pensamientosData.items.length;
+      set('_hud-pens', np ? np+' pensamientos' : '—');
+    }
+    if(window._relacionesData && window._relacionesData.items){
+      var nr = window._relacionesData.items.length;
+      set('_hud-rels', nr ? nr+' personas' : '—');
+    }
+    // Salud y entrenamiento desde DOM o datos
+    var salItems = document.querySelectorAll('#salud-body .salud-item');
+    if(salItems.length) set('_hud-sal', salItems.length+' registros');
+    var entItems = document.querySelectorAll('#entrenamiento-body [class*="item"]');
+    if(entItems.length) set('_hud-ent', entItems.length+' sesiones');
   };
   
 
