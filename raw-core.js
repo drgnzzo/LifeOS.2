@@ -3328,6 +3328,7 @@ document.addEventListener('DOMContentLoaded', function(){
                '<td style="padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
                  (hab.sims||hab.bw?'<div style="font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-bottom:1px">'+(hab.sims||hab.bw)+'</div>':'')+
                  '<div style="font-size:13px;font-weight:500;color:'+(allDone?c.color:'#C8D0E0')+';'+
+                 'max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+
                  (allDone?'text-shadow:0 0 8px '+c.glow:'')+'">' + hab.nombre+'</div>'+
                '</td>';
           dias.forEach(function(dia){
@@ -3345,7 +3346,7 @@ document.addEventListener('DOMContentLoaded', function(){
         if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
         var sorted = applyItemFilter(items, tipo);
         return filterBar(tipo)+
-          '<div style="display:flex;flex-direction:column">'+
+          '<div style="display:flex;flex-direction:column;width:100%">'+
           sorted.map(function(it){
             var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
             return '<div class="_item-row" style="display:flex;align-items:center;gap:10px;padding:8px 16px;'+
@@ -3353,7 +3354,8 @@ document.addEventListener('DOMContentLoaded', function(){
               ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
               chkItem(it.fila, tipo, done)+
               '<span style="font-size:13px;font-weight:500;color:'+(done?'#4A5266':'#C8D0E0')+';'+
-              'word-break:break-word;overflow-wrap:anywhere;min-width:0">'+it.nombre+'</span>'+
+              'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'+
+              'line-height:1.4;word-break:break-word;min-width:0;flex:1">'+it.nombre+'</span>'+
             '</div>';
           }).join('')+'</div>';
       }
@@ -3419,10 +3421,19 @@ document.addEventListener('DOMContentLoaded', function(){
         '</div>';
 
       // ── PANEL WRAPPER ──
+      // Ancho por tipo: hábitos necesitan espacio para checks, listas para texto
+      var colW = {
+        personal:    'flex:1 1 auto;min-width:230px;max-width:340px',
+        electronics: 'flex:1 1 auto;min-width:230px;max-width:340px',
+        libro:       'flex:1 1 auto;min-width:200px;max-width:280px',
+        movie:       'flex:1 1 auto;min-width:200px;max-width:280px',
+        norut:       'flex:1 1 auto;min-width:200px;max-width:280px',
+      };
       function panelCol(tipo, inner){
         var c = CAT[tipo];
-        return '<div data-panel-tipo="'+tipo+'" style="flex:1 1 220px;min-width:200px;max-width:320px;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
-               'display:flex;flex-direction:column;overflow:hidden;'+
+        var wStyle = colW[tipo] || 'flex:1 1 auto;min-width:200px;max-width:300px';
+        return '<div data-panel-tipo="'+tipo+'" style="'+wStyle+';background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
+               'display:flex;flex-direction:column;overflow:hidden;width:max-content;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
           '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px">'+
             '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
@@ -3495,7 +3506,7 @@ document.addEventListener('DOMContentLoaded', function(){
       board.innerHTML =
         header +
         '<div style="display:flex;gap:12px;padding:12px;flex:1;overflow:hidden;min-height:0;align-items:stretch">'+
-          '<div style="display:flex;gap:10px;flex:1;overflow-x:auto;overflow-y:hidden;min-width:0;padding-bottom:6px;align-items:stretch">'+
+          '<div style="display:flex;gap:10px;flex:1;overflow-x:auto;overflow-y:hidden;min-width:0;padding-bottom:6px;align-items:stretch;width:100%">'+
             panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
             panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
             panelCol('libro',       itemList(d.libros||[],   'libro'))+
