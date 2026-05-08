@@ -539,54 +539,127 @@ function _crearDialOverlay(){
   window._reposicionarHUD = _reposicionarHUD;
 
   // ══════════════════════════════════════
-  //  HELPERS VISUALES — v2: cards separadas, textos grandes
+  //  HELPERS VISUALES — v3: panels independientes con breathing
   // ══════════════════════════════════════
 
-  // Card contenedor con borde de color y línea top neón
-  function _card(color, children){
-    return '<div style="margin:10px 14px 0;border-radius:12px;border:1px solid '+color+'28;'+
-      'background:linear-gradient(135deg,rgba(20,12,40,0.65),rgba(14,8,28,0.50));'+
-      'overflow:hidden;position:relative">'+
-      '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';'+
-        'box-shadow:0 0 10px '+color+',0 0 20px '+color+'44;opacity:.85;animation:hudAccPulse 3s ease-in-out infinite;--acc:'+color+'"></div>'+
-      children+
-    '</div>';
+  // ── Keyframes específicos de los mini-panels ──
+  (function(){
+    if(document.getElementById('hud-mini-kf')) return;
+    var s=document.createElement('style'); s.id='hud-mini-kf';
+    s.textContent=[
+      // Breathing con glow de color variable via --pc
+      '@keyframes miniBreath{',
+        '0%,100%{box-shadow:0 0 0 1px var(--pc-dim,rgba(140,100,220,0.15)),0 8px 32px rgba(0,0,0,0.7),0 0 20px var(--pc-glow,rgba(139,92,246,0.05))}',
+        '50%{box-shadow:0 0 0 1px var(--pc-mid,rgba(140,100,220,0.40)),0 8px 40px rgba(0,0,0,0.85),0 0 50px var(--pc-glow,rgba(139,92,246,0.18))}',
+      '}',
+      // Scan line que recorre el perímetro (top→right→bottom→left)
+      '@keyframes perimScan{',
+        '0%  {clip-path:inset(0 100% 98% 0)}',     // top izq→der
+        '25% {clip-path:inset(0 0 98% 0)}',          // top completo
+        '26% {clip-path:inset(0 0 0 98%)}',          // right arriba
+        '50% {clip-path:inset(0 0 0 0%)}',            // right completo
+        '51% {clip-path:inset(98% 0 0 0)}',           // bottom der→izq
+        '75% {clip-path:inset(98% 100% 0 0)}',       // bottom completo
+        '76% {clip-path:inset(0 100% 0 0)}',          // left abajo
+        '99% {clip-path:inset(0 100% 0 100%)}',      // left completo
+        '100%{clip-path:inset(0 100% 98% 0)}',       // reinicio
+      '}',
+      // Pulso de la línea top de color
+      '@keyframes topPulse{0%,100%{opacity:.5;filter:blur(0)}50%{opacity:1;filter:blur(1px)}}',
+      // Valor entra
+      '@keyframes hudValIn{0%{opacity:0;transform:translateY(3px)}100%{opacity:1;transform:none}}',
+      '@keyframes hudDotPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.5);opacity:1}}',
+    ].join('');
+    document.head.appendChild(s);
+  })();
+
+  // ── Crear un panel flotante independiente ──
+  function _mkFloatPanel(id, accentColor, glowColor){
+    var p = document.createElement('div');
+    p.id  = id;
+    p.style.cssText = [
+      'position:fixed','z-index:9001',
+      'background:rgba(10,7,22,0.88)',
+      'border:1px solid rgba(140,100,220,0.22)',
+      'backdrop-filter:blur(22px) saturate(170%)',
+      '-webkit-backdrop-filter:blur(22px) saturate(170%)',
+      'border-radius:14px',
+      'opacity:0','visibility:hidden',
+      'transition:opacity 500ms ease-out',
+      'overflow:hidden',
+      'font-family:-apple-system,BlinkMacSystemFont,sans-serif',
+      'animation:miniBreath 4s ease-in-out infinite',
+      // Circuit pattern
+      'background-image:linear-gradient(rgba(120,80,200,0.018) 1px,transparent 1px),linear-gradient(90deg,rgba(120,80,200,0.018) 1px,transparent 1px)',
+      'background-size:28px 28px',
+    ].join(';');
+    // CSS vars para el breathing de color
+    p.style.setProperty('--pc-dim',  accentColor.replace(')',',0.18)').replace('rgb','rgba'));
+    p.style.setProperty('--pc-mid',  accentColor.replace(')',',0.45)').replace('rgb','rgba'));
+    p.style.setProperty('--pc-glow', glowColor);
+    p._accent = accentColor;
+
+    // Línea top neón animada
+    var top = document.createElement('div');
+    top.style.cssText = 'position:absolute;top:0;left:0;right:0;height:2px;'+
+      'background:'+accentColor+';'+
+      'box-shadow:0 0 10px '+accentColor+',0 0 20px '+glowColor+';'+
+      'animation:topPulse 3s ease-in-out infinite;z-index:2';
+    p.appendChild(top);
+
+    // Scan perimetral — un div con borde completo que se recorta animado
+    var scan = document.createElement('div');
+    scan.style.cssText = 'position:absolute;inset:0;border-radius:14px;pointer-events:none;z-index:3;'+
+      'border:1.5px solid '+accentColor.replace(')',',0.6)').replace('rgb','rgba')+';'+
+      'box-shadow:inset 0 0 8px '+glowColor+';'+
+      'animation:perimScan 5s linear infinite';
+    p.appendChild(scan);
+
+    // Contenedor de contenido (para no interferir con el scan)
+    var inner = document.createElement('div');
+    inner.style.cssText = 'position:relative;z-index:1;display:flex;flex-direction:column';
+    inner.id = id+'-inner';
+    p.appendChild(inner);
+
+    return p;
   }
 
-  // Header de card
-  function _cHdr(label, color, icon){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:12px 14px 10px">'+
-      '<div style="width:30px;height:30px;border-radius:8px;background:'+color+'18;border:1px solid '+color+'40;'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px '+color+'25">'+
-        '<i class="fas '+icon+'" style="font-size:12px;color:'+color+';filter:drop-shadow(0 0 5px '+color+')"></i>'+
+  // ── Header del panel ──
+  function _pH(label, color, icon){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:13px 16px 11px">'+
+      '<div style="width:30px;height:30px;border-radius:8px;background:'+color+'18;border:1px solid '+color+'45;'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;'+
+        'box-shadow:0 0 12px '+color+'30;filter:drop-shadow(0 0 4px '+color+')">'+
+        '<i class="fas '+icon+'" style="font-size:12px;color:'+color+'"></i>'+
       '</div>'+
-      '<span style="font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;'+
-        'color:'+color+';text-shadow:0 0 10px '+color+'88">'+label+'</span>'+
-    '</div>';
+      '<span style="font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;'+
+        'color:'+color+';text-shadow:0 0 12px '+color+'88">'+label+'</span>'+
+    '</div>'+
+    '<div style="height:1px;background:linear-gradient(90deg,'+color+'50,rgba(140,100,220,0.08),transparent)"></div>';
   }
 
-  // Hero — valor grande
+  // ── Hero valor grande ──
   function _hero(id, color, sublabel){
-    return '<div style="padding:4px 14px 14px">'+
+    return '<div style="padding:12px 16px 8px">'+
       '<div style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;'+
-        'color:rgba(200,208,230,0.35);margin-bottom:6px">'+sublabel+'</div>'+
+        'color:rgba(200,208,230,0.30);margin-bottom:6px">'+sublabel+'</div>'+
       '<div id="'+id+'" style="font-size:34px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;'+
-        'text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22">—</div>'+
+        'text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22;animation:hudValIn .5s ease-out">—</div>'+
     '</div>';
   }
 
-  // Fila stat — label 13px, valor 14px
+  // ── Fila stat 13px label / 14px valor ──
   function _row(label, id, color, barId, emoji){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;'+
+    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 16px;'+
       'border-top:1px solid rgba(255,255,255,0.05)">'+
-      '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
+      '<div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">'+
         (emoji
           ? '<span style="font-size:14px;flex-shrink:0">'+emoji+'</span>'
           : '<div style="width:8px;height:8px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>')+
-        '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+label+'</span>'+
+        '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>'+
       '</div>'+
       (barId
-        ? '<div style="width:50px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;flex-shrink:0">'+
+        ? '<div style="width:48px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;flex-shrink:0">'+
             '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'80;border-radius:2px;transition:width .8s ease"></div>'+
           '</div>' : '')+
       '<span id="'+id+'" style="font-size:14px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;'+
@@ -594,15 +667,15 @@ function _crearDialOverlay(){
     '</div>';
   }
 
-  // Duo: 2 valores en cajas
+  // ── Duo: 2 valores en cajas ──
   function _duo(id1,lbl1,c1, id2,lbl2,c2){
-    return '<div style="display:flex;gap:8px;padding:8px 14px 12px">'+
-      '<div style="flex:1;background:'+c1+'10;border:1px solid '+c1+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
+    return '<div style="display:flex;gap:8px;padding:10px 16px 12px">'+
+      '<div style="flex:1;background:'+c1+'12;border:1px solid '+c1+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
         '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+c1+';opacity:.6;box-shadow:0 0 8px '+c1+'"></div>'+
         '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:'+c1+'90;margin-bottom:7px">'+lbl1+'</div>'+
         '<div id="'+id1+'" style="font-size:22px;font-weight:800;color:'+c1+';text-shadow:0 0 14px '+c1+'55;line-height:1">—</div>'+
       '</div>'+
-      '<div style="flex:1;background:'+c2+'10;border:1px solid '+c2+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
+      '<div style="flex:1;background:'+c2+'12;border:1px solid '+c2+'30;border-radius:10px;padding:12px;position:relative;overflow:hidden">'+
         '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+c2+';opacity:.6;box-shadow:0 0 8px '+c2+'"></div>'+
         '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:'+c2+'90;margin-bottom:7px">'+lbl2+'</div>'+
         '<div id="'+id2+'" style="font-size:22px;font-weight:800;color:'+c2+';text-shadow:0 0 14px '+c2+'55;line-height:1">—</div>'+
@@ -610,9 +683,9 @@ function _crearDialOverlay(){
     '</div>';
   }
 
-  // Maslow con nombre 13px
+  // ── Maslow bar ──
   function _maslow(label, id, barId, color){
-    return '<div style="padding:8px 14px;border-top:1px solid rgba(255,255,255,0.04)">'+
+    return '<div style="padding:9px 16px;border-top:1px solid rgba(255,255,255,0.04)">'+
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'+
         '<div style="width:8px;height:8px;border-radius:50%;background:'+color+';box-shadow:0 0 7px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>'+
         '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.70);flex:1">'+label+'</span>'+
@@ -624,17 +697,17 @@ function _crearDialOverlay(){
     '</div>';
   }
 
-  // Botón nav
+  // ── Nav button ──
   function _nav(label, icon, color, fn){
     var b = document.createElement('div');
-    b.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;'+
+    b.style.cssText = 'display:flex;align-items:center;gap:12px;padding:11px 16px;cursor:pointer;'+
       'transition:background .15s;border-top:1px solid rgba(255,255,255,0.05)';
     b.innerHTML =
-      '<div style="width:32px;height:32px;border-radius:9px;background:'+color+'15;border:1px solid '+color+'35;'+
-        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px '+color+'20">'+
-        '<i class="fas '+icon+'" style="font-size:12px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
+      '<div style="width:30px;height:30px;border-radius:8px;background:'+color+'15;border:1px solid '+color+'35;'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 8px '+color+'20">'+
+        '<i class="fas '+icon+'" style="font-size:11px;color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
       '</div>'+
-      '<span style="font-size:13px;font-weight:600;color:rgba(220,220,240,0.75);flex:1;letter-spacing:.04em">'+label+'</span>'+
+      '<span style="font-size:13px;font-weight:600;color:rgba(220,220,240,0.75);flex:1">'+label+'</span>'+
       '<i class="fas fa-chevron-right" style="font-size:10px;color:'+color+'60"></i>';
     b.addEventListener('mouseenter',function(){ b.style.background=color+'14'; b.querySelector('span').style.color='#fff'; });
     b.addEventListener('mouseleave',function(){ b.style.background='transparent'; b.querySelector('span').style.color='rgba(220,220,240,0.75)'; });
@@ -643,89 +716,148 @@ function _crearDialOverlay(){
   }
 
   // ══════════════════════════════════════
-  //  PANEL IZQUIERDO — 3 cards
+  //  6 PANELS FLOTANTES INDEPENDIENTES
+  //  Izq: Patrimonio / Necesidades / Bitácora
+  //  Der: Financiero / Activity+Logros / Navegación
   // ══════════════════════════════════════
-  var _pLeft = _mkHudPanel('hud-left','left');
-  _pLeft.style.setProperty('--hud-glow','rgba(34,197,94,0.14)');
-  _pLeft.innerHTML =
-    _card('#22C55E',
-      _cHdr('Patrimonio','#22C55E','fa-landmark') +
-      _hero('_hud-saldo','#22C55E','Disponible hoy') +
-      '<div style="padding:0 14px 10px">'+
-        '<div style="display:flex;justify-content:space-between;margin-bottom:5px">'+
-          '<span style="font-size:11px;color:rgba(200,208,230,0.35);text-transform:uppercase;letter-spacing:.10em">Fondo emergencia</span>'+
-          '<span id="_hud-fondo-pct" style="font-size:12px;font-weight:700;color:#22C55E">—</span>'+
-        '</div>'+
-        '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
-          '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(34,197,94,.5);border-radius:3px;transition:width .8s ease"></div>'+
-        '</div>'+
+
+  // ── Panel 1: Patrimonio ──
+  var _p1 = _mkFloatPanel('hud-patrimonio','#22C55E','rgba(34,197,94,0.15)');
+  document.getElementById('hud-patrimonio-inner').innerHTML =
+    _pH('Patrimonio','#22C55E','fa-landmark') +
+    _hero('_hud-saldo','#22C55E','Disponible hoy') +
+    '<div style="padding:0 16px 10px">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:5px">'+
+        '<span style="font-size:11px;color:rgba(200,208,230,0.30);text-transform:uppercase;letter-spacing:.10em">Fondo emergencia</span>'+
+        '<span id="_hud-fondo-pct" style="font-size:12px;font-weight:700;color:#22C55E">—</span>'+
       '</div>'+
-      _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','🏦') +
-      _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
-      _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
-      _row('Apartados','_hud-apart', '#F59E0B',null,'🔒')
-    ) +
-    _card('#A855F7',
-      _cHdr('Necesidades','#A855F7','fa-layer-group') +
-      _maslow('Fisiológicas',   '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
-      _maslow('Seguridad',      '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
-      _maslow('Afiliación',     '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
-      _maslow('Reconocimiento', '_hud-nec-4','_hud-nec-4-bar','#A855F7') +
-      _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E')
-    ) +
-    _card('#C084FC',
-      _cHdr('Bitácora','#C084FC','fa-book-open') +
-      _row('Pensamientos','_hud-pens','#C084FC',null,'💭') +
-      _row('Relaciones',  '_hud-rels','#EC4899',null,'👥') +
-      _row('Salud',       '_hud-sal', '#EF4444',null,'❤️') +
-      _row('Entrenamiento','_hud-ent','#FB923C',null,'💪')
-    ) +
-    '<div style="height:10px"></div>';
+      '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
+        '<div id="_hud-fondo-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(34,197,94,.5);border-radius:3px;transition:width .8s ease"></div>'+
+      '</div>'+
+    '</div>'+
+    _row('BBVA',     '_hud-bbva',  '#4ADE80','_hud-bbva-bar','🏦') +
+    _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
+    _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
+    _row('Apartados','_hud-apart', '#F59E0B',null,'🔒') +
+    '<div style="height:4px"></div>';
 
-  _pLeft.appendChild(_nav('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
-  _pLeft.appendChild(_nav('Ver Necesidades','fa-layer-group','#A855F7','irABitacora'));
+  // ── Panel 2: Necesidades ──
+  var _p2 = _mkFloatPanel('hud-necesidades','#A855F7','rgba(168,85,247,0.15)');
+  document.getElementById('hud-necesidades-inner').innerHTML =
+    _pH('Necesidades','#A855F7','fa-layer-group') +
+    _maslow('Fisiológicas',   '_hud-nec-1','_hud-nec-1-bar','#EF4444') +
+    _maslow('Seguridad',      '_hud-nec-2','_hud-nec-2-bar','#F59E0B') +
+    _maslow('Afiliación',     '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
+    _maslow('Reconocimiento', '_hud-nec-4','_hud-nec-4-bar','#A855F7') +
+    _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E') +
+    '<div style="height:4px"></div>';
 
-  // ══════════════════════════════════════
-  //  PANEL DERECHO — 2 cards + nav
-  // ══════════════════════════════════════
-  var _pRight = _mkHudPanel('hud-right','right');
-  _pRight.style.setProperty('--hud-glow','rgba(34,211,238,0.14)');
-  _pRight.innerHTML =
-    _card('#22D3EE',
-      _cHdr('Financiero','#22D3EE','fa-chart-line') +
-      _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
-      _duo('_hud-fin-ing','Ingresos','#22C55E','_hud-fin-egr','Egresos','#EF4444') +
-      _row('Ahorro %',  '_hud-fin-aho','#FACC15','_hud-aho-bar',null) +
-      _row('Runway',    '_hud-runway', '#22D3EE',null,'🛫') +
-      _row('Gasto/día', '_hud-gastoDia','#A78BFA',null,'📊')
-    ) +
-    _card('#FB923C',
-      _cHdr('Activity + Logros','#FB923C','fa-bolt') +
-      _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
-      '<div style="padding:8px 14px 14px">'+
-        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'+
-          '<div style="display:flex;align-items:center;gap:7px">'+
-            '<i class="fas fa-fire" style="font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
-            '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.55);text-transform:uppercase;letter-spacing:.10em">Racha</span>'+
-          '</div>'+
-          '<span id="_hud-racha" style="font-size:20px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">—</span>'+
+  // ── Panel 3: Bitácora ──
+  var _p3 = _mkFloatPanel('hud-bitacora','#C084FC','rgba(192,132,252,0.15)');
+  document.getElementById('hud-bitacora-inner').innerHTML =
+    _pH('Bitácora','#C084FC','fa-book-open') +
+    _row('Pensamientos','_hud-pens','#C084FC',null,'💭') +
+    _row('Relaciones',  '_hud-rels','#EC4899',null,'👥') +
+    _row('Salud',       '_hud-sal', '#EF4444',null,'❤️') +
+    _row('Entrenamiento','_hud-ent','#FB923C',null,'💪') +
+    '<div style="height:4px"></div>';
+  _p3.appendChild(_nav('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
+
+  // ── Panel 4: Financiero ──
+  var _p4 = _mkFloatPanel('hud-financiero','#22D3EE','rgba(34,211,238,0.15)');
+  document.getElementById('hud-financiero-inner').innerHTML =
+    _pH('Financiero','#22D3EE','fa-chart-line') +
+    _hero('_hud-fin-exc','#22D3EE','Excedente del mes') +
+    _duo('_hud-fin-ing','Ingresos','#22C55E','_hud-fin-egr','Egresos','#EF4444') +
+    _row('Ahorro %',  '_hud-fin-aho','#FACC15','_hud-aho-bar',null) +
+    _row('Runway',    '_hud-runway', '#22D3EE',null,'🛫') +
+    _row('Gasto/día','_hud-gastoDia','#A78BFA',null,'📊') +
+    '<div style="height:4px"></div>';
+
+  // ── Panel 5: Activity + Logros ──
+  var _p5 = _mkFloatPanel('hud-activity','#FB923C','rgba(251,146,60,0.15)');
+  document.getElementById('hud-activity-inner').innerHTML =
+    _pH('Activity + Logros','#FB923C','fa-bolt') +
+    _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
+    '<div style="padding:10px 16px 14px;border-top:1px solid rgba(255,255,255,0.05)">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">'+
+        '<div style="display:flex;align-items:center;gap:7px">'+
+          '<i class="fas fa-fire" style="font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
+          '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.55);text-transform:uppercase;letter-spacing:.10em">Racha</span>'+
         '</div>'+
-        '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
-          '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:3px"></div>'+
-        '</div>'+
-      '</div>'
-    ) +
-    '<div style="height:10px"></div>';
+        '<span id="_hud-racha" style="font-size:20px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">—</span>'+
+      '</div>'+
+      '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
+        '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:3px"></div>'+
+      '</div>'+
+    '</div>';
+  _p5.appendChild(_nav('Activity','fa-bolt','#FB923C','irAActivity'));
+  _p5.appendChild(_nav('Logros','fa-trophy','#FACC15','irALogros'));
 
-  [{label:'Activity Check',icon:'fa-bolt',fn:'irAActivity',color:'#FB923C'},
-   {label:'Logros',icon:'fa-trophy',fn:'irALogros',color:'#FACC15'},
-   {label:'Nutrición',icon:'fa-leaf',fn:'irANutricion',color:'#4ADE80'},
-   {label:'Bitácora',icon:'fa-book-open',fn:'irABitacora',color:'#C084FC'},
-   {label:'RAW Sheet',icon:'fa-table',fn:'irASheets',color:'#A5B4FC'},
-   {label:'Actualizar',icon:'fa-rotate-right',fn:'refreshTodo',color:'#64748B'},
-  ].forEach(function(n){ _pRight.appendChild(_nav(n.label,n.icon,n.color,n.fn)); });
+  // ── Panel 6: Navegación ──
+  var _p6 = _mkFloatPanel('hud-nav','#A78BFA','rgba(167,139,250,0.12)');
+  document.getElementById('hud-nav-inner').innerHTML =
+    _pH('Navegación','#A78BFA','fa-compass');
+  [
+    {label:'Nutrición',    icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
+    {label:'Bitácora',     icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
+    {label:'RAW Sheet',    icon:'fa-table',         fn:'irASheets',    color:'#A5B4FC'},
+    {label:'Actualizar',   icon:'fa-rotate-right', fn:'refreshTodo',  color:'#64748B'},
+  ].forEach(function(n){ _p6.appendChild(_nav(n.label,n.icon,n.color,n.fn)); });
 
-  var _hudPanels = [{el:_pLeft},{el:_pRight}];
+  // ── Registrar los 6 panels con su lado y orden vertical ──
+  // side: 'left'|'right', order: 0=top 1=mid 2=bot
+  _p1._side='left';  _p1._order=0;
+  _p2._side='left';  _p2._order=1;
+  _p3._side='left';  _p3._order=2;
+  _p4._side='right'; _p4._order=0;
+  _p5._side='right'; _p5._order=1;
+  _p6._side='right'; _p6._order=2;
+
+  var _hudPanels = [
+    {el:_p1},{el:_p2},{el:_p3},
+    {el:_p4},{el:_p5},{el:_p6},
+  ];
+
+  // ── Reposicionar: distribuir en columnas izq/der, sin solaparse ──
+  function _reposicionarHUD(){
+    if(!_dialCanvas||!window._hudPanels) return;
+    var r   = _dialCanvas.getBoundingClientRect();
+    var cx  = r.left + r.width/2;
+    var vW  = window.innerWidth;
+    var vH  = window.innerHeight;
+    var GAP = 14;
+    var leftX  = GAP;
+    var leftW  = Math.max(220, r.left - GAP*2);
+    var rightX = r.right + GAP;
+    var rightW = Math.max(220, vW - r.right - GAP*2);
+
+    // Recoger alturas reales de cada panel para distribuirlos sin solaparse
+    var leftPanels  = window._hudPanels.filter(function(hp){ return hp.el._side==='left';  });
+    var rightPanels = window._hudPanels.filter(function(hp){ return hp.el._side==='right'; });
+
+    function positionCol(panels, x, w){
+      var totalH  = panels.reduce(function(s,hp){ return s + hp.el.offsetHeight + GAP; },0) - GAP;
+      var startY  = Math.max(GAP, (vH - totalH)/2);
+      var curY    = startY;
+      panels.sort(function(a,b){ return a.el._order - b.el._order; });
+      panels.forEach(function(hp){
+        hp.el.style.left  = x + 'px';
+        hp.el.style.width = w + 'px';
+        hp.el.style.top   = curY + 'px';
+        // chamfer según lado
+        hp.el.style.clipPath = x < vW/2
+          ? 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))'
+          : 'polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)';
+        curY += hp.el.offsetHeight + GAP;
+      });
+    }
+
+    positionCol(leftPanels,  leftX,  leftW);
+    positionCol(rightPanels, rightX, rightW);
+  }
+  window._reposicionarHUD = _reposicionarHUD;
+
   _dialOverlay.appendChild(_dialCanvas);
   document.body.appendChild(_dialOverlay);
   _hudPanels.forEach(function(hp){ document.body.appendChild(hp.el); });
