@@ -2997,12 +2997,11 @@ function initTooltip(){
    Solo se definen si no existen
 ══════════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', function(){
-
   if(typeof window.renderActivity !== 'function'){
     window.renderActivity = function(){
       var d = window._actData; if(!d) return;
-      var board = document.getElementById('board-activity');
-      if(!board) return;
+      var WRAP = document.getElementById('act-wrapper') || document.getElementById('board-activity');
+      if(!WRAP) return;
 
       var CAT = {
         personal:    { color:'#A855F7', glow:'rgba(168,85,247,0.4)',  icon:'fa-user',      label:'PERSONAL',    dias:['L','M','W','J','V','S','D'] },
@@ -3027,107 +3026,417 @@ document.addEventListener('DOMContentLoaded', function(){
       var totalAll  = totales.personal+totales.electronics+totales.libro+totales.movie+totales.norut;
       var doneAll   = totales.doneP+totales.doneE+totales.doneL+totales.doneM+totales.doneN;
       var pctGeneral= totalAll>0?Math.round(doneAll/totalAll*100):0;
+      var circ = 2*Math.PI*28;
 
       function chkCircle(fila, dia, checked, tipo){
         var c = CAT[tipo]; var esH=(dia===diaKey);
         var isChecked = checked===true || (checked&&checked.v);
+        var fechaHora = (checked&&checked.fecha) ? checked.fecha : null;
+        var tooltip   = isChecked && fechaHora ? 'title="'+fechaHora+'"' : '';
         return '<div class="_act-chk" data-fila="'+fila+'" data-dia="'+dia+'" data-tipo="'+tipo+'"'+
+          ' '+tooltip+
           ' style="position:relative;width:22px;height:22px;min-width:22px;border-radius:50%;cursor:pointer;transition:all 200ms;'+
           'border:1.5px solid '+(isChecked?c.color:esH?'rgba(255,255,255,.35)':'rgba(100,80,160,0.3)')+';'+
           'background:'+(isChecked?c.color:'transparent')+';'+
-          'box-shadow:'+(isChecked?'0 0 8px '+c.glow:'none')+';'+
-          'display:flex;align-items:center;justify-content:center">'+
+          'box-shadow:'+(isChecked?'0 0 8px '+c.glow+',0 0 4px '+c.glow:'none')+';'+
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">'+
           (isChecked?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'')+
+          (isChecked&&fechaHora?'<span style="font-size:5px;color:rgba(255,255,255,0.75);pointer-events:none;line-height:1;letter-spacing:0;font-weight:600">'+fechaHora+'</span>':'')+
         '</div>';
       }
+
       function chkItem(fila, tipo, done){
         var c = CAT[tipo];
         return '<div class="_act-item" data-fila="'+fila+'" data-tipo="'+tipo+'"'+
           ' style="width:20px;height:20px;min-width:20px;border-radius:50%;cursor:pointer;transition:all 200ms;flex-shrink:0;'+
           'border:1.5px solid '+(done?c.color:'#26304A')+';'+
           'background:'+(done?c.color:'transparent')+';'+
+          'box-shadow:'+(done?'0 0 8px '+c.glow:'none')+';'+
           'display:flex;align-items:center;justify-content:center">'+
           (done?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'')+
         '</div>';
       }
+
+      function kpiPill(tipo, done, total){
+        var c = CAT[tipo];
+        return '<div style="display:flex;align-items:center;gap:8px;padding:0 20px;border-right:1px solid rgba(140,100,220,0.14)">'+
+          '<i class="fas '+c.icon+'" style="font-size:16px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
+          '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45)">'+c.label+'</div>'+
+          '<div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">'+
+            '<span style="color:'+c.color+'">'+done+'</span>'+
+            '<span style="color:rgba(200,208,230,0.25)"> / '+total+'</span>'+
+          '</div></div>'+
+        '</div>';
+      }
+
+      // ── HEADER BAR ──
+      var header =
+        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-bottom:1px solid rgba(140,100,220,0.14);'+
+             'height:72px;padding:0 20px;gap:0;flex-shrink:0;overflow:hidden">'+
+          '<div onclick="(typeof volverAlAnverso===\'function\'&&volverAlAnverso())"'+
+               ' style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;'+
+               'background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:8px;cursor:pointer;'+
+               'margin-right:16px;flex-shrink:0;transition:all .15s">'+
+            '<i class="fas fa-arrow-left" style="color:#22D3EE;font-size:14px"></i>'+
+          '</div>'+
+          '<div style="margin-right:32px;flex-shrink:0">'+
+            '<div style="font-size:18px;font-weight:700;letter-spacing:.05em;color:#fff">ACTIVITY CHECK</div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-top:1px">Tu progreso, tu recompensa</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;flex:1;overflow:hidden">'+
+            kpiPill('personal',    totales.doneP, totales.personal)+
+            kpiPill('electronics', totales.doneE, totales.electronics)+
+            kpiPill('libro',       totales.doneL, totales.libro)+
+            kpiPill('movie',       totales.doneM, totales.movie)+
+            '<div style="display:flex;align-items:center;gap:8px;padding:0 20px">'+
+              '<i class="fas fa-star" style="font-size:16px;color:#EC4899;filter:drop-shadow(0 0 6px rgba(236,72,153,0.4))"></i>'+
+              '<div><div style="font-size:10px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45)">PENDIENTES</div>'+
+              '<div style="font-size:13px;font-weight:600;font-variant-numeric:tabular-nums">'+
+                '<span style="color:#EC4899">'+totales.doneN+'</span>'+
+                '<span style="color:rgba(200,208,230,0.25)"> / '+totales.norut+'</span>'+
+              '</div></div>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:14px;flex-shrink:0;padding-left:20px;border-left:1px solid rgba(140,100,220,0.14)">'+
+            '<svg width="64" height="64" viewBox="0 0 64 64">'+
+              '<circle cx="32" cy="32" r="28" fill="none" stroke="#26304A" stroke-width="4"/>'+
+              '<circle cx="32" cy="32" r="28" fill="none" stroke="#3B82F6" stroke-width="4"'+
+                ' stroke-dasharray="'+circ.toFixed(1)+'" stroke-dashoffset="'+(circ*(1-pctGeneral/100)).toFixed(1)+'"'+
+                ' stroke-linecap="round" transform="rotate(-90 32 32)"'+
+                ' style="filter:drop-shadow(0 0 6px rgba(59,130,246,0.6));transition:stroke-dashoffset .8s"/>'+
+              '<text x="32" y="37" text-anchor="middle" font-size="14" font-weight="700" fill="#fff" font-family="system-ui">'+pctGeneral+'%</text>'+
+            '</svg>'+
+            '<div><div style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.45);margin-bottom:2px">PROGRESO GENERAL</div>'+
+            '<div style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">'+
+              '<span style="color:#3B82F6">'+doneAll+'</span>'+
+              '<span style="color:rgba(200,208,230,0.25)"> / '+totalAll+'</span>'+
+            '</div></div>'+
+          '</div>'+
+        '</div>';
+
+      // ── Filtros por columna ──
+      var _actFilter = window._actFilter || (window._actFilter = {});
+
+      function hexToRgb(hex){
+        var r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
+        return r+','+g+','+b;
+      }
+
+      function filterBar(tipo){
+        var c = CAT[tipo];
+        var cur = _actFilter[tipo] || 'az';
+        var BTNS = [
+          {k:'az',     ico:'fa-arrow-down-a-z',  tip:'A → Z'},
+          {k:'za',     ico:'fa-arrow-up-z-a',    tip:'Z → A'},
+          {k:'hoy_si', ico:'fa-circle-check',    tip:'Con check hoy'},
+          {k:'hoy_no', ico:'fa-circle',           tip:'Sin check hoy'},
+        ];
+        return '<div class="_act-filter-bar" data-tipo="'+tipo+'" style="'+
+          'display:flex;gap:4px;padding:6px 12px;background:rgba(6,4,14,0.95);border-bottom:1px solid rgba(140,100,220,0.14);align-items:center;flex-shrink:0">'+
+          '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-right:4px;flex-shrink:0">Orden</span>'+
+          BTNS.map(function(b){
+            var on = (cur===b.k);
+            return '<button class="_act-filter-btn" data-tipo="'+tipo+'" data-filter="'+b.k+'" title="'+b.tip+'" style="'+
+              'width:26px;height:26px;border-radius:6px;border:1px solid '+(on?c.color:'#26304A')+';'+
+              'background:'+(on?'rgba('+hexToRgb(c.color)+',0.15)':'transparent')+';'+
+              'color:'+(on?c.color:'#4A5266')+';cursor:pointer;font-size:11px;'+
+              'display:flex;align-items:center;justify-content:center;transition:all .12s;'+
+              'box-shadow:'+(on?'0 0 8px '+c.glow:'none')+';flex-shrink:0">'+
+              '<i class="fas '+b.ico+'" style="pointer-events:none"></i></button>';
+          }).join('')+
+        '</div>';
+      }
+
+      function applyHabFilter(items, tipo){
+        var f = _actFilter[tipo] || 'az';
+        var s = items.slice();
+        if(f==='az') s.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+        else if(f==='za') s.sort(function(a,b){ return b.nombre.localeCompare(a.nombre); });
+        else if(f==='hoy_si') s.sort(function(a,b){
+          var ac=a.checks&&a.checks[diaKey]?1:0, bc=b.checks&&b.checks[diaKey]?1:0;
+          return bc-ac;
+        });
+        else if(f==='hoy_no') s.sort(function(a,b){
+          var ac=a.checks&&a.checks[diaKey]?1:0, bc=b.checks&&b.checks[diaKey]?1:0;
+          return ac-bc;
+        });
+        return s;
+      }
+
+      function applyItemFilter(items, tipo){
+        var f = _actFilter[tipo] || 'az';
+        var s = items.slice();
+        var isDone = function(it){ return it.completado===true||it.completado==='Sí'||it.completado==='Si'; };
+        if(f==='az') s.sort(function(a,b){ return a.nombre.localeCompare(b.nombre); });
+        else if(f==='za') s.sort(function(a,b){ return b.nombre.localeCompare(a.nombre); });
+        else if(f==='hoy_si') s.sort(function(a,b){ return (isDone(b)?1:0)-(isDone(a)?1:0); });
+        else if(f==='hoy_no') s.sort(function(a,b){ return (isDone(a)?1:0)-(isDone(b)?1:0); });
+        return s;
+      }
+
       function habTable(items, tipo){
         var c = CAT[tipo]; var dias = c.dias;
-        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
-        var h = '<table style="width:100%;border-collapse:collapse">';
-        h += '<tr><th style="text-align:left;padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14)">HÁBITO</th>';
+        if(!items||!items.length) return filterBar(tipo)+'<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
+        var sorted = applyHabFilter(items, tipo);
+        var h = filterBar(tipo);
+        h += '<table style="width:100%;border-collapse:collapse">';
+        h += '<tr><th style="text-align:left;padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1">HÁBITO</th>';
         dias.forEach(function(d){
           var esH=(d===diaKey);
-          h += '<th style="text-align:center;padding:6px 4px;font-size:10px;font-weight:'+(esH?700:600)+';color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid rgba(140,100,220,0.14);min-width:36px">'+(DLBL[d]||d)+'</th>';
+          h += '<th style="text-align:center;padding:6px 4px;font-size:10px;font-weight:'+(esH?700:600)+';'+
+               'color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid rgba(140,100,220,0.14);min-width:36px;'+
+               'position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1;'+
+               (esH?'text-shadow:0 0 8px '+c.glow:'')+'">'+(DLBL[d]||d)+'</th>';
         });
         h += '</tr>';
-        items.forEach(function(hab){
-          h += '<tr><td style="padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)"><div style="font-size:13px;color:#C8D0E0;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+hab.nombre+'</div></td>';
+        sorted.forEach(function(hab){
+          var allDone = dias.every(function(dia){ return hab.checks&&hab.checks[dia]; });
+          h += '<tr class="_hab-row" style="transition:background .15s;cursor:default"'+
+               ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
+               '<td style="padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+                 (hab.sims||hab.bw?'<div style="font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-bottom:1px">'+(hab.sims||hab.bw)+'</div>':'')+
+                 '<div style="font-size:13px;font-weight:500;color:'+(allDone?c.color:'#C8D0E0')+';'+
+                 'max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+
+                 (allDone?'text-shadow:0 0 8px '+c.glow:'')+'">' + hab.nombre+'</div>'+
+               '</td>';
           dias.forEach(function(dia){
-            h += '<td style="text-align:center;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14)">'+chkCircle(hab.fila, dia, hab.checks&&hab.checks[dia], tipo)+'</td>';
+            h += '<td style="text-align:center;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+                 chkCircle(hab.fila, dia, hab.checks&&hab.checks[dia], tipo)+'</td>';
           });
           h += '</tr>';
         });
         h += '</table>';
         return h;
       }
+
       function itemList(items, tipo){
-        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
-        return '<div style="display:flex;flex-direction:column;width:100%">'+items.map(function(it){
-          var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
-          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
-            chkItem(it.fila, tipo, done)+
-            '<span style="font-size:13px;color:'+(done?'#4A5266':'#C8D0E0')+';flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">'+it.nombre+'</span>'+
-          '</div>';
-        }).join('')+'</div>';
+        if(!items||!items.length) return filterBar(tipo)+'<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
+        var sorted = applyItemFilter(items, tipo);
+        return filterBar(tipo)+
+          '<div style="display:flex;flex-direction:column;width:100%">'+
+          sorted.map(function(it){
+            var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
+            return '<div class="_item-row" style="display:flex;align-items:center;gap:10px;padding:8px 16px;'+
+              'transition:background .15s;border-bottom:1px solid rgba(140,100,220,0.14)"'+
+              ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
+              chkItem(it.fila, tipo, done)+
+              '<span style="font-size:13px;font-weight:500;color:'+(done?'#4A5266':'#C8D0E0')+';'+
+              'display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;'+
+              'line-height:1.4;word-break:break-word;min-width:0;flex:1">'+it.nombre+'</span>'+
+            '</div>';
+          }).join('')+'</div>';
       }
+
+      // ── SIDEBAR ──
+      function sidebarBar(tipo, done, total){
+        var c = CAT[tipo];
+        var pct = total>0?Math.round(done/total*100):0;
+        return '<div style="margin-bottom:12px">'+
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">'+
+            '<div style="display:flex;align-items:center;gap:7px">'+
+              '<i class="fas '+c.icon+'" style="font-size:11px;color:'+c.color+'"></i>'+
+              '<span style="font-size:12px;font-weight:500;color:rgba(220,220,240,0.85)">'+c.label.charAt(0)+c.label.slice(1).toLowerCase()+'</span>'+
+            '</div>'+
+            '<span style="font-size:12px;font-weight:600;font-variant-numeric:tabular-nums;color:rgba(220,220,240,0.85)">'+done+' / '+total+'</span>'+
+          '</div>'+
+          '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
+            '<div style="height:100%;width:'+pct+'%;background:'+c.color+';border-radius:2px;'+
+            'box-shadow:0 0 6px '+c.glow+';transition:width .4s"></div>'+
+          '</div>'+
+        '</div>';
+      }
+
+      var sidebar =
+        '<div style="width:260px;flex-shrink:0;display:flex;flex-direction:column;gap:12px;padding:16px;overflow-y:auto">'+
+          '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:16px;'+
+               'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
+              '<i class="fas fa-cube" style="font-size:14px;color:#3B82F6"></i>'+
+              '<span style="font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(200,208,230,0.45)">RECOMPENSA ACTUAL</span>'+
+            '</div>'+
+            '<div style="font-size:14px;font-weight:700;color:#fff;margin-bottom:4px">Maestro del progreso</div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-bottom:10px">Completa '+totalAll+' actividades para desbloquear</div>'+
+            '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden;margin-bottom:5px">'+
+              '<div style="height:100%;width:'+pctGeneral+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5);transition:width .8s"></div>'+
+            '</div>'+
+            '<div style="display:flex;justify-content:flex-end;font-size:11px;font-weight:600;color:#3B82F6;font-variant-numeric:tabular-nums">'+doneAll+' / '+totalAll+'</div>'+
+          '</div>'+
+          '<div style="background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;padding:16px;'+
+               'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
+            '<div style="font-size:10px;font-weight:700;letter-spacing:.12em;color:rgba(200,208,230,0.45);margin-bottom:14px">CATEGORÍAS</div>'+
+            sidebarBar('personal',    totales.doneP, totales.personal)+
+            sidebarBar('electronics', totales.doneE, totales.electronics)+
+            sidebarBar('libro',       totales.doneL, totales.libro)+
+            sidebarBar('movie',       totales.doneM, totales.movie)+
+            sidebarBar('norut',       totales.doneN, totales.norut)+
+          '</div>'+
+          '<div style="background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(168,85,247,0.08));'+
+               'border:1px solid rgba(59,130,246,0.2);border-radius:12px;padding:14px">'+
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+              '<i class="fas fa-chart-line" style="font-size:13px;color:#3B82F6"></i>'+
+              '<span style="font-size:12px;font-weight:700;color:#fff">SIGUE ASÍ</span>'+
+            '</div>'+
+            '<div style="font-size:11px;color:rgba(200,208,230,0.45);line-height:1.5">'+
+              (pctGeneral>=70?'¡Llevas un excelente ritmo! Cada hábito completado te acerca a tu mejor versión.':
+               pctGeneral>=40?'Vas bien. Mantén el ritmo y cierra tus anillos hoy.':
+               'Empieza pequeño. Un hábito a la vez hace la diferencia.')+
+            '</div>'+
+          '</div>'+
+        '</div>';
+
+      // ── PANEL COL CON SCROLL VERTICAL POR COLUMNA ──
+      var colW = {
+        personal:    'flex:2 1 0;min-width:240px',
+        electronics: 'flex:2 1 0;min-width:240px',
+        libro:       'flex:1 1 0;min-width:180px',
+        movie:       'flex:1 1 0;min-width:180px',
+        norut:       'flex:1 1 0;min-width:180px',
+      };
       function panelCol(tipo, inner){
         var c = CAT[tipo];
-        return '<div style="flex:1 1 0;min-width:200px;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;display:flex;flex-direction:column;overflow:hidden">'+
-          '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px">'+
-            '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+'"></i>'+
+        var wStyle = colW[tipo] || 'flex:1 1 auto;min-width:200px;max-width:300px';
+        // CADA COLUMNA tiene su propio scroll vertical: panel-inner con overflow-y:auto
+        return '<div data-panel-tipo="'+tipo+'" style="'+wStyle+';background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
+               'display:flex;flex-direction:column;overflow:hidden;height:100%;'+
+               'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
+          '<div style="padding:14px 16px 12px;border-bottom:1px solid rgba(140,100,220,0.14);display:flex;align-items:center;gap:8px;flex-shrink:0">'+
+            '<i class="fas '+c.icon+'" style="font-size:14px;color:'+c.color+';filter:drop-shadow(0 0 6px '+c.glow+')"></i>'+
             '<span style="font-size:13px;font-weight:700;letter-spacing:.08em;color:'+c.color+'">'+c.label+'</span>'+
+            '<span style="margin-left:auto;font-size:11px;font-weight:600;color:rgba(200,208,230,0.4);font-variant-numeric:tabular-nums">'+
+              ((tipo==='personal'?totales.doneP:tipo==='electronics'?totales.doneE:tipo==='libro'?totales.doneL:tipo==='movie'?totales.doneM:totales.doneN))+
+              ' / '+
+              ((tipo==='personal'?totales.personal:tipo==='electronics'?totales.electronics:tipo==='libro'?totales.libro:tipo==='movie'?totales.movie:totales.norut))+
+            '</span>'+
           '</div>'+
-          '<div style="flex:1;overflow-y:auto">'+inner+'</div>'+
+          '<div data-panel-inner style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0">'+inner+'</div>'+
         '</div>';
       }
 
-      var header =
-        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-bottom:1px solid rgba(140,100,220,0.14);height:72px;padding:0 20px;gap:0;flex-shrink:0">'+
-          '<div onclick="(typeof volverAlAnverso===\'function\'&&volverAlAnverso())" style="display:flex;align-items:center;justify-content:center;width:44px;height:44px;background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:8px;cursor:pointer;margin-right:16px;flex-shrink:0">'+
-            '<i class="fas fa-arrow-left" style="color:#22D3EE;font-size:14px"></i>'+
+      // ── FOOTER BAR ──
+      var xpActual = (window._lgr&&window._lgr.xpActual)||0;
+      var xpMax    = (window._lgr&&window._lgr.xpNivel)||500;
+      var nivel    = (window._lgr&&window._lgr.nivel)||1;
+      var xpPct    = xpMax>0?Math.round(xpActual/xpMax*100):0;
+
+      var footer =
+        '<div style="display:flex;align-items:center;background:rgba(10,6,22,0.96);border-top:1px solid rgba(140,100,220,0.14);'+
+             'height:64px;padding:0;flex-shrink:0">'+
+          '<div style="display:flex;align-items:center;gap:12px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<div style="width:36px;height:36px;border-radius:8px;background:rgba(6,4,14,0.95);border:1px solid rgba(140,100,220,0.18);'+
+                 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+              '<span style="font-size:13px;font-weight:800;color:#A78BFA">'+nivel+'</span>'+
+            '</div>'+
+            '<div style="flex:1">'+
+              '<div style="font-size:11px;font-weight:700;color:#fff;margin-bottom:3px">NIVEL '+nivel+
+                ' <span style="font-size:10px;color:rgba(200,208,230,0.45);font-weight:500;font-variant-numeric:tabular-nums">'+xpActual+' / '+xpMax+' XP</span></div>'+
+              '<div style="height:4px;background:rgba(6,4,14,0.95);border-radius:2px;overflow:hidden">'+
+                '<div style="height:100%;width:'+xpPct+'%;background:linear-gradient(90deg,#7C3AED,#A855F7);border-radius:2px;box-shadow:0 0 6px rgba(59,130,246,0.5)"></div>'+
+              '</div>'+
+            '</div>'+
           '</div>'+
-          '<div style="margin-right:32px;flex-shrink:0">'+
-            '<div style="font-size:18px;font-weight:700;letter-spacing:.05em;color:#fff">ACTIVITY CHECK</div>'+
-            '<div style="font-size:11px;color:rgba(200,208,230,0.45);margin-top:1px">'+doneAll+' / '+totalAll+' completos · '+pctGeneral+'%</div>'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<i class="fas fa-fire" style="font-size:20px;color:#FB923C;filter:drop-shadow(0 0 8px rgba(251,146,60,0.6))"></i>'+
+            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">RACHA ACTUAL</div>'+
+            '<div style="font-size:16px;font-weight:700;color:#FB923C">'+doneAll+' actividades</div></div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px;border-right:1px solid rgba(140,100,220,0.14)">'+
+            '<i class="fas fa-bullseye" style="font-size:16px;color:#A855F7"></i>'+
+            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">PROGRESO HOY</div>'+
+            '<div style="font-size:13px;font-weight:600;color:#fff;margin-top:1px">'+
+              doneAll+' / '+totalAll+' <span style="color:#A855F7;font-size:11px;font-weight:700">+50 XP</span>'+
+            '</div></div>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:10px;flex:1;padding:0 24px">'+
+            '<div style="width:36px;height:36px;border-radius:8px;background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.3);'+
+                 'display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
+              '<span style="font-size:13px;font-weight:800;color:#A855F7">'+(nivel+1)+'</span>'+
+            '</div>'+
+            '<div><div style="font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45)">PRÓXIMO NIVEL</div>'+
+            '<div style="font-size:12px;font-weight:600;color:rgba(220,220,240,0.85);margin-top:1px">'+
+              '<span style="color:#A855F7">+500 XP</span> <span style="color:rgba(200,208,230,0.25)">|</span> <span style="color:#22D3EE">+$250</span>'+
+            '</div></div>'+
+            '<i class="fas fa-box" style="font-size:18px;color:rgba(200,208,230,0.45);margin-left:auto"></i>'+
           '</div>'+
         '</div>';
 
+      // ── LAYOUT FIJO: 100vh con header+contenido+footer
+      // El board ocupa todo el viewport, así NO crece la página
+      var board = document.getElementById('board-activity');
+      if(!board) return;
       board.style.display = 'flex';
       board.style.flexDirection = 'column';
       board.style.background = 'rgba(4,4,14,0.97)';
       board.style.overflow = 'hidden';
+      board.style.height = '100vh';
+      board.style.maxHeight = '100vh';
 
       board.innerHTML =
         header +
-        '<div style="display:flex;gap:10px;padding:12px;flex:1;overflow-x:auto;overflow-y:hidden;align-items:stretch">'+
-          panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
-          panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
-          panelCol('libro',       itemList(d.libros||[],   'libro'))+
-          panelCol('movie',       itemList(d.movies||[],   'movie'))+
-          panelCol('norut',       itemList(d.noRutinarias||[],'norut'))+
-        '</div>';
+        // Contenedor principal: flex:1 con min-height:0 para que sus hijos puedan scrollear
+        '<div style="display:flex;gap:12px;padding:12px;flex:1;min-height:0;overflow:hidden;align-items:stretch">'+
+          '<div style="display:flex;gap:10px;flex:1;min-width:0;align-items:stretch;height:100%">'+
+            panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
+            panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+
+            panelCol('libro',       itemList(d.libros||[],   'libro'))+
+            panelCol('movie',       itemList(d.movies||[],   'movie'))+
+            panelCol('norut',       itemList(d.noRutinarias||[],'norut'))+
+          '</div>'+
+          sidebar+
+        '</div>'+
+        footer;
 
+      // Event delegation
       board.addEventListener('click', function(e){
+        // Filtros por columna
+        var fb = e.target.closest('._act-filter-btn');
+        if(fb){
+          var tipo = fb.dataset.tipo;
+          var filt = fb.dataset.filter;
+          _actFilter[tipo] = filt;
+          var d2 = window._actData;
+          if(!d2) return;
+          var panelEl = fb.closest('[data-panel-tipo]');
+          if(panelEl){
+            var inner = panelEl.querySelector('[data-panel-inner]');
+            if(inner){
+              var isHab = (tipo==='personal'||tipo==='electronics');
+              var items = isHab
+                ? (tipo==='personal'?d2.habitosPersonal:d2.habitosElectronics)||[]
+                : (tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias)||[];
+              inner.innerHTML = isHab ? habTable(items, tipo) : itemList(items, tipo);
+            }
+          }
+          return;
+        }
+
         var c = e.target.closest('._act-chk');
         if(c){
           var ok = !!c.querySelector('.fa-check');
           var nowChk = !ok;
           var tipo = c.dataset.tipo;
           var cat  = CAT[tipo];
+          var ahora = new Date();
+          var horaStr = String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0');
           c.style.borderColor = nowChk?cat.color:'rgba(100,80,160,0.3)';
           c.style.background  = nowChk?cat.color:'transparent';
-          c.style.boxShadow   = nowChk?'0 0 8px '+cat.glow:'none';
-          c.innerHTML = nowChk?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'';
+          c.style.boxShadow   = nowChk?'0 0 8px '+cat.glow+',0 0 4px '+cat.glow:'none';
+          if(nowChk){
+            c.setAttribute('title', horaStr);
+            c.innerHTML = '<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>'+
+              '<span style="font-size:5px;color:rgba(255,255,255,0.75);pointer-events:none;line-height:1;font-weight:600">'+horaStr+'</span>';
+            c.style.flexDirection='column';c.style.gap='1px';
+          } else {
+            c.removeAttribute('title');
+            c.innerHTML='';
+          }
+          var row = c.closest('tr');
+          if(row){
+            var allChks = row.querySelectorAll('._act-chk');
+            var allDone = Array.prototype.every.call(allChks, function(ch){ return !!ch.querySelector('.fa-check'); });
+            var td = row.querySelector('td:first-child div:last-child');
+            if(td) td.style.color = allDone?cat.color:'#C8D0E0';
+            if(td) td.style.textShadow = allDone?'0 0 8px '+cat.glow:'none';
+          }
           if(typeof api!=='undefined') api.setActivityCheck(tipo, parseInt(c.dataset.fila), c.dataset.dia, nowChk);
           return;
         }
@@ -3141,11 +3450,20 @@ document.addEventListener('DOMContentLoaded', function(){
           it.style.background  = nowDone?cat.color:'transparent';
           it.style.boxShadow   = nowDone?'0 0 8px '+cat.glow:'none';
           it.innerHTML = nowDone?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'';
+          var row = it.parentElement;
+          var sp  = row&&row.querySelector('span');
+          if(sp) sp.style.color = nowDone?'#4A5266':'#C8D0E0';
+          if(row&&row.parentElement){
+            if(nowDone) row.parentElement.appendChild(row);
+            else        row.parentElement.insertBefore(row, row.parentElement.firstChild);
+          }
           if(typeof api!=='undefined') api.marcarActivityItem(tipo, parseInt(it.dataset.fila), nowDone);
         }
       });
     };
   }
+
+
 
   if(typeof window.renderNutricion !== 'function'){
     window.renderNutricion = function(data){
