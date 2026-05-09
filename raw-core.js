@@ -3047,13 +3047,20 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function chkItem(fila, tipo, done){
         var c = CAT[tipo];
-        return '<div class="_act-item" data-fila="'+fila+'" data-tipo="'+tipo+'"'+
-          ' style="width:20px;height:20px;min-width:20px;border-radius:50%;cursor:pointer;transition:all 200ms;flex-shrink:0;'+
+        // Recuperar fecha guardada localmente para este check
+        var fechaLocal = '';
+        try {
+          fechaLocal = localStorage.getItem('actItemDate:'+tipo+':'+fila) || '';
+        } catch(e){}
+        var tooltip = (done && fechaLocal) ? 'title="'+fechaLocal+'"' : '';
+        return '<div class="_act-item" data-fila="'+fila+'" data-tipo="'+tipo+'" '+tooltip+
+          ' style="width:24px;height:24px;min-width:24px;border-radius:50%;cursor:pointer;transition:all 200ms;flex-shrink:0;'+
           'border:1.5px solid '+(done?c.color:'#26304A')+';'+
           'background:'+(done?c.color:'transparent')+';'+
           'box-shadow:'+(done?'0 0 8px '+c.glow:'none')+';'+
-          'display:flex;align-items:center;justify-content:center">'+
-          (done?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'')+
+          'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0">'+
+          (done?'<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none;line-height:1"></i>':'')+
+          (done&&fechaLocal?'<span style="font-size:5px;color:rgba(255,255,255,0.85);pointer-events:none;line-height:1;font-weight:700;margin-top:1px">'+fechaLocal+'</span>':'')+
         '</div>';
       }
 
@@ -3176,10 +3183,9 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function habTable(items, tipo){
         var c = CAT[tipo]; var dias = c.dias;
-        if(!items||!items.length) return filterBar(tipo)+'<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
+        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
         var sorted = applyHabFilter(items, tipo);
-        var h = filterBar(tipo);
-        h += '<table style="width:100%;border-collapse:collapse">';
+        var h = '<table style="width:100%;border-collapse:collapse">';
         h += '<tr><th style="text-align:left;padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1">HÁBITO</th>';
         dias.forEach(function(d){
           var esH=(d===diaKey);
@@ -3188,9 +3194,12 @@ document.addEventListener('DOMContentLoaded', function(){
                'position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1;'+
                (esH?'text-shadow:0 0 8px '+c.glow:'')+'">'+(DLBL[d]||d)+'</th>';
         });
+        // Columna extra para el botón "limpiar fila"
+        h += '<th style="width:28px;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1"></th>';
         h += '</tr>';
         sorted.forEach(function(hab){
           var allDone = dias.every(function(dia){ return hab.checks&&hab.checks[dia]; });
+          var anyDone = dias.some(function(dia){ return hab.checks&&hab.checks[dia]; });
           h += '<tr class="_hab-row" style="transition:background .15s;cursor:default"'+
                ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
                '<td style="padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
@@ -3203,6 +3212,18 @@ document.addEventListener('DOMContentLoaded', function(){
             h += '<td style="text-align:center;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
                  chkCircle(hab.fila, dia, hab.checks&&hab.checks[dia], tipo)+'</td>';
           });
+          // Botón limpiar fila — solo activo si hay al menos 1 check
+          h += '<td style="padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14);text-align:center">'+
+                 '<button class="_act-clear-row" data-fila="'+hab.fila+'" data-tipo="'+tipo+'"'+
+                 ' title="Limpiar todos los checks de esta fila"'+
+                 ' style="width:22px;height:22px;border-radius:6px;border:1px solid '+(anyDone?'rgba(239,68,68,0.4)':'rgba(100,80,160,0.15)')+';'+
+                 'background:transparent;color:'+(anyDone?'#EF4444':'rgba(100,80,160,0.4)')+';'+
+                 'cursor:'+(anyDone?'pointer':'not-allowed')+';font-size:10px;'+
+                 'display:flex;align-items:center;justify-content:center;transition:all .12s;margin:0 auto"'+
+                 (anyDone?'':'disabled')+'>'+
+                 '<i class="fas fa-eraser" style="pointer-events:none"></i>'+
+                 '</button>'+
+               '</td>';
           h += '</tr>';
         });
         h += '</table>';
@@ -3210,10 +3231,9 @@ document.addEventListener('DOMContentLoaded', function(){
       }
 
       function itemList(items, tipo){
-        if(!items||!items.length) return filterBar(tipo)+'<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
+        if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin registros</div>';
         var sorted = applyItemFilter(items, tipo);
-        return filterBar(tipo)+
-          '<div style="display:flex;flex-direction:column;width:100%">'+
+        return '<div style="display:flex;flex-direction:column;width:100%">'+
           sorted.map(function(it){
             var done=it.completado===true||it.completado==='Sí'||it.completado==='Si';
             return '<div class="_item-row" style="display:flex;align-items:center;gap:10px;padding:8px 16px;'+
@@ -3295,7 +3315,7 @@ document.addEventListener('DOMContentLoaded', function(){
       function panelCol(tipo, inner){
         var c = CAT[tipo];
         var wStyle = colW[tipo] || 'flex:1 1 auto;min-width:200px;max-width:300px';
-        // CADA COLUMNA tiene su propio scroll vertical: panel-inner con overflow-y:auto
+        // CADA COLUMNA: header + filterBar fija + inner con scroll vertical propio
         return '<div data-panel-tipo="'+tipo+'" style="'+wStyle+';background:rgba(14,8,28,0.92);border:1px solid rgba(140,100,220,0.18);border-radius:12px;'+
                'display:flex;flex-direction:column;overflow:hidden;height:100%;'+
                'box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4)">'+
@@ -3308,6 +3328,8 @@ document.addEventListener('DOMContentLoaded', function(){
               ((tipo==='personal'?totales.personal:tipo==='electronics'?totales.electronics:tipo==='libro'?totales.libro:tipo==='movie'?totales.movie:totales.norut))+
             '</span>'+
           '</div>'+
+          // ── filterBar FIJA, fuera del scroll ──
+          filterBar(tipo)+
           '<div data-panel-inner style="flex:1;overflow-y:auto;overflow-x:hidden;min-height:0">'+inner+'</div>'+
         '</div>';
       }
@@ -3387,7 +3409,7 @@ document.addEventListener('DOMContentLoaded', function(){
 
       // Event delegation
       board.addEventListener('click', function(e){
-        // Filtros por columna
+        // ── Filtros por columna ──
         var fb = e.target.closest('._act-filter-btn');
         if(fb){
           var tipo = fb.dataset.tipo;
@@ -3397,6 +3419,14 @@ document.addEventListener('DOMContentLoaded', function(){
           if(!d2) return;
           var panelEl = fb.closest('[data-panel-tipo]');
           if(panelEl){
+            // Re-renderizar la filterBar (para actualizar el botón activo)
+            var oldBar = panelEl.querySelector('._act-filter-bar');
+            if(oldBar){
+              var tmp = document.createElement('div');
+              tmp.innerHTML = filterBar(tipo);
+              oldBar.replaceWith(tmp.firstChild);
+            }
+            // Re-renderizar SOLO el inner (no toca la filterBar fija)
             var inner = panelEl.querySelector('[data-panel-inner]');
             if(inner){
               var isHab = (tipo==='personal'||tipo==='electronics');
@@ -3409,6 +3439,47 @@ document.addEventListener('DOMContentLoaded', function(){
           return;
         }
 
+        // ── Botón limpiar fila completa (Personal/Electronics) ──
+        var clr = e.target.closest('._act-clear-row');
+        if(clr && !clr.disabled){
+          var fila = parseInt(clr.dataset.fila);
+          var tipo = clr.dataset.tipo;
+          var d2   = window._actData; if(!d2) return;
+          var arr  = tipo==='personal'?d2.habitosPersonal:d2.habitosElectronics;
+          var hab  = (arr||[]).find(function(x){ return x.fila===fila; });
+          if(!hab) return;
+          // Confirmar
+          if(!confirm('¿Limpiar todos los checks de "'+hab.nombre+'"?')) return;
+          var diasH = (CAT[tipo].dias||[]);
+          // Llamar API para cada día marcado
+          diasH.forEach(function(dia){
+            if(hab.checks && hab.checks[dia]){
+              if(typeof api!=='undefined') api.setActivityCheck(tipo, fila, dia, false);
+              hab.checks[dia] = false;
+            }
+          });
+          // Re-render la fila visualmente
+          var tr = clr.closest('tr');
+          if(tr){
+            tr.querySelectorAll('._act-chk').forEach(function(ch){
+              ch.style.borderColor = 'rgba(100,80,160,0.3)';
+              ch.style.background  = 'transparent';
+              ch.style.boxShadow   = 'none';
+              ch.removeAttribute('title');
+              ch.innerHTML = '';
+            });
+            var td = tr.querySelector('td:first-child div:last-child');
+            if(td){ td.style.color = '#C8D0E0'; td.style.textShadow = 'none'; }
+            // Deshabilitar el botón
+            clr.disabled = true;
+            clr.style.cursor = 'not-allowed';
+            clr.style.color  = 'rgba(100,80,160,0.4)';
+            clr.style.borderColor = 'rgba(100,80,160,0.15)';
+          }
+          return;
+        }
+
+        // ── Click en check de día (hábito) ──
         var c = e.target.closest('._act-chk');
         if(c){
           var ok = !!c.querySelector('.fa-check');
@@ -3433,23 +3504,58 @@ document.addEventListener('DOMContentLoaded', function(){
           if(row){
             var allChks = row.querySelectorAll('._act-chk');
             var allDone = Array.prototype.every.call(allChks, function(ch){ return !!ch.querySelector('.fa-check'); });
+            var anyDone = Array.prototype.some.call(allChks, function(ch){ return !!ch.querySelector('.fa-check'); });
             var td = row.querySelector('td:first-child div:last-child');
             if(td) td.style.color = allDone?cat.color:'#C8D0E0';
             if(td) td.style.textShadow = allDone?'0 0 8px '+cat.glow:'none';
+            // Habilitar/deshabilitar botón limpiar fila
+            var clrBtn = row.querySelector('._act-clear-row');
+            if(clrBtn){
+              clrBtn.disabled = !anyDone;
+              clrBtn.style.cursor = anyDone?'pointer':'not-allowed';
+              clrBtn.style.color  = anyDone?'#EF4444':'rgba(100,80,160,0.4)';
+              clrBtn.style.borderColor = anyDone?'rgba(239,68,68,0.4)':'rgba(100,80,160,0.15)';
+            }
+          }
+          // Sincronizar dato local
+          var d2 = window._actData;
+          if(d2){
+            var arr2 = tipo==='personal'?d2.habitosPersonal:d2.habitosElectronics;
+            var hab2 = (arr2||[]).find(function(x){ return x.fila===parseInt(c.dataset.fila); });
+            if(hab2 && hab2.checks) hab2.checks[c.dataset.dia] = nowChk;
           }
           if(typeof api!=='undefined') api.setActivityCheck(tipo, parseInt(c.dataset.fila), c.dataset.dia, nowChk);
           return;
         }
+
+        // ── Click en item simple (libro/movie/norut) ──
         var it = e.target.closest('._act-item');
         if(it){
           var ok = !!it.querySelector('.fa-check');
           var nowDone = !ok;
           var tipo = it.dataset.tipo;
+          var fila = parseInt(it.dataset.fila);
           var cat  = CAT[tipo];
+          var ahora = new Date();
+          var fechaStr = String(ahora.getDate()).padStart(2,'0')+'/'+String(ahora.getMonth()+1).padStart(2,'0');
+          // Guardar fecha en localStorage
+          try {
+            var lsKey = 'actItemDate:'+tipo+':'+fila;
+            if(nowDone) localStorage.setItem(lsKey, fechaStr);
+            else        localStorage.removeItem(lsKey);
+          } catch(e2){}
           it.style.borderColor = nowDone?cat.color:'#26304A';
           it.style.background  = nowDone?cat.color:'transparent';
           it.style.boxShadow   = nowDone?'0 0 8px '+cat.glow:'none';
-          it.innerHTML = nowDone?'<i class="fas fa-check" style="font-size:8px;color:#fff;pointer-events:none"></i>':'';
+          it.style.flexDirection='column';
+          if(nowDone){
+            it.setAttribute('title', fechaStr);
+            it.innerHTML = '<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none;line-height:1"></i>'+
+              '<span style="font-size:5px;color:rgba(255,255,255,0.85);pointer-events:none;line-height:1;font-weight:700;margin-top:1px">'+fechaStr+'</span>';
+          } else {
+            it.removeAttribute('title');
+            it.innerHTML = '';
+          }
           var row = it.parentElement;
           var sp  = row&&row.querySelector('span');
           if(sp) sp.style.color = nowDone?'#4A5266':'#C8D0E0';
@@ -3457,7 +3563,14 @@ document.addEventListener('DOMContentLoaded', function(){
             if(nowDone) row.parentElement.appendChild(row);
             else        row.parentElement.insertBefore(row, row.parentElement.firstChild);
           }
-          if(typeof api!=='undefined') api.marcarActivityItem(tipo, parseInt(it.dataset.fila), nowDone);
+          // Sincronizar dato local
+          var d2 = window._actData;
+          if(d2){
+            var arr2 = tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias;
+            var item2 = (arr2||[]).find(function(x){ return x.fila===fila; });
+            if(item2) item2.completado = nowDone;
+          }
+          if(typeof api!=='undefined') api.marcarActivityItem(tipo, fila, nowDone);
         }
       });
     };
