@@ -21,10 +21,15 @@
 
   // Slots vacíos por zona. Si bajas la cantidad, no aparecen ghosts.
   var SLOTS_CONFIG = {
-    left:   4,   // 3 paneles actuales + 1 slot vacío extra
-    right:  4,   // 3 paneles actuales + 1 slot vacío extra
-    bottom: 3,   // 3 cards (sin ghosts por defecto)
+    'left-1':  3,
+    'left-2':  3,
+    'right-1': 3,
+    'right-2': 3,
+    bottom:    3,
   };
+  // Lados válidos para drag-and-drop
+  var ALLOWED_SIDES = ['left-1','left-2','right-1','right-2','bottom-left','bottom-center','bottom-right'];
+  function isAllowedSide(s){ return ALLOWED_SIDES.indexOf(s) !== -1; }
 
   var _state = {
     initialized: false,
@@ -50,18 +55,20 @@
       '.hud-dragging{opacity:.35;cursor:grabbing!important;z-index:9100!important}',
       '.hud-dragging *{pointer-events:none}',
       '.hud-empty-slot{position:fixed;z-index:9001;border-radius:14px;'+
-        'border:2px dashed rgba(167,139,250,0.35);background:rgba(167,139,250,0.04);'+
+        'border:2px dashed rgba(167,139,250,0.55);background:rgba(167,139,250,0.08);'+
         'display:flex;align-items:center;justify-content:center;'+
         'opacity:0;transition:opacity .35s ease,border-color .2s,background .2s;'+
-        'pointer-events:none}',
-      '.hud-empty-slot.visible{opacity:1;pointer-events:auto}',
-      '.hud-empty-slot.drop-target{border-color:rgba(167,139,250,0.75);'+
-        'background:rgba(167,139,250,0.12);'+
-        'box-shadow:0 0 24px rgba(167,139,250,0.35),inset 0 0 16px rgba(167,139,250,0.18)}',
+        'pointer-events:none;'+
+        'box-shadow:inset 0 0 18px rgba(167,139,250,0.10),0 0 16px rgba(167,139,250,0.10)}',
+      '.hud-empty-slot.visible{opacity:0.85;pointer-events:auto}',
+      '.hud-empty-slot:hover{opacity:1;border-color:rgba(167,139,250,0.80)}',
+      '.hud-empty-slot.drop-target{border-color:rgba(167,139,250,0.95);'+
+        'background:rgba(167,139,250,0.18);'+
+        'box-shadow:0 0 32px rgba(167,139,250,0.50),inset 0 0 24px rgba(167,139,250,0.25)}',
       '.hud-empty-slot-inner{display:flex;flex-direction:column;align-items:center;'+
-        'gap:6px;color:rgba(167,139,250,0.55);text-align:center}',
-      '.hud-empty-slot-inner i{font-size:18px}',
-      '.hud-empty-slot-inner span{font-size:9px;font-weight:800;letter-spacing:.14em;'+
+        'gap:6px;color:rgba(167,139,250,0.75);text-align:center}',
+      '.hud-empty-slot-inner i{font-size:20px;filter:drop-shadow(0 0 6px rgba(167,139,250,0.55))}',
+      '.hud-empty-slot-inner span{font-size:9px;font-weight:800;letter-spacing:.16em;'+
         'text-transform:uppercase}',
       '.hud-drop-indicator{position:fixed;z-index:9050;height:3px;'+
         'background:linear-gradient(90deg,transparent,#A78BFA,transparent);'+
@@ -81,11 +88,10 @@
   }
   function saveLayout(){
     if(!window._hudPanels) return;
-    var layout = { left:[], right:[], bottom:[] };
+    var layout = { 'left-1':[], 'left-2':[], 'right-1':[], 'right-2':[], bottom:[] };
     window._hudPanels.forEach(function(hp){
       var side = hp.el._side;
-      if(side === 'left' || side === 'right' ||
-         side === 'bottom-left' || side === 'bottom-center' || side === 'bottom-right'){
+      if(isAllowedSide(side)){
         var key = side.indexOf('bottom-') === 0 ? 'bottom' : side;
         layout[key].push({ id: hp.el.id, side: side, order: hp.el._order });
       }
@@ -97,7 +103,7 @@
     if(!saved || !window._hudPanels) return;
     var byId = {};
     window._hudPanels.forEach(function(hp){ byId[hp.el.id] = hp; });
-    ['left','right','bottom'].forEach(function(zone){
+    ['left-1','left-2','right-1','right-2','bottom'].forEach(function(zone){
       var entries = saved[zone];
       if(!Array.isArray(entries)) return;
       entries.forEach(function(entry, idx){
@@ -119,7 +125,6 @@
     clearGhostSlots();
     if(!window._hudPanels) return;
     if(!window._dialVisible && !document.getElementById('dial-overlay')) return;
-    // P6: Sin slots cuando hay un panel expandido
     if(window._hudExpanded) return;
 
     function lastPanelInfo(side){
@@ -131,9 +136,25 @@
       return { rect: rect, count: ps.length, lastEl: last };
     }
 
-    // Slots laterales (left, right): aparecen DEBAJO del último panel
-    ['left','right'].forEach(function(side){
-      var info = lastPanelInfo(side);
+    // Para columnas vacías (sin paneles), necesitamos calcular su posición
+    // usando los datos de _reposicionarHUD (colA_X, colB_X, colC_X, colD_X)
+    // que se guardan en window._hudColPositions.
+    function emptyColInfo(side){
+      var cp = window._hudColPositions;
+      if(!cp) return null;
+      var x = cp[side+'_X'], w = cp.COL_W, topY = cp.colTopY;
+      if(x === undefined || w === undefined || topY === undefined) return null;
+      // Simular rect del último panel en y=topY-gap-slotH (para que el primer slot quede en topY)
+      return {
+        rect: { left:x, right:x+w, top:topY-124, bottom:topY-14, width:w, height:110 },
+        count: 0,
+        lastEl: null
+      };
+    }
+
+    // Slots laterales 4 columnas
+    ['left-1','left-2','right-1','right-2'].forEach(function(side){
+      var info = lastPanelInfo(side) || emptyColInfo(side);
       if(!info) return;
       var needed = SLOTS_CONFIG[side] - info.count;
       if(needed <= 0) return;
@@ -142,7 +163,6 @@
       var w     = info.rect.width;
       var x     = info.rect.left;
       var y     = info.rect.bottom + gap;
-      // Verificar que no invada el track
       var trackEl = document.getElementById('hud-track');
       var maxBottom = trackEl ? (trackEl.getBoundingClientRect().top - gap) : (window.innerHeight - 40);
       for(var i=0; i<needed; i++){
@@ -162,7 +182,6 @@
         document.body.appendChild(slot);
         _ghostSlots.push(slot);
         y += slotH + gap;
-        // Activar transición
         (function(s){ requestAnimationFrame(function(){ s.classList.add('visible'); }); })(slot);
       }
     });
@@ -229,8 +248,7 @@
   function makeDraggable(panelEl){
     if(panelEl._dndDraggable) return;
     var side = panelEl._side;
-    var allowedSides = ['left','right','bottom-left','bottom-center','bottom-right'];
-    if(allowedSides.indexOf(side) === -1) return;
+    if(!isAllowedSide(side)) return;
 
     var header = panelEl.querySelector('.hud-h') || panelEl.querySelector('.hud-card');
     if(!header) return;
@@ -335,7 +353,6 @@
   }
 
   function detectZoneAt(x, y){
-    // 1. Slot vacío
     for(var i=0; i<_ghostSlots.length; i++){
       var slot = _ghostSlots[i];
       var rect = slot.getBoundingClientRect();
@@ -343,13 +360,11 @@
         return { type:'slot', el:slot };
       }
     }
-    // 2. Panel
     if(!window._hudPanels) return null;
-    var allowedSides = ['left','right','bottom-left','bottom-center','bottom-right'];
     for(var j=0; j<window._hudPanels.length; j++){
       var hp = window._hudPanels[j];
       if(hp.el === _state.dragEl) continue;
-      if(allowedSides.indexOf(hp.el._side) === -1) continue;
+      if(!isAllowedSide(hp.el._side)) continue;
       var pr = hp.el.getBoundingClientRect();
       if(x>=pr.left && x<=pr.right && y>=pr.top && y<=pr.bottom){
         return { type:'panel', el:hp.el, side:hp.el._side };
