@@ -1,10 +1,21 @@
-/* RAW Entry — Core v.5.072
-   Cambios desde v5.056:
-   - Banda Sim (9 needs) integrada arriba del dial overlay como _pSim
-   - _reposicionarHUD soporta side==='top' (banda full-width centrada)
-   - Panel Bitácora (_p3) ahora incluye fila Nutrición
-   - _refrescarEspejos agrega conteo de Nutrición y renderSimsNeeds
-   - Eliminados duplicados de renderers de formularios y _refrescarEspejos colgado
+/* RAW Entry — Core v.5.079
+   Cambios desde v5.078:
+   - Panel _p5 (Activity+Logros): se eliminan los nav buttons "Activity" y "Logros"
+       que estaban duplicados (ahora ya viven sólo en _p6, panel de Navegación).
+   - Panel _p6 (Navegación): completado con los 6 items del Hero del header
+       en UN SOLO PANEL: Activity · Logros · Nutrición · Bitácora · RAW Sheet · Actualizar.
+   ── (heredado de v5.078) ──
+   - Overlay del dial reestructurado en grid de 3 zonas (superior/central/inferior)
+   - Dial reducido (min(640px,68vw)) para acomodar zonas top/bottom
+   - Banda Sim estilo The Sims: 2 cols × 5 filas con barras horizontales largas
+       (label arriba, barra con gradiente crítico→color del need, sin flechas)
+   - Paneles zona superior: _pUser (USER/Nivel/XP), _pStats (Energía/Racha/Créditos)
+   - Paneles zona inferior: _pTrack (track de niveles), _pMision (Misión Diaria),
+       _pLogro (Logro Reciente), _pNivel (Nivel Siguiente)
+   - _reposicionarHUD soporta sides 'top-left','top-center','top-right',
+       'bottom-track','bottom-left','bottom-center','bottom-right' además de 'left'/'right'
+   - _calcXPNivel y _calcRachaCreditos derivan datos base de actData/logrosData/etc
+   - _refrescarEspejos actualiza todos los nuevos espejos
 */
 window._apartadosData = window._apartadosData || [];
 window._fijosData     = window._fijosData     || [];
@@ -389,6 +400,165 @@ function renderSimsNeeds(targetId){
 }
 window.renderSimsNeeds = renderSimsNeeds;
 
+// ══════════════════════════════════════════
+//  XP / NIVEL / STATS — derivados de actData/logrosData/etc
+// ══════════════════════════════════════════
+function _calcXPNivel(){
+  var xp = 0;
+  // Hábitos completados (cualquier check de la semana)
+  var act = window._actData;
+  if(act){
+    (act.habitosPersonal||[]).forEach(function(h){
+      if(h.checks){ Object.keys(h.checks).forEach(function(k){ if(h.checks[k]) xp += 25; }); }
+    });
+    (act.habitosElectronics||[]).forEach(function(h){
+      if(h.checks){ Object.keys(h.checks).forEach(function(k){ if(h.checks[k]) xp += 30; }); }
+    });
+  }
+  // Logros completados
+  if(window._logrosData && window._logrosData.items){
+    window._logrosData.items.forEach(function(l){
+      if(l.completado==='Sí'||l.completado===true) xp += 200;
+    });
+  }
+  // Bitácora: pensamientos, relaciones, salud
+  if(window._pensamientosData && window._pensamientosData.items){
+    xp += window._pensamientosData.items.length * 8;
+  }
+  if(window._relacionesData && window._relacionesData.items){
+    xp += window._relacionesData.items.length * 12;
+  }
+  if(window._saludData && window._saludData.items){
+    xp += window._saludData.items.length * 15;
+  }
+  // Cada nivel cuesta 1000 XP base, escalando 250 por nivel: 1000, 1250, 1500, ...
+  // Aproximación lineal simple: nivel = floor(xp/1000)+1, xpEnNivel = xp % 1000, meta = 1000
+  var nivel = Math.max(1, Math.floor(xp / 1000) + 1);
+  var xpActual = xp % 1000;
+  var xpMeta = 1000;
+  return { xpTotal:xp, nivel:nivel, xpActual:xpActual, xpMeta:xpMeta };
+}
+
+function _calcRachaCreditos(){
+  // Racha: días consecutivos con al menos 1 hábito personal cumplido (aproximación)
+  // Como solo tenemos checks por día de la semana actual, contamos días con check de la semana
+  var racha = 0;
+  var act = window._actData;
+  if(act && act.habitosPersonal){
+    var dias = ['L','M','W','J','V','S','D'];
+    var hoyIdx = (new Date().getDay()+6)%7;
+    // Cuenta días hacia atrás desde hoy mientras haya al menos un check
+    for(var i=hoyIdx; i>=0; i--){
+      var dk = dias[i];
+      var hayCheck = act.habitosPersonal.some(function(h){ return h.checks && h.checks[dk]; });
+      if(hayCheck) racha++;
+      else break;
+    }
+  }
+  // Créditos: 100 por logro completado + 10 por hábito hoy
+  var creditos = 0;
+  if(window._logrosData && window._logrosData.items){
+    creditos += window._logrosData.items.filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length * 100;
+  }
+  if(act){
+    var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+    creditos += (act.habitosPersonal||[]).filter(function(h){ return h.checks && h.checks[diaKey]; }).length * 10;
+    creditos += (act.habitosElectronics||[]).filter(function(h){ return h.checks && h.checks[diaKey]; }).length * 15;
+  }
+  // Energía: derivada del need 'energia' del Sim
+  var n = (typeof _calcSimsNeeds==='function') ? _calcSimsNeeds() : { energia:50 };
+  var energia = n.energia || 50;
+  return { racha:racha, creditos:creditos, energia:energia };
+}
+
+function _calcMisionDiaria(){
+  // Misión: completar X hábitos de hoy. X = total de hábitos personales hoy.
+  var act = window._actData;
+  if(!act) return { hechos:0, total:3, label:'Registra 3 hábitos hoy', recompensa:'+50 XP' };
+  var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+  var hechos = (act.habitosPersonal||[]).filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
+  var total  = (act.habitosPersonal||[]).length || 3;
+  var meta   = Math.min(total, 3);
+  return {
+    hechos: Math.min(hechos, meta),
+    total: meta,
+    label: 'Completa '+meta+' hábitos hoy',
+    recompensa: '+'+(meta*25)+' XP',
+  };
+}
+
+function _calcLogroReciente(){
+  // Logro reciente NO completado con mayor avance
+  var lg = window._logrosData;
+  if(!lg || !lg.items || !lg.items.length) return { titulo:'—', avance:0 };
+  var pendientes = lg.items.filter(function(l){ return !(l.completado==='Sí'||l.completado===true); });
+  if(!pendientes.length){
+    var ult = lg.items[lg.items.length-1];
+    return { titulo:(ult && ult.titulo)||'—', avance:100 };
+  }
+  // Tomar el de mayor avance
+  pendientes.sort(function(a,b){ return (b.avance||0)-(a.avance||0); });
+  var p = pendientes[0];
+  return { titulo:p.titulo||'—', avance:Math.round(p.avance||0) };
+}
+
+function _calcNivelSiguiente(){
+  var x = _calcXPNivel();
+  var pct = Math.round((x.xpActual/x.xpMeta)*100);
+  var dots = 8;
+  var dotsLlenos = Math.min(dots, Math.round((pct/100)*dots));
+  return {
+    nivelAct: x.nivel,
+    nivelSig: x.nivel+1,
+    xpFalta: x.xpMeta - x.xpActual,
+    pct: pct,
+    dots: dots,
+    dotsLlenos: dotsLlenos,
+    creditosBonus: 250,
+  };
+}
+
+// ══════════════════════════════════════════
+//  RENDER BANDA SIM ESTILO SIMS (2x5 con barras horizontales)
+// ══════════════════════════════════════════
+function renderSimsBandSimsStyle(targetId){
+  var id = targetId || 'hud-sim-band-grid';
+  var el = document.getElementById(id);
+  if(!el){
+    if(!renderSimsBandSimsStyle._retry) renderSimsBandSimsStyle._retry = 0;
+    if(renderSimsBandSimsStyle._retry < 5){
+      renderSimsBandSimsStyle._retry++;
+      setTimeout(function(){ renderSimsBandSimsStyle(id); }, 100);
+    }
+    return;
+  }
+  renderSimsBandSimsStyle._retry = 0;
+  var needs = _calcSimsNeeds();
+  // Layout: grid 2 columnas × ceil(9/2)=5 filas
+  el.innerHTML = _SIMS_NEEDS.map(function(s){
+    var v = needs[s.key];
+    if(v === undefined || v === null) v = 50;
+    var col = s.color;
+    // Color de la barra según nivel del need (estilo Sims: rojo si crítico, amarillo medio, verde/color si bien)
+    var barCol = v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col);
+    var barColDim = barCol + '55';
+    return ''+
+      '<div style="display:flex;flex-direction:column;gap:6px;min-width:0">'+
+        '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between">'+
+          '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
+            '<span style="font-size:14px;line-height:1;flex-shrink:0;filter:drop-shadow(0 0 5px '+col+'66)">'+s.icon+'</span>'+
+            '<span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.65);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+s.label+'</span>'+
+          '</div>'+
+          '<span style="font-size:11px;font-weight:800;color:'+barCol+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+barCol+'66;flex-shrink:0">'+v+'</span>'+
+        '</div>'+
+        '<div style="height:8px;background:rgba(255,255,255,0.05);border-radius:4px;overflow:hidden;border:1px solid rgba(255,255,255,0.04);position:relative">'+
+          '<div style="height:100%;width:'+v+'%;background:linear-gradient(90deg,'+barColDim+','+barCol+');box-shadow:0 0 8px '+barCol+'80,inset 0 0 4px rgba(255,255,255,0.10);transition:width .8s ease;border-radius:3px"></div>'+
+        '</div>'+
+      '</div>';
+  }).join('');
+}
+window.renderSimsBandSimsStyle = renderSimsBandSimsStyle;
+
 function _crearDialOverlay(){
   if(_dialOverlay) return;
 
@@ -398,7 +568,7 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(850px,88vw);height:min(850px,88vw);position:relative;pointer-events:auto;z-index:1';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(640px,68vw);height:min(640px,68vw);position:relative;pointer-events:auto;z-index:1';
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
@@ -578,30 +748,101 @@ function _crearDialOverlay(){
   }
 
   // ══════════════════════════════════════
-  //  BANDA SIM — _pSim, top, full-width
+  //  ZONA SUPERIOR (full-width, 3 sub-paneles)
+  // ══════════════════════════════════════
+
+  // ── _pUser: USER / Nivel / XP (top-left) ──
+  var _pUser = _mkFloatPanel('hud-user','#A78BFA','rgba(167,139,250,0.15)');
+  document.body.appendChild(_pUser);
+  _pUser.style.animationDelay = '0s';
+  _pUser.style.borderRadius = '12px';
+  document.getElementById('hud-user-inner').innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px">'+
+      '<div style="width:42px;height:42px;border-radius:10px;background:rgba(167,139,250,0.15);border:1px solid rgba(167,139,250,0.45);'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 14px rgba(167,139,250,0.30)">'+
+        '<i class="fas fa-user-astronaut" style="font-size:16px;color:#A78BFA;filter:drop-shadow(0 0 5px #A78BFA)"></i>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1">'+
+        '<div style="display:flex;align-items:baseline;gap:10px">'+
+          '<span style="font-size:13px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#fff">USER</span>'+
+          '<span id="_hud-user-nivel" style="font-size:11px;font-weight:700;color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,0.55)">Nivel 1</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<div style="height:5px;flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;min-width:60px">'+
+            '<div id="_hud-user-xpbar" style="height:100%;width:0%;background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px rgba(167,139,250,0.6);border-radius:3px;transition:width .8s ease"></div>'+
+          '</div>'+
+          '<span id="_hud-user-xp" style="font-size:10px;font-weight:700;color:rgba(220,220,240,0.65);font-variant-numeric:tabular-nums;white-space:nowrap">0 / 1,000 XP</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  // ══════════════════════════════════════
+  //  BANDA SIM — _pSim, top-center, ESTILO SIMS (sin flechas)
   // ══════════════════════════════════════
   var _pSim = _mkFloatPanel('hud-sim-band','#FBBF24','rgba(251,191,36,0.15)');
   document.body.appendChild(_pSim);
-  _pSim.style.animationDelay = '0s';
-  // Override styles: la banda no es panel vertical, es horizontal
+  _pSim.style.animationDelay = '0.4s';
   _pSim.style.borderRadius = '12px';
   document.getElementById('hud-sim-band-inner').innerHTML =
-    '<div style="display:flex;align-items:center;gap:10px;padding:8px 16px 6px">'+
-      '<div style="width:24px;height:24px;border-radius:6px;background:rgba(251,191,36,0.18);border:1px solid rgba(251,191,36,0.45);'+
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px 16px 8px">'+
+      '<div style="width:26px;height:26px;border-radius:7px;background:rgba(251,191,36,0.18);border:1px solid rgba(251,191,36,0.45);'+
         'display:flex;align-items:center;justify-content:center;flex-shrink:0;'+
-        'box-shadow:0 0 10px rgba(251,191,36,0.30)">'+
-        '<i class="fas fa-heart-pulse" style="font-size:10px;color:#FBBF24"></i>'+
+        'box-shadow:0 0 12px rgba(251,191,36,0.30)">'+
+        '<i class="fas fa-heart-pulse" style="font-size:11px;color:#FBBF24"></i>'+
       '</div>'+
-      '<span style="font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;'+
+      '<span style="font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;'+
         'color:#FBBF24;text-shadow:0 0 10px rgba(251,191,36,0.55);flex:1">Estado del Sim</span>'+
       '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;'+
         'color:rgba(220,220,240,0.40)">9 needs</span>'+
     '</div>'+
-    '<div id="hud-sim-needs-grid" style="display:flex;gap:8px;padding:8px 16px 12px;align-items:flex-start;justify-content:space-between"></div>';
+    '<div id="hud-sim-band-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:10px 18px;padding:6px 16px 14px"></div>';
 
-  // Render SÍNCRONO inmediato de las 9 barras (con valores default 50)
-  // antes de que _reposicionarHUD calcule la altura del panel
-  if(typeof renderSimsNeeds === 'function') renderSimsNeeds('hud-sim-needs-grid');
+  // Render inicial síncrono de la banda Sims
+  if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
+
+  // ── _pStats: Energía / Racha / Créditos (top-right) ──
+  var _pStats = _mkFloatPanel('hud-stats','#22D3EE','rgba(34,211,238,0.15)');
+  document.body.appendChild(_pStats);
+  _pStats.style.animationDelay = '0.8s';
+  _pStats.style.borderRadius = '12px';
+  document.getElementById('hud-stats-inner').innerHTML =
+    '<div style="display:flex;align-items:center;justify-content:space-around;gap:14px;padding:12px 16px">'+
+      // Energía
+      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
+        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.40);'+
+          'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px rgba(251,191,36,0.25)">'+
+          '<i class="fas fa-bolt" style="font-size:13px;color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
+          '<span style="font-size:14px;font-weight:800;color:#FBBF24;text-shadow:0 0 8px rgba(251,191,36,0.55);line-height:1"><span id="_hud-energia">—</span><span style="font-size:9px;color:rgba(220,220,240,0.40);font-weight:600">/100</span></span>'+
+          '<span style="font-size:8px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Energía</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="width:1px;height:30px;background:rgba(255,255,255,0.08)"></div>'+
+      // Racha
+      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
+        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(251,146,60,0.15);border:1px solid rgba(251,146,60,0.40);'+
+          'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px rgba(251,146,60,0.25)">'+
+          '<i class="fas fa-fire" style="font-size:13px;color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
+          '<span style="font-size:14px;font-weight:800;color:#FB923C;text-shadow:0 0 8px rgba(251,146,60,0.55);line-height:1"><span id="_hud-racha-dias">—</span><span style="font-size:9px;color:rgba(220,220,240,0.40);font-weight:600"> días</span></span>'+
+          '<span style="font-size:8px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Racha actual</span>'+
+        '</div>'+
+      '</div>'+
+      '<div style="width:1px;height:30px;background:rgba(255,255,255,0.08)"></div>'+
+      // Créditos
+      '<div style="display:flex;align-items:center;gap:9px;min-width:0">'+
+        '<div style="width:30px;height:30px;border-radius:8px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.40);'+
+          'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 10px rgba(34,211,238,0.25)">'+
+          '<i class="fas fa-gem" style="font-size:13px;color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
+        '</div>'+
+        '<div style="display:flex;flex-direction:column;gap:1px;min-width:0">'+
+          '<span id="_hud-creditos" style="font-size:14px;font-weight:800;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.55);line-height:1">—</span>'+
+          '<span style="font-size:8px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Créditos</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
 
   // ── Panel 1: Patrimonio ──
   var _p1 = _mkFloatPanel('hud-patrimonio','#22C55E','rgba(34,197,94,0.15)');
@@ -684,8 +925,7 @@ function _crearDialOverlay(){
         '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:3px"></div>'+
       '</div>'+
     '</div>';
-  _p5.appendChild(_nav('Activity','fa-bolt','#FB923C','irAActivity'));
-  _p5.appendChild(_nav('Logros','fa-trophy','#FACC15','irALogros'));
+  // (los items de navegación viven solo en _p6 — un único panel)
 
   // ── Panel 6: Navegación ──
   var _p6 = _mkFloatPanel('hud-nav','#A78BFA','rgba(167,139,250,0.12)');
@@ -694,25 +934,148 @@ function _crearDialOverlay(){
   document.getElementById('hud-nav-inner').innerHTML =
     _pH('Navegación','#A78BFA','fa-compass');
   [
+    {label:'Activity',     icon:'fa-bolt',         fn:'irAActivity',  color:'#FB923C'},
+    {label:'Logros',       icon:'fa-trophy',       fn:'irALogros',    color:'#FACC15'},
     {label:'Nutrición',    icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
     {label:'Bitácora',     icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
-    {label:'RAW Sheet',    icon:'fa-table',         fn:'irASheets',    color:'#A5B4FC'},
+    {label:'RAW Sheet',    icon:'fa-table',        fn:'irASheets',    color:'#A5B4FC'},
     {label:'Actualizar',   icon:'fa-rotate-right', fn:'refreshTodo',  color:'#64748B'},
   ].forEach(function(n){ _p6.appendChild(_nav(n.label,n.icon,n.color,n.fn)); });
 
-  // ── Registrar panels ──
-  _pSim._side='top';   _pSim._order=0;
+  // ══════════════════════════════════════
+  //  ZONA INFERIOR — track de niveles + 3 cards
+  // ══════════════════════════════════════
+
+  // ── _pTrack: track horizontal de niveles (debajo del dial) ──
+  var _pTrack = _mkFloatPanel('hud-track','#A78BFA','rgba(167,139,250,0.12)');
+  document.body.appendChild(_pTrack);
+  _pTrack.style.animationDelay = '1.0s';
+  _pTrack.style.borderRadius = '12px';
+  document.getElementById('hud-track-inner').innerHTML =
+    '<div style="display:flex;align-items:center;gap:14px;padding:10px 16px">'+
+      // Hexágono nivel actual
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;flex-shrink:0">'+
+        '<div style="width:42px;height:42px;display:flex;align-items:center;justify-content:center;'+
+          'background:radial-gradient(circle,rgba(167,139,250,0.22),rgba(167,139,250,0.05));'+
+          'border:1.5px solid #A78BFA;border-radius:8px;'+
+          'box-shadow:0 0 16px rgba(167,139,250,0.45),inset 0 0 8px rgba(167,139,250,0.18);'+
+          'clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)">'+
+          '<span id="_hud-track-nivel" style="font-size:15px;font-weight:800;color:#fff;text-shadow:0 0 8px #A78BFA">1</span>'+
+        '</div>'+
+        '<span style="font-size:8px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,220,240,0.45)">Actual</span>'+
+      '</div>'+
+      // XP info
+      '<div style="display:flex;flex-direction:column;gap:2px;min-width:0;flex-shrink:0">'+
+        '<span style="font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,220,240,0.40)">Nivel actual</span>'+
+        '<span id="_hud-track-xp" style="font-size:13px;font-weight:800;color:#A78BFA;font-variant-numeric:tabular-nums;text-shadow:0 0 8px rgba(167,139,250,0.55)">0 / 1,000 XP</span>'+
+      '</div>'+
+      // Track de niveles siguientes
+      '<div style="display:flex;align-items:center;gap:6px;flex:1;justify-content:center">'+
+        '<div id="_hud-track-stops" style="display:flex;align-items:center;gap:4px"></div>'+
+      '</div>'+
+      // Cofre del horizonte
+      '<div style="display:flex;align-items:center;flex-shrink:0">'+
+        '<i class="fas fa-trophy" style="font-size:18px;color:#A78BFA;filter:drop-shadow(0 0 6px rgba(167,139,250,0.6))"></i>'+
+      '</div>'+
+    '</div>';
+
+  // ── _pMision: Misión Diaria (bottom-left) ──
+  var _pMision = _mkFloatPanel('hud-mision','#22D3EE','rgba(34,211,238,0.15)');
+  document.body.appendChild(_pMision);
+  _pMision.style.animationDelay = '1.4s';
+  _pMision.style.borderRadius = '12px';
+  document.getElementById('hud-mision-inner').innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px">'+
+      '<div style="width:36px;height:36px;border-radius:9px;background:rgba(34,211,238,0.15);border:1px solid rgba(34,211,238,0.45);'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px rgba(34,211,238,0.30)">'+
+        '<i class="fas fa-bullseye" style="font-size:14px;color:#22D3EE;filter:drop-shadow(0 0 5px #22D3EE)"></i>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+          '<span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.55)">Misión Diaria</span>'+
+          '<span id="_hud-mision-progreso" style="font-size:11px;font-weight:800;color:#22D3EE;font-variant-numeric:tabular-nums">0/3</span>'+
+        '</div>'+
+        '<span id="_hud-mision-label" style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Completa 3 hábitos hoy</span>'+
+        '<div style="display:flex;align-items:center;gap:8px">'+
+          '<div style="height:5px;flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
+            '<div id="_hud-mision-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#22D3EE,#67E8F9);box-shadow:0 0 6px rgba(34,211,238,0.6);border-radius:3px;transition:width .8s ease"></div>'+
+          '</div>'+
+          '<span id="_hud-mision-recompensa" style="font-size:9px;font-weight:700;color:#FACC15;text-shadow:0 0 6px rgba(250,204,21,0.45);white-space:nowrap">+50 XP</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  // ── _pLogro: Logro Reciente (bottom-center) ──
+  var _pLogro = _mkFloatPanel('hud-logro','#FACC15','rgba(250,204,21,0.15)');
+  document.body.appendChild(_pLogro);
+  _pLogro.style.animationDelay = '1.7s';
+  _pLogro.style.borderRadius = '12px';
+  document.getElementById('hud-logro-inner').innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px">'+
+      '<div style="width:36px;height:36px;border-radius:9px;background:rgba(250,204,21,0.15);border:1px solid rgba(250,204,21,0.45);'+
+        'display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 0 12px rgba(250,204,21,0.30)">'+
+        '<i class="fas fa-star" style="font-size:14px;color:#FACC15;filter:drop-shadow(0 0 5px #FACC15)"></i>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+          '<span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#FACC15;text-shadow:0 0 8px rgba(250,204,21,0.55)">Logro Reciente</span>'+
+          '<span id="_hud-logro-pct" style="font-size:11px;font-weight:800;color:#FACC15;font-variant-numeric:tabular-nums">0%</span>'+
+        '</div>'+
+        '<span id="_hud-logro-titulo" style="font-size:11px;font-weight:600;color:rgba(220,220,240,0.75);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</span>'+
+        '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
+          '<div id="_hud-logro-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#FACC15,#FCD34D);box-shadow:0 0 6px rgba(250,204,21,0.6);border-radius:3px;transition:width .8s ease"></div>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+
+  // ── _pNivel: Nivel Siguiente (bottom-right) ──
+  var _pNivel = _mkFloatPanel('hud-nivel','#A78BFA','rgba(167,139,250,0.15)');
+  document.body.appendChild(_pNivel);
+  _pNivel.style.animationDelay = '2.0s';
+  _pNivel.style.borderRadius = '12px';
+  document.getElementById('hud-nivel-inner').innerHTML =
+    '<div style="display:flex;align-items:center;gap:12px;padding:11px 14px">'+
+      // Hexágono pequeño con número del siguiente nivel
+      '<div style="width:36px;height:36px;display:flex;align-items:center;justify-content:center;'+
+        'background:radial-gradient(circle,rgba(167,139,250,0.22),rgba(167,139,250,0.05));'+
+        'border:1.5px solid #A78BFA;'+
+        'box-shadow:0 0 12px rgba(167,139,250,0.40),inset 0 0 6px rgba(167,139,250,0.18);'+
+        'clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0">'+
+        '<span id="_hud-nivel-num" style="font-size:13px;font-weight:800;color:#fff;text-shadow:0 0 8px #A78BFA">2</span>'+
+      '</div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px;min-width:0;flex:1">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+          '<span style="font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,0.55)">Nivel Siguiente</span>'+
+        '</div>'+
+        '<div style="display:flex;align-items:baseline;gap:8px">'+
+          '<span id="_hud-nivel-xp" style="font-size:12px;font-weight:800;color:#A78BFA;text-shadow:0 0 8px rgba(167,139,250,0.55);font-variant-numeric:tabular-nums">+1,000 XP</span>'+
+          '<span style="color:rgba(255,255,255,0.15)">|</span>'+
+          '<span id="_hud-nivel-bonus" style="font-size:11px;font-weight:700;color:#22D3EE;text-shadow:0 0 6px rgba(34,211,238,0.45);font-variant-numeric:tabular-nums">+$250</span>'+
+        '</div>'+
+        '<div id="_hud-nivel-dots" style="display:flex;align-items:center;gap:4px"></div>'+
+      '</div>'+
+    '</div>';
+
+  _pUser._side='top-left';     _pUser._order=0;
+  _pSim._side='top-center';    _pSim._order=0;
+  _pStats._side='top-right';   _pStats._order=0;
   _p1._side='left';    _p1._order=0;
   _p2._side='left';    _p2._order=1;
   _p3._side='left';    _p3._order=2;
   _p4._side='right';   _p4._order=0;
   _p5._side='right';   _p5._order=1;
   _p6._side='right';   _p6._order=2;
+  _pTrack._side='bottom-track';   _pTrack._order=0;
+  _pMision._side='bottom-left';   _pMision._order=0;
+  _pLogro._side='bottom-center';  _pLogro._order=0;
+  _pNivel._side='bottom-right';   _pNivel._order=0;
 
   var _hudPanels = [
-    {el:_pSim},
+    {el:_pUser},{el:_pSim},{el:_pStats},
     {el:_p1},{el:_p2},{el:_p3},
     {el:_p4},{el:_p5},{el:_p6},
+    {el:_pTrack},
+    {el:_pMision},{el:_pLogro},{el:_pNivel},
   ];
 
   // ── Reposicionar HUD ──
@@ -721,50 +1084,176 @@ function _crearDialOverlay(){
     var r   = _dialCanvas.getBoundingClientRect();
     var vW  = window.innerWidth;
     var vH  = window.innerHeight;
-    var GAP = 14;
+    var GAP = 12;
 
-    // ── BANDA SIM (top) ──
-    var topPanels = window._hudPanels.filter(function(hp){ return hp.el._side==='top'; });
-    topPanels.forEach(function(hp){
-      var bandW  = Math.min(720, r.width - 80);
-      if(bandW < 320) bandW = Math.min(560, vW - 32);
-      var bandH  = hp.el.scrollHeight || hp.el.offsetHeight || 110;
-      var top    = Math.max(GAP, r.top - bandH - 14);
-      var left   = (vW - bandW) / 2;
-      hp.el.style.width = bandW + 'px';
-      hp.el.style.left  = left + 'px';
-      hp.el.style.top   = top + 'px';
-      // Chamfer en las 8 esquinas para banda horizontal
-      hp.el.style.clipPath = 'polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px),0 8px)';
+    // Chamfers por posición
+    var chamferRect = 'polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)';
+    var chamferLeft  = 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))';
+    var chamferRight = 'polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)';
+
+    // ══════════════════════════════════════════
+    //  ZONA SUPERIOR (3 sub-paneles full-width)
+    // ══════════════════════════════════════════
+    // Distribuye top-left / top-center / top-right en una banda horizontal arriba
+    var topPad  = GAP;
+    var topGap  = 12;
+    var topAvail = vW - topPad*2;
+    // Ancho fijo proporcional: USER 220, Stats 280, resto centro
+    var wUser  = Math.min(280, Math.max(180, Math.round(topAvail * 0.20)));
+    var wStats = Math.min(360, Math.max(220, Math.round(topAvail * 0.28)));
+    var wSim   = topAvail - wUser - wStats - topGap*2;
+    if(wSim < 320){
+      // viewport pequeño: dejar solo banda Sim centrada arriba
+      wUser = 0; wStats = 0;
+      wSim = Math.min(720, vW - topPad*2);
+    }
+    // Posicionar
+    function getTop(side){
+      return window._hudPanels.filter(function(hp){ return hp.el._side===side; });
+    }
+    var pUser  = getTop('top-left')[0];
+    var pSim   = getTop('top-center')[0];
+    var pStats = getTop('top-right')[0];
+
+    // Primera pasada: setear width para que scrollHeight sea correcto
+    if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; }
+    else if(pUser){ pUser.el.style.width='0px'; pUser.el.style.opacity='0'; pUser.el.style.visibility='hidden'; }
+    if(pSim){ pSim.el.style.width = wSim+'px'; }
+    if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; }
+    else if(pStats){ pStats.el.style.width='0px'; pStats.el.style.opacity='0'; pStats.el.style.visibility='hidden'; }
+
+    // Calcular altura máxima de la fila top
+    var topH = 0;
+    [pUser,pSim,pStats].forEach(function(hp){
+      if(hp && hp.el && hp.el.style.width !== '0px'){
+        var h = hp.el.scrollHeight || hp.el.offsetHeight || 90;
+        if(h>topH) topH = h;
+      }
     });
+    if(topH===0) topH = 90;
 
-    // ── COLUMNAS LATERALES ──
+    var topY = topPad;
+    var curX = topPad;
+    if(pUser && wUser>0){
+      pUser.el.style.left = curX+'px';
+      pUser.el.style.top  = topY+'px';
+      pUser.el.style.clipPath = chamferRect;
+      curX += wUser + topGap;
+    }
+    if(pSim){
+      // Centrar la banda Sim en el espacio disponible si hay laterales, o full si no
+      if(wUser>0 && wStats>0){
+        pSim.el.style.left = curX+'px';
+        pSim.el.style.top  = topY+'px';
+      } else {
+        pSim.el.style.left = Math.round((vW - wSim)/2)+'px';
+        pSim.el.style.top  = topY+'px';
+      }
+      pSim.el.style.clipPath = chamferRect;
+      if(wUser>0 && wStats>0) curX += wSim + topGap;
+    }
+    if(pStats && wStats>0){
+      pStats.el.style.left = (vW - topPad - wStats)+'px';
+      pStats.el.style.top  = topY+'px';
+      pStats.el.style.clipPath = chamferRect;
+    }
+
+    // ══════════════════════════════════════════
+    //  ZONA INFERIOR — track + 3 cards
+    // ══════════════════════════════════════════
+    var pTrack  = getTop('bottom-track')[0];
+    var pMision = getTop('bottom-left')[0];
+    var pLogro  = getTop('bottom-center')[0];
+    var pNivel  = getTop('bottom-right')[0];
+
+    var botPad  = GAP;
+    var botGap  = 12;
+    var botAvail = vW - botPad*2;
+    var wMision = Math.round((botAvail - botGap*2)/3);
+    var wLogro  = wMision;
+    var wNivel  = botAvail - wMision - wLogro - botGap*2;
+
+    if(pMision){ pMision.el.style.width = wMision+'px'; }
+    if(pLogro){ pLogro.el.style.width = wLogro+'px'; }
+    if(pNivel){ pNivel.el.style.width = wNivel+'px'; }
+
+    // Track horizontal: ancho relativo al dial, debajo del dial
+    var trackW = Math.min(640, Math.max(420, r.width - 40));
+    if(pTrack){ pTrack.el.style.width = trackW+'px'; }
+
+    // Altura máxima de la fila bottom (cards)
+    var botH = 0;
+    [pMision,pLogro,pNivel].forEach(function(hp){
+      if(hp && hp.el){
+        var h = hp.el.scrollHeight || hp.el.offsetHeight || 80;
+        if(h>botH) botH = h;
+      }
+    });
+    if(botH===0) botH = 80;
+    var trackH = (pTrack && pTrack.el) ? (pTrack.el.scrollHeight || pTrack.el.offsetHeight || 64) : 64;
+
+    // Y de la fila bottom: pegada al fondo
+    var botY = vH - botPad - botH;
+    var trackY = botY - trackH - 8;
+
+    if(pTrack){
+      pTrack.el.style.left = Math.round((vW - trackW)/2)+'px';
+      pTrack.el.style.top  = trackY+'px';
+      pTrack.el.style.clipPath = chamferRect;
+    }
+    var bX = botPad;
+    if(pMision){
+      pMision.el.style.left = bX+'px';
+      pMision.el.style.top  = botY+'px';
+      pMision.el.style.clipPath = chamferRect;
+      bX += wMision + botGap;
+    }
+    if(pLogro){
+      pLogro.el.style.left = bX+'px';
+      pLogro.el.style.top  = botY+'px';
+      pLogro.el.style.clipPath = chamferRect;
+      bX += wLogro + botGap;
+    }
+    if(pNivel){
+      pNivel.el.style.left = (vW - botPad - wNivel)+'px';
+      pNivel.el.style.top  = botY+'px';
+      pNivel.el.style.clipPath = chamferRect;
+    }
+
+    // ══════════════════════════════════════════
+    //  COLUMNAS LATERALES — encima de la zona central
+    // ══════════════════════════════════════════
+    // Espacio vertical disponible para columnas: entre topH y trackY
+    var colTopY    = topY + topH + GAP*2;
+    var colBotY    = trackY - GAP;
+    var colVAvail  = Math.max(200, colBotY - colTopY);
+
     var leftSpace  = r.left;
     var rightSpace = vW - r.right;
-    var leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.78));
-    var rightW = Math.min(Math.max(180, rightSpace - GAP*2), Math.floor(rightSpace * 0.78));
+    var leftW  = Math.min(Math.max(190, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.82));
+    var rightW = Math.min(Math.max(190, rightSpace - GAP*2), Math.floor(rightSpace * 0.82));
     var leftX  = Math.floor((leftSpace  - leftW)  / 2);
     var rightX = r.right + Math.floor((rightSpace - rightW) / 2);
 
     var leftPanels  = window._hudPanels.filter(function(hp){ return hp.el._side==='left';  });
     var rightPanels = window._hudPanels.filter(function(hp){ return hp.el._side==='right'; });
 
-    function positionCol(panels, x, w){
+    function positionCol(panels, x, w, isLeft){
       panels.sort(function(a,b){ return a.el._order - b.el._order; });
       panels.forEach(function(hp){
-        hp.el.style.width    = w + 'px';
-        hp.el.style.left     = x + 'px';
-        hp.el.style.top      = '-9999px';
+        hp.el.style.width = w + 'px';
+        hp.el.style.left  = x + 'px';
+        hp.el.style.top   = '-9999px';
       });
       var totalH = panels.reduce(function(s,hp){
         return s + (hp.el.scrollHeight || hp.el.offsetHeight || 200) + GAP;
       },0) - GAP;
-      var startY = Math.max(GAP, (vH - totalH) / 2);
+      // Centrar verticalmente entre colTopY y colBotY
+      var startY = Math.max(colTopY, colTopY + (colVAvail - totalH)/2);
+      // Si no cabe (totalH > colVAvail), arrancar en colTopY y dejar que se vea aunque se solape
+      if(totalH > colVAvail) startY = colTopY;
       var curY   = startY;
-      var isLeft = x < vW/2;
-      var chamfer = isLeft
-        ? 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))'
-        : 'polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)';
+      var chamfer = isLeft ? chamferLeft : chamferRight;
       panels.forEach(function(hp){
         var h = hp.el.scrollHeight || hp.el.offsetHeight || 200;
         hp.el.style.top      = curY + 'px';
@@ -773,8 +1262,39 @@ function _crearDialOverlay(){
       });
     }
 
-    positionCol(leftPanels,  leftX,  leftW);
-    positionCol(rightPanels, rightX, rightW);
+    positionCol(leftPanels,  leftX,  leftW,  true);
+    positionCol(rightPanels, rightX, rightW, false);
+
+    // ══════════════════════════════════════════
+    //  TRACK STOPS — render dinámico de los hexes del track
+    // ══════════════════════════════════════════
+    var stopsEl = document.getElementById('_hud-track-stops');
+    if(stopsEl && pTrack){
+      var xpInfo = (typeof _calcXPNivel==='function') ? _calcXPNivel() : { nivel:1 };
+      var n = xpInfo.nivel;
+      var stops = [n+1, n+2, n+3];
+      var html = '';
+      stops.forEach(function(lvl, idx){
+        // Línea entre stops
+        if(idx>0){
+          html += '<div style="width:24px;height:1px;background:linear-gradient(90deg,rgba(167,139,250,0.30),rgba(167,139,250,0.10));position:relative">'+
+            '<div style="position:absolute;top:50%;right:-2px;width:5px;height:5px;border-radius:50%;background:#A78BFA;transform:translateY(-50%);box-shadow:0 0 6px #A78BFA"></div>'+
+          '</div>';
+        } else {
+          html += '<div style="width:18px;height:1px;background:linear-gradient(90deg,rgba(167,139,250,0.40),rgba(167,139,250,0.20))"></div>';
+        }
+        html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'+
+          '<div style="width:30px;height:30px;display:flex;align-items:center;justify-content:center;'+
+            'background:rgba(167,139,250,0.06);border:1px solid rgba(167,139,250,0.30);'+
+            'clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);'+
+            'box-shadow:0 0 8px rgba(167,139,250,0.18)">'+
+            '<span style="font-size:11px;font-weight:800;color:rgba(220,220,240,0.75)">'+lvl+'</span>'+
+          '</div>'+
+          '<span style="font-size:8px;font-weight:700;color:rgba(167,139,250,0.60);font-variant-numeric:tabular-nums">+'+(500*(idx+1))+' XP</span>'+
+        '</div>';
+      });
+      stopsEl.innerHTML = html;
+    }
   }
   window._reposicionarHUD = _reposicionarHUD;
 
@@ -798,8 +1318,66 @@ function _crearDialOverlay(){
 
     var d = datos || window._hudDatos || {};
 
-    // ── Banda Sim ──
-    renderSimsNeeds('hud-sim-needs-grid');
+    // ── Banda Sim (estilo Sims) ──
+    if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
+    // Compatibilidad: si aún hay un grid viejo en la página, refrescarlo también
+    if(document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+
+    // ── USER / Nivel / XP (top-left) ──
+    if(typeof _calcXPNivel === 'function'){
+      var xp = _calcXPNivel();
+      set('_hud-user-nivel', 'Nivel '+xp.nivel);
+      set('_hud-user-xp', xp.xpActual.toLocaleString('es-MX')+' / '+xp.xpMeta.toLocaleString('es-MX')+' XP');
+      setW('_hud-user-xpbar', (xp.xpActual/xp.xpMeta)*100);
+      // Track
+      set('_hud-track-nivel', xp.nivel);
+      set('_hud-track-xp', xp.xpActual.toLocaleString('es-MX')+' / '+xp.xpMeta.toLocaleString('es-MX')+' XP');
+      // Nivel Siguiente
+      set('_hud-nivel-num', xp.nivel+1);
+      set('_hud-nivel-xp', '+'+(xp.xpMeta - xp.xpActual).toLocaleString('es-MX')+' XP');
+    }
+
+    // ── Stats (Energía / Racha / Créditos) ──
+    if(typeof _calcRachaCreditos === 'function'){
+      var rc = _calcRachaCreditos();
+      set('_hud-energia', rc.energia);
+      set('_hud-racha-dias', rc.racha);
+      set('_hud-creditos', rc.creditos.toLocaleString('es-MX'));
+    }
+
+    // ── Misión Diaria ──
+    if(typeof _calcMisionDiaria === 'function'){
+      var ms = _calcMisionDiaria();
+      set('_hud-mision-progreso', ms.hechos+'/'+ms.total);
+      set('_hud-mision-label', ms.label);
+      set('_hud-mision-recompensa', ms.recompensa);
+      setW('_hud-mision-bar', ms.total>0 ? (ms.hechos/ms.total)*100 : 0);
+    }
+
+    // ── Logro Reciente ──
+    if(typeof _calcLogroReciente === 'function'){
+      var lr = _calcLogroReciente();
+      set('_hud-logro-titulo', lr.titulo);
+      set('_hud-logro-pct', lr.avance+'%');
+      setW('_hud-logro-bar', lr.avance);
+    }
+
+    // ── Nivel Siguiente: dots ──
+    if(typeof _calcNivelSiguiente === 'function'){
+      var ns = _calcNivelSiguiente();
+      var dotsEl = document.getElementById('_hud-nivel-dots');
+      if(dotsEl){
+        var dh = '';
+        for(var i=0;i<ns.dots;i++){
+          var lleno = i < ns.dotsLlenos;
+          dh += '<div style="width:6px;height:6px;border-radius:50%;'+
+            'background:'+(lleno?'#A78BFA':'rgba(255,255,255,0.10)')+';'+
+            (lleno?'box-shadow:0 0 5px rgba(167,139,250,0.7);':'')+
+          '"></div>';
+        }
+        dotsEl.innerHTML = dh;
+      }
+    }
 
     // ── Patrimonio ──
     var fijosAll = window._fijosData || [];
@@ -914,7 +1492,7 @@ function _crearDialOverlay(){
           var n = (d && d.items||[]).length || (d && (d.semana||[]).reduce(function(s,x){ return s+(x.items||[]).length; },0)) || 0;
           set('_hud-nut', n ? n+' registros' : '—');
           // Actualizar también la banda Sim si tiene needs que dependen de nutrición
-          if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+          if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
         }).catch(function(){ window._nutLoading = false; });
       }
     }
@@ -1555,7 +2133,7 @@ function abrirDial(){
   if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
   if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
   // Render banda Sim ya construida — renderizamos AHORA y reposicionamos después
-  if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+  if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
   if(window._hudPanels && window.innerWidth>=900){
     window._hudPanels.forEach(function(hp, i){
       hp.el.style.opacity='0'; hp.el.style.visibility='hidden';
@@ -1568,13 +2146,13 @@ function abrirDial(){
     // para que la banda Sim recalcule altura con el contenido ya pintado
     var totalDelay = window._hudPanels.length * 80 + 60;
     setTimeout(function(){
-      if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
     }, totalDelay);
   } else {
     // Modo compacto / mobile: aun así forzar render+reposicionamiento
     setTimeout(function(){
-      if(typeof renderSimsNeeds==='function') renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
     }, 100);
   }
