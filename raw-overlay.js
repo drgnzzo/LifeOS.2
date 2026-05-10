@@ -1,24 +1,19 @@
-/* RAW Entry — Overlay v.5.091
-   Cambios desde v5.090:
-   - Bitácora expandida: tarjetas de Pensamientos, Relaciones, Salud,
-     Nutrición, Entrenamiento con últimos registros.
-   - Activity+Logros expandida: hábitos personales del día, hábitos
-     Electronics del día, logros con barra de progreso, lista de
-     logros recientes.
-   - Necesidades expandida: radar SVG (5 ejes) + barras de distribución
-     por nivel (Fisiológicas, Seguridad, Afiliación, Reconocimiento,
-     Autorrealización) con totales y porcentajes.
-   - Fijos/Variables: tabla y gráfico ahora centrados verticalmente.
-   - ANIMACIÓN AL REGRESAR del modo expandido: transitions activas
-     mantenidas durante el cambio de tamaño/posición. Antes el regreso
-     era instantáneo.
-   - Bug de paneles amontonados al regresar: limpieza explícita de
-     width/height/minHeight/clipPath del panel que se acaba de colapsar
-     (estaban quedando con valores expandidos inline y peleando con
-     el reposicionamiento normal).
-
-   Pendiente:
-   - Misión, Logro, Nivel expandidos (siguen con placeholder).
+/* RAW Entry — Overlay v.5.092
+   Cambios desde v5.091 (transiciones de aparición y cierre):
+   - APARICIÓN ALEATORIA de cards (P-1b): cada panel del overlay obtiene
+     un delay random entre 0 y 800ms. Anima fade-in + slide pequeño desde
+     su zona de origen (top-left entra desde top-left, right entra desde
+     la derecha, etc.). Easing: cubic-bezier(.16,1,.3,1), 520-580ms.
+     Flag _animatingEntry preserva el transform durante la animación
+     incluso si _reposicionarHUD se ejecuta en medio.
+   - FADE-IN del overlay subido a 480ms (antes 320ms). El blur del fondo
+     ya estaba aplicado desde el primer frame (P-2a sin animar).
+   - CIERRE con fade-out (P-3c): cerrarDial ahora tarda 280ms en lugar
+     de 220ms. Los paneles también se desvanecen en paralelo (220ms).
+   - NAVEGACIÓN desde tabs del overlay (HOME, LOGROS, BITÁCORA, etc.):
+     antes ejecutaba directo la función → el overlay desaparecía de golpe.
+     Ahora cierra el dial primero con animación, espera 300ms, y luego
+     navega a la sección correspondiente.
 */
 
 var _dialOverlay   = null;
@@ -798,14 +793,18 @@ function _crearDialOverlay(){
     var id = tab.dataset.tabId;
     var target = tab.dataset.tabTarget;
     if(id === 'sim'){
-      // Tab SIM: re-marcar como activo (no hace nada más, ya muestra el contenido Sim)
       document.querySelectorAll('.hud-megatab').forEach(function(t){ t.classList.remove('active'); });
       tab.classList.add('active');
       return;
     }
-    // Otros tabs: cerrar dial y navegar a la sección correspondiente (P-A2 + P-B2)
+    // P-3c: Otros tabs → cerrar dial con fade-out, LUEGO navegar.
     if(target && typeof window[target] === 'function'){
-      window[target]();
+      // Cerrar el dial primero con su animación
+      if(typeof cerrarDial === 'function') cerrarDial();
+      // Esperar el fade-out (~290ms) y entonces navegar
+      setTimeout(function(){
+        try { window[target](); } catch(e){}
+      }, 300);
     }
   });
 
@@ -1431,8 +1430,8 @@ function _crearDialOverlay(){
         hp.el.style.width = w + 'px';
         hp.el.style.left  = x + 'px';
         hp.el.style.top   = '-9999px';
-        // Limpiar transform por si quedó de iteración previa
-        hp.el.style.transform = '';
+        // Limpiar transform SOLO si no está animando entrada
+        if(!hp.el._animatingEntry) hp.el.style.transform = '';
       });
       // Medir alturas reales
       var heights = panels.map(function(hp){
@@ -2845,7 +2844,7 @@ function abrirDial(){
   _dialOverlay.style.pointerEvents = 'auto';
   _dialVisible = true;
   requestAnimationFrame(function(){
-    _dialOverlay.style.transition = 'opacity 320ms cubic-bezier(.16,1,.3,1)';
+    _dialOverlay.style.transition = 'opacity 480ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
   if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
@@ -2853,24 +2852,64 @@ function abrirDial(){
   // Render banda Sim ya construida — renderizamos AHORA y reposicionamos después
   if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
   if(window._hudPanels && window.innerWidth>=900){
-    window._hudPanels.forEach(function(hp, i){
-      hp.el.style.opacity='0'; hp.el.style.visibility='hidden';
-      setTimeout(function(){
-        hp.el.style.visibility='visible';
-        requestAnimationFrame(function(){ hp.el.style.opacity='1'; });
-      }, i * 80);
+    // P-1b: aparición ALEATORIA con fade-in + slide desde su zona de origen.
+    function _slideOrigin(side){
+      switch(side){
+        case 'top-left':       return 'translate(-18px,-12px)';
+        case 'top-center':     return 'translate(0,-16px)';
+        case 'top-right':      return 'translate(18px,-12px)';
+        case 'left':           return 'translate(-22px,0)';
+        case 'right':          return 'translate(22px,0)';
+        case 'bottom-track':   return 'translate(0,18px)';
+        case 'bottom-left':    return 'translate(-18px,14px)';
+        case 'bottom-center':  return 'translate(0,18px)';
+        case 'bottom-right':   return 'translate(18px,14px)';
+        default:               return 'translate(0,12px) scale(0.96)';
+      }
+    }
+    // Marcar todos como ocultos y con slide aplicado
+    window._hudPanels.forEach(function(hp){
+      hp.el._animatingEntry = true;
+      hp.el.style.opacity='0';
+      hp.el.style.visibility='hidden';
+      hp.el.style.transform = _slideOrigin(hp.el._side);
+      hp.el.style.transition = 'opacity 520ms cubic-bezier(.16,1,.3,1),transform 580ms cubic-bezier(.16,1,.3,1)';
     });
-    // Una vez todos visibles, re-render de barras + reposicionamiento
-    // para que la banda Sim recalcule altura con el contenido ya pintado
-    var totalDelay = window._hudPanels.length * 80 + 60;
+    // Forzar reposicionamiento DESPUÉS de aplicar el transform inicial
+    requestAnimationFrame(function(){
+      window._hudPanels.forEach(function(hp){
+        // Re-aplicar transform por si _reposicionarHUD lo limpió
+        if(hp.el._animatingEntry){
+          hp.el.style.transform = _slideOrigin(hp.el._side);
+        }
+        // Delay aleatorio entre 0 y 800ms
+        var delay = Math.round(Math.random() * 800);
+        setTimeout(function(){
+          hp.el.style.visibility='visible';
+          requestAnimationFrame(function(){
+            hp.el.style.opacity='1';
+            hp.el.style.transform='';
+          });
+        }, delay);
+      });
+    });
+    // Una vez todos visibles, limpiar transitions inline y flag de animación
     setTimeout(function(){
-      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
+      if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
-    }, totalDelay);
+      if(window._hudPanels){
+        window._hudPanels.forEach(function(hp){
+          hp.el.style.transition = '';
+          hp.el._animatingEntry = false;
+        });
+      }
+    }, 1500);
   } else {
-    // Modo compacto / mobile: aun así forzar render+reposicionamiento
+    // Modo compacto / mobile
     setTimeout(function(){
-      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid'); if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
+      if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
     }, 100);
   }
@@ -2880,20 +2919,29 @@ function abrirDial(){
 
 function cerrarDial(){
   if(!_dialOverlay){ _dialVisible=false; return; }
-  _dialOverlay.style.transition = 'opacity 220ms ease';
+  _dialOverlay.style.transition = 'opacity 280ms cubic-bezier(.4,0,.6,1)';
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
+  // Fade-out simultáneo de los paneles para que no parpadeen
+  if(window._hudPanels){
+    window._hudPanels.forEach(function(hp){
+      if(!hp.el) return;
+      hp.el.style.transition = 'opacity 220ms ease';
+      hp.el.style.opacity = '0';
+    });
+  }
   setTimeout(function(){
     if(_dialOverlay && !_dialVisible) _dialOverlay.style.display='none';
     if(window._hudPanels){ window._hudPanels.forEach(function(hp){
       hp.el.style.opacity='0';
       hp.el.style.visibility='hidden';
+      hp.el.style.transition = '';
     }); }
-  }, 230);
+  }, 290);
 }
 
 function abrirFormulario(modo){
