@@ -1,5 +1,27 @@
-/* RAW Entry — Overlay v.5.099
-   Cambios:
+/* RAW Entry — Overlay v.5.100
+   TIMELINE de apertura del overlay reescrita con fases estrictas:
+     t=0      → backdrop fade-in (sin nada visible)
+     t=300ms  → FASE 1: aro circular pulsante aparece (P-1b)
+                · Glow ambiental + 2 círculos SVG delineados (uno principal
+                  + uno secundario interior) + punto central pulsante.
+                · Keyframes dialRingPulse y dialDotPulse propios.
+     t=1100ms → FASE 2: empieza CASCADA de paneles (shuffle aleatorio)
+     t=2900ms → FASE 2b: SLOTS VACÍOS punteados aparecen (P-2b)
+                · Mientras window._hudCascadaEnCurso=true, buildGhostSlots
+                  no construye nada. Al finalizar cascada se pone en false.
+     t=3300ms → FASE 3: DIAL CANVAS aparece con su animación
+                · El aro pulsante se atenúa a opacity 0.18 para no competir.
+     t=4800ms → limpieza final + breathings/scans al azar
+
+   FIX layout 2x2 columnas pegadas al dial:
+     Antes: colA_X = GAP (extremo izquierdo del viewport) y la fila top
+     quedaba toda pegada a la izquierda con espacio vacío a la derecha.
+     Ahora: col-B termina junto al borde izq del dial; col-A queda a su
+     izquierda. Col-C empieza junto al borde der del dial; col-D va a su
+     derecha. Si no caben, se ajustan al borde del viewport con clamp.
+     Resultado: USER alineado con col-A (izq extremo), Stats alineado con
+     col-D (der extremo), Sim band ocupa todo el centro.
+
    - SECUENCIA de apertura del overlay reordenada:
      · t=0–600ms: BREATHING ambiental visible primero (boost del _glowEl
        con brightness 2.2 + saturate 1.4 que vuelve a normal en ~800ms).
@@ -435,6 +457,38 @@ function _crearDialOverlay(){
     document.head.appendChild(ks);
   }
   _dialOverlay.appendChild(_glowEl);
+
+  // ── Aro pulsante "breathing" (P-1b): círculo delineado SVG centrado en el dial.
+  // Se muestra ANTES de que aparezcan los paneles y antes que el dial canvas.
+  var _ringEl = document.createElement('div');
+  _ringEl.id = 'dial-ring-breath';
+  _ringEl.style.cssText = [
+    'position:absolute','inset:0','pointer-events:none','z-index:1',
+    'display:flex','align-items:center','justify-content:center',
+    'opacity:0',
+  ].join(';');
+  _ringEl.innerHTML =
+    '<svg viewBox="0 0 600 600" style="width:min(836px,57vw);height:min(836px,57vw);overflow:visible">'+
+      // Aro principal
+      '<circle cx="300" cy="300" r="280" fill="none" stroke="rgba(167,139,250,0.55)" stroke-width="1.5" '+
+        'style="filter:drop-shadow(0 0 12px rgba(167,139,250,0.55));animation:dialRingPulse 3s ease-in-out infinite"/>'+
+      // Aro secundario interior más tenue
+      '<circle cx="300" cy="300" r="252" fill="none" stroke="rgba(167,139,250,0.20)" stroke-width="1" '+
+        'style="animation:dialRingPulse 3s ease-in-out infinite;animation-delay:.6s"/>'+
+      // Punto central pulsante
+      '<circle cx="300" cy="300" r="6" fill="rgba(167,139,250,0.9)" '+
+        'style="filter:drop-shadow(0 0 8px rgba(167,139,250,0.9));animation:dialDotPulse 1.6s ease-in-out infinite"/>'+
+    '</svg>';
+  _dialOverlay.appendChild(_ringEl);
+  // Keyframes del aro
+  if(!document.getElementById('dial-ring-kf')){
+    var rkf = document.createElement('style');
+    rkf.id = 'dial-ring-kf';
+    rkf.textContent =
+      '@keyframes dialRingPulse{0%,100%{stroke-opacity:.35;transform:scale(0.96);transform-origin:50% 50%}50%{stroke-opacity:.85;transform:scale(1.02);transform-origin:50% 50%}}'+
+      '@keyframes dialDotPulse{0%,100%{opacity:.6;r:5}50%{opacity:1;r:8}}';
+    document.head.appendChild(rkf);
+  }
 
   // ── Keyframes mini-panels ──
   (function(){
@@ -1417,13 +1471,29 @@ function _crearDialOverlay(){
 
     var colA_X, colB_X, colC_X, colD_X, leftW, rightW, leftX, rightX;
     if(fourCols){
-      // Izquierda: [GAP][col-A][GAP][col-B][GAP] hasta el borde del dial
-      colA_X = GAP;
-      colB_X = GAP + COL_W + COL_GAP;
-      // Derecha: empieza después del dial, [GAP][col-C][GAP][col-D][GAP]
+      // Izquierda: las dos columnas se ANCLAN al borde del dial.
+      // col-B termina junto al dial; col-A queda a su izquierda.
+      // Total ancho izquierdo = COL_W + GAP + COL_W
+      var totalLeftW = COL_W * 2 + COL_GAP;
+      // Centrar las 2 columnas en el espacio izquierdo:
+      // Pero priorizar tocar el borde del dial (col-B pegada al dial).
+      // Distribución: GAP entre col-B y dial.
+      colB_X = r.left - GAP - COL_W;
+      colA_X = colB_X - COL_GAP - COL_W;
+      // Si colA_X queda negativo (no hay espacio), pegarlo al borde izquierdo
+      if(colA_X < GAP){
+        colA_X = GAP;
+        colB_X = colA_X + COL_W + COL_GAP;
+      }
+      // Derecha: col-C pegada al dial, col-D a la derecha.
       colC_X = r.right + GAP;
-      colD_X = r.right + GAP + COL_W + COL_GAP;
-      // Para el cálculo de la barra top, leftX..leftX+leftW abarca col-A + col-B
+      colD_X = colC_X + COL_W + COL_GAP;
+      // Si colD_X+COL_W excede el viewport, ajustar
+      if(colD_X + COL_W + GAP > vW){
+        colD_X = vW - GAP - COL_W;
+        colC_X = colD_X - COL_GAP - COL_W;
+      }
+      // Para la barra top: leftX..leftX+leftW abarca col-A + col-B
       leftX = colA_X;
       leftW = (colB_X + COL_W) - colA_X;
       rightX = colC_X;
@@ -3783,36 +3853,36 @@ function abrirDial(){
     })();
   }
 
+  // Bandera global para que buildGhostSlots NO construya slots durante la cascada
+  window._hudCascadaEnCurso = true;
+
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
   _dialOverlay.style.pointerEvents = 'auto';
   _dialVisible = true;
 
-  // ── OCULTAR DIAL al inicio: aparece DESPUÉS de la cascada de cards ──
+  // ═══ FASE 0 — Estado inicial: TODO oculto ═══
+
+  // Dial canvas oculto
   if(_dialCanvas){
     _dialCanvas.style.opacity = '0';
     _dialCanvas.style.transform = 'scale(0.85)';
     _dialCanvas.style.transition = 'none';
   }
-
-  // ── Boost del breathing ambiental durante la primera fase ──
-  // El _glowEl (radial gradient con animation:dialBreath) ya existe en el
-  // overlay. Le subimos opacity/scale temporalmente para que sea LO PRIMERO
-  // que se note antes de que aparezcan los paneles.
+  // Glow ambiental oculto al inicio (luego fade-in con la fase 1)
   var glowEl = document.getElementById('dial-ambient');
   if(glowEl){
     glowEl.style.transition = 'none';
     glowEl.style.opacity = '0';
-    glowEl.style.filter = 'brightness(2.2) saturate(1.4)';
-    requestAnimationFrame(function(){
-      glowEl.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1),filter 1800ms ease-out';
-      glowEl.style.opacity = '1';
-      // Después de 1.5s baja a su brightness normal
-      setTimeout(function(){ glowEl.style.filter = ''; }, 800);
-    });
   }
-
-  // ── OCULTAR TODOS LOS PANELES de inmediato ──
+  // Aro circular pulsante oculto al inicio
+  var ringEl = document.getElementById('dial-ring-breath');
+  if(ringEl){
+    ringEl.style.transition = 'none';
+    ringEl.style.opacity = '0';
+    ringEl.style.transform = 'scale(0.92)';
+  }
+  // TODOS los paneles ocultos
   if(window._hudPanels){
     window._hudPanels.forEach(function(hp){
       if(!hp.el) return;
@@ -3823,32 +3893,59 @@ function abrirDial(){
     });
   }
 
-  // Fade del backdrop
+  // ═══ Backdrop fade-in (sucede en paralelo con la fase 1) ═══
   requestAnimationFrame(function(){
     _dialOverlay.style.transition = 'opacity 480ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
 
+  // Reposicionar antes de que aparezcan las cosas (para que cuando aparezcan
+  // ya estén en sus coordenadas correctas)
   if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
   if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
   if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
   if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
 
   if(window._hudPanels && window.innerWidth>=900){
-    // Delay base: 600ms para que el breathing del glow tenga "tiempo de aire"
-    // antes de que aparezcan los paneles. Esto crea el orden:
-    //   1) Breathing visible (0–600ms)
-    //   2) Cascada de paneles (600–2400ms)
-    //   3) Dial aparece (2600ms)
-    var BREATH_LEAD_MS = 600;
+    // ═══════════════════════════════════════════════════════════════
+    //  TIMELINE DE APERTURA — orden estricto:
+    //   t = 300ms  → FASE 1: aro circular del breathing aparece
+    //   t = 1100ms → FASE 2: empieza cascada de paneles (todos al azar)
+    //   t = 2900ms → FASE 2b: aparecen slots vacíos punteados
+    //   t = 3300ms → FASE 3: aparece el dial canvas completo
+    //   t = 4800ms → limpieza final + vida (breathing/scan al azar)
+    // ═══════════════════════════════════════════════════════════════
 
+    var T_RING_IN       = 300;
+    var T_CASCADA_START = 1100;
+    var T_CASCADA_DUR   = 1800; // ventana de la cascada
+    var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 2900
+    var T_DIAL_IN       = T_SLOTS_IN + 400;                // 3300
+    var T_CLEANUP       = T_DIAL_IN + 1500;                // 4800
+
+    // ── FASE 1: aro circular aparece ──
+    setTimeout(function(){
+      if(glowEl){
+        glowEl.style.transition = 'opacity 900ms cubic-bezier(.16,1,.3,1)';
+        glowEl.style.opacity = '1';
+      }
+      if(ringEl){
+        ringEl.style.transition = 'opacity 900ms cubic-bezier(.16,1,.3,1),transform 900ms cubic-bezier(.16,1,.3,1)';
+        ringEl.style.opacity = '1';
+        ringEl.style.transform = '';
+      }
+    }, T_RING_IN);
+
+    // ── FASE 2: cascada de paneles ──
     function _slideOrigin(side){
       switch(side){
         case 'top-left':       return 'translate(-22px,-16px)';
         case 'top-center':     return 'translate(0,-20px)';
         case 'top-right':      return 'translate(22px,-16px)';
-        case 'left':           return 'translate(-28px,0)';
-        case 'right':          return 'translate(28px,0)';
+        case 'left-1':         return 'translate(-32px,0)';
+        case 'left-2':         return 'translate(-22px,0)';
+        case 'right-1':        return 'translate(22px,0)';
+        case 'right-2':        return 'translate(32px,0)';
         case 'bottom-track':   return 'translate(0,22px)';
         case 'bottom-left':    return 'translate(-22px,18px)';
         case 'bottom-center':  return 'translate(0,22px)';
@@ -3856,30 +3953,24 @@ function abrirDial(){
         default:               return 'translate(0,16px) scale(0.94)';
       }
     }
-    // Aplicar transform inicial de slide a todos los paneles (siguen ocultos)
     window._hudPanels.forEach(function(hp){
       hp.el.style.transform = _slideOrigin(hp.el._side);
       hp.el.style.transition = 'opacity 820ms cubic-bezier(.16,1,.3,1),transform 920ms cubic-bezier(.16,1,.3,1),filter 820ms ease';
       hp.el.style.filter = 'brightness(0.4) blur(2px)';
     });
-
-    // Generar delays. Empiezan en BREATH_LEAD_MS (600ms) para que el breathing
-    // del glow sea visible solo antes de la cascada.
     var nPanels = window._hudPanels.length;
-    var slotSize = 1800 / Math.max(1, nPanels - 1);
+    var slotSize = T_CASCADA_DUR / Math.max(1, nPanels - 1);
     var delays = [];
     for(var i=0;i<nPanels;i++){
-      var base = BREATH_LEAD_MS + i * slotSize;
+      var base = T_CASCADA_START + i * slotSize;
       var jitter = (Math.random() - 0.5) * slotSize * 0.8;
       delays.push(Math.round(base + jitter));
     }
-    // Shuffle el ORDEN de paneles para que no entren predeciblemente por posición
     var shuffledIdx = window._hudPanels.map(function(_,i){return i;});
     for(var s=shuffledIdx.length-1;s>0;s--){
       var r = Math.floor(Math.random()*(s+1));
       var tmp = shuffledIdx[s]; shuffledIdx[s] = shuffledIdx[r]; shuffledIdx[r] = tmp;
     }
-
     requestAnimationFrame(function(){
       window._hudPanels.forEach(function(hp, idx){
         var delay = delays[shuffledIdx.indexOf(idx)];
@@ -3895,17 +3986,33 @@ function abrirDial(){
       });
     });
 
-    // Dial aparece después de la cascada de paneles
-    var dialAppearDelay = BREATH_LEAD_MS + 2000; // ~2600ms
+    // ── FASE 2b: slots vacíos punteados aparecen ──
+    setTimeout(function(){
+      window._hudCascadaEnCurso = false;
+      // Forzar construcción de slots ahora que la bandera está en false
+      if(window._overlayDnd && typeof window._overlayDnd.buildGhostSlots === 'function'){
+        window._overlayDnd.buildGhostSlots();
+      } else if(typeof window._reposicionarHUD === 'function'){
+        // El hook del DnD sobre _reposicionarHUD construye slots
+        window._reposicionarHUD();
+      }
+    }, T_SLOTS_IN);
+
+    // ── FASE 3: dial canvas aparece ──
     setTimeout(function(){
       if(_dialCanvas){
-        _dialCanvas.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1),transform 800ms cubic-bezier(.16,1,.3,1)';
+        _dialCanvas.style.transition = 'opacity 800ms cubic-bezier(.16,1,.3,1),transform 900ms cubic-bezier(.16,1,.3,1)';
         _dialCanvas.style.opacity = '1';
         _dialCanvas.style.transform = '';
       }
-    }, dialAppearDelay);
+      // El aro pulsante se atenúa para no competir con el dial
+      if(ringEl){
+        ringEl.style.transition = 'opacity 800ms ease';
+        ringEl.style.opacity = '0.18';
+      }
+    }, T_DIAL_IN);
 
-    // Limpiar transitions cuando todo está visible
+    // ── Limpieza final ──
     setTimeout(function(){
       if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
       if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
@@ -3918,9 +4025,10 @@ function abrirDial(){
       }
       if(_dialCanvas) _dialCanvas.style.transition = '';
       _aplicarVidaPaneles();
-    }, 4000);
+    }, T_CLEANUP);
   } else {
     // Modo compacto: todo visible de inmediato
+    window._hudCascadaEnCurso = false;
     if(window._hudPanels){
       window._hudPanels.forEach(function(hp){
         hp.el.style.opacity = '1';
@@ -3931,6 +4039,8 @@ function abrirDial(){
       });
     }
     if(_dialCanvas){ _dialCanvas.style.opacity = '1'; _dialCanvas.style.transform = ''; }
+    if(ringEl){ ringEl.style.opacity = '0.18'; }
+    if(glowEl){ glowEl.style.opacity = '1'; }
     setTimeout(function(){
       if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
       if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
@@ -3948,6 +4058,7 @@ function cerrarDial(){
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
+  window._hudCascadaEnCurso = false;
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
@@ -3963,6 +4074,12 @@ function cerrarDial(){
   if(_dialCanvas){
     _dialCanvas.style.transition = 'opacity 240ms ease';
     _dialCanvas.style.opacity = '0';
+  }
+  // Aro pulsante también
+  var ringE = document.getElementById('dial-ring-breath');
+  if(ringE){
+    ringE.style.transition = 'opacity 240ms ease';
+    ringE.style.opacity = '0';
   }
   setTimeout(function(){
     if(_dialOverlay && !_dialVisible) _dialOverlay.style.display='none';
