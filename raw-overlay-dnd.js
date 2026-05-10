@@ -126,6 +126,9 @@
     if(!window._hudPanels) return;
     if(!window._dialVisible && !document.getElementById('dial-overlay')) return;
     if(window._hudExpanded) return;
+    // Mientras la cascada de apertura está en curso, NO mostrar slots vacíos.
+    // Se construirán al final cuando _hudCascadaEnCurso pase a false.
+    if(window._hudCascadaEnCurso) return;
 
     function lastPanelInfo(side){
       var ps = window._hudPanels.filter(function(hp){ return hp.el._side === side; });
@@ -458,6 +461,7 @@
   // Debug global
   window._overlayDnd = {
     rebuild: buildGhostSlots,
+    buildGhostSlots: buildGhostSlots,
     save: saveLayout,
     load: loadLayout,
     reset: function(){
