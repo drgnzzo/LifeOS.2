@@ -1,5 +1,16 @@
-/* RAW Entry — Overlay v.5.101
-   DEBUG real del bug "la animación sigue iguaita":
+/* RAW Entry — Overlay v.5.102
+   Fix: slots vacíos punteados se ocultan al expandir un card y se
+   reconstruyen al colapsar (regresar al dial central).
+   - _hudExpand llama window._overlayDnd.clear() al inicio para borrar
+     los slots existentes.
+   - _hudCollapse reconstruye con window._overlayDnd.buildGhostSlots()
+     dentro del setTimeout(500ms) post-reposicionamiento, cuando los
+     paneles ya están en sus posiciones finales.
+   - raw-overlay-dnd.js expone clear y clearGhostSlots en window._overlayDnd.
+   - buildGhostSlots ya tenía guard `if(window._hudExpanded) return;`
+     que evita reconstruir DURANTE el modo expandido; ahora también
+     se borran los que ya estaban antes de expandir.
+
    ENCONTRÉ DOS LUGARES donde _reposicionarHUD pisaba el opacity:0 de la
    cascada y hacía a los paneles INSTANTÁNEAMENTE visibles:
 
@@ -2774,6 +2785,10 @@ function _crearDialOverlay(){
     if(window._hudExpanded){
       _hudCollapse(/*sinReposicionar=*/true);
     }
+    // Ocultar slots vacíos durante el modo expandido
+    if(window._overlayDnd && typeof window._overlayDnd.clear === 'function'){
+      window._overlayDnd.clear();
+    }
     var inner = panelEl.querySelector(':scope > [id$="-inner"]');
     if(inner){
       // Crear o reusar el wrapper expandido
@@ -2914,6 +2929,10 @@ function _crearDialOverlay(){
         });
       }
       if(_dialCanvas) _dialCanvas.style.transition = '';
+      // Reconstruir slots vacíos ahora que los paneles regresaron a sus posiciones
+      if(window._overlayDnd && typeof window._overlayDnd.buildGhostSlots === 'function'){
+        window._overlayDnd.buildGhostSlots();
+      }
     }, 500);
   }
 
