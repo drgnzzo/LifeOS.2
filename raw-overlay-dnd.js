@@ -148,8 +148,9 @@
       var x = cp[side+'_X'], w = cp.COL_W, topY = cp.colTopY;
       if(x === undefined || w === undefined || topY === undefined) return null;
       // Simular rect del último panel en y=topY-gap-slotH (para que el primer slot quede en topY)
+      // gap=22 (sync con _reposicionarHUD), slotH=110 → top = topY - 22 - 110 = topY - 132
       return {
-        rect: { left:x, right:x+w, top:topY-124, bottom:topY-14, width:w, height:110 },
+        rect: { left:x, right:x+w, top:topY-132, bottom:topY-22, width:w, height:110 },
         count: 0,
         lastEl: null
       };
@@ -162,7 +163,7 @@
       var needed = SLOTS_CONFIG[side] - info.count;
       if(needed <= 0) return;
       var slotH = 110;
-      var gap   = 14;
+      var gap   = 22;  // mismo GAP que _reposicionarHUD (v5.104)
       var w     = info.rect.width;
       var x     = info.rect.left;
       var y     = info.rect.bottom + gap;
