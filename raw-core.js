@@ -1,35 +1,32 @@
-/* RAW Entry — Core v.5.082
-   AJUSTES DE CARGA VISUAL para igualar la imagen objetivo:
+/* RAW Entry — Core v.5.083
+   AJUSTES DE PROPORCIONES — alineación de paneles top y bottom con el dial:
 
-   FIX CRÍTICO en _mkFloatPanel:
-   - Antes: border:1px solid rgba(140,100,220,0.22) (genérico violeta para TODOS)
-     y --pc-dim/mid se calculaban con .replace() que FALLABA en hex (#RRGGBB),
-     resultando en variables undefined → fallback violeta. Por eso TODOS los
-     paneles parecían "del mismo color gris-violeta".
-   - Ahora: helper interno _ax(alpha) convierte el hex del panel a rgba con
-     alpha variable, y aplica:
-       - Border principal: 1.5px solid <accent>@45
-       - --pc-dim: <accent>@30, --pc-mid: <accent>@65, --pc-glow: <accent>@22
-       - Box-shadow exterior con glow del accent + sombra
-       - Inner glow radial desde arriba con accent@8
-   - Cada panel ahora tiene su propio borde luminoso del color del tema.
+   ZONA SUPERIOR (top):
+   - USER ahora con ANCHO FIJO 220px (antes 16-20% del viewport → infladísimo)
+   - Stats con ANCHO FIJO 340px (antes 24-28% del viewport)
+   - Estado del Sim con ancho IGUAL al dial (r.width), NO el resto del viewport.
+     Antes: Sim ocupaba topAvail - wUser - wStats → quedaba absurdamente ancho
+     en pantallas grandes, estirándose y aplastando la altura proporcional.
+   - Sim CENTRADO en X igual que el dial (r.left + (r.width - wSim)/2).
+   - USER pegado a la izquierda, Stats pegado a la derecha — sin estirar.
 
-   miniBreath sin fallback genérico — usa solo --pc-* del panel.
-   topPulse simplificado (sin filter:blur que costaba performance).
+   BANDA SIM:
+   - Layout: 9 columnas en una sola fila horizontal (antes grid 2×5).
+   - Cada need: top (icono + label) sobre bottom (barra + valor).
+   - Padding 8px arriba, gap horizontal 14px entre needs.
 
-   BARRAS MÁS VISIBLES:
-   - Need bars (Sims): height 9px (antes 8), track rgba(255,255,255,0.08)
-     con inset shadow oscuro, shine highlight más opaco (0.40 vs 0.30).
-   - Row bars y maslow bars: track 0.08 (antes 0.05/0.06).
+   ZONA INFERIOR (bottom):
+   - Misión Diaria: ANCHO FIJO 320px (antes 1/3 del viewport ≈ 600+).
+   - Nivel Siguiente: ANCHO FIJO 360px.
+   - Logro Reciente: ancho IGUAL al dial, CENTRADO en X con el dial.
+   - Si no caben los 3 → reparte proporcional.
+   - Track: ancho EXACTO del dial (antes min(720,r.width-20)).
 
-   DENSIDAD:
-   - Sims grid: gap 7px×22px (antes 9×28) → más apretado y compacto.
-   - Row padding: 8px (antes 9), Maslow padding: 8px (antes 9).
+   COLUMNAS LATERALES:
+   - Cap absoluto bajado de 300px → 260px (objetivo: ~220-240 en pantallas anchas).
 
-   CHIP "vs ayer" en Patrimonio:
-   - Compara saldo actual contra snapshot guardado en localStorage del día
-     anterior. Verde si subió, rojo si bajó. Se oculta si no hay snapshot
-     comparable (primer día).
+   Resultado: paneles del overlay ahora se alinean con el dial central como
+   una grilla coherente; nada se estira artificialmente al viewport completo.
 */
 window._apartadosData = window._apartadosData || [];
 window._fijosData     = window._fijosData     || [];
@@ -554,16 +551,19 @@ function renderSimsBandSimsStyle(targetId){
     var v = needs[s.key];
     if(v === undefined || v === null) v = 50;
     var col = s.color;
-    // Color barra: rojo crítico, amarillo medio, color del need si bien
     var barCol = v < 30 ? '#EF4444' : (v < 55 ? '#FBBF24' : col);
     return ''+
       '<div class="hud-need">'+
-        '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
-        '<span class="hud-need-l">'+s.label+'</span>'+
-        '<div class="hud-need-bar-wrap">'+
-          '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'88,'+barCol+');box-shadow:0 0 6px '+barCol+'80"></div>'+
+        '<div class="hud-need-top">'+
+          '<span class="hud-need-ico" style="color:'+col+';filter:drop-shadow(0 0 4px '+col+'88)">'+s.icon+'</span>'+
+          '<span class="hud-need-l">'+s.label+'</span>'+
         '</div>'+
-        '<span class="hud-need-v" style="color:'+barCol+'">'+v+'<span class="max"> /100</span></span>'+
+        '<div class="hud-need-bot">'+
+          '<div class="hud-need-bar-wrap">'+
+            '<div class="hud-need-bar" style="width:'+v+'%;background:linear-gradient(90deg,'+barCol+'88,'+barCol+');box-shadow:0 0 6px '+barCol+'80"></div>'+
+          '</div>'+
+          '<span class="hud-need-v" style="color:'+barCol+'">'+v+'<span class="max">/100</span></span>'+
+        '</div>'+
       '</div>';
   }).join('');
 }
@@ -747,15 +747,17 @@ function _crearDialOverlay(){
       '.hud-mas-v{font-size:12px;font-weight:700;letter-spacing:0;text-align:right;font-family:JetBrains Mono,monospace}',
       '.hud-mas-bar{height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;margin-left:15px}',
       '.hud-mas-bar > div{height:100%;width:0;border-radius:999px;transition:width .9s ease}',
-      // need (sims) - barras gruesas
-      '.hud-need{display:flex;align-items:center;gap:10px;min-width:0}',
-      '.hud-need-ico{font-size:14px;flex-shrink:0;width:18px;display:flex;align-items:center;justify-content:center}',
-      '.hud-need-l{flex:1;font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.62);min-width:0}',
-      '.hud-need-bar-wrap{flex:2;height:9px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:60px;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4)}',
+      // need (sims) - una columna por need en fila horizontal
+      '.hud-need{display:flex;flex-direction:column;gap:5px;min-width:0}',
+      '.hud-need-top{display:flex;align-items:center;gap:6px;min-width:0}',
+      '.hud-need-ico{font-size:13px;flex-shrink:0;width:14px;display:flex;align-items:center;justify-content:center;line-height:1}',
+      '.hud-need-l{flex:1;font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:rgba(220,224,235,0.62);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-need-bot{display:flex;align-items:center;gap:6px;min-width:0}',
+      '.hud-need-bar-wrap{flex:1;height:7px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);position:relative;min-width:0;box-shadow:inset 0 1px 2px rgba(0,0,0,0.4)}',
       '.hud-need-bar{height:100%;border-radius:999px;transition:width .8s ease;position:relative}',
-      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:6px;right:6px;height:2px;background:rgba(255,255,255,0.40);border-radius:999px;filter:blur(0.8px)}',
-      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;min-width:38px;text-align:right}',
-      '.hud-need-v .max{opacity:.40;font-weight:700;font-size:9px}',
+      '.hud-need-bar::after{content:"";position:absolute;top:1px;left:4px;right:4px;height:2px;background:rgba(255,255,255,0.40);border-radius:999px;filter:blur(0.6px)}',
+      '.hud-need-v{font-size:10px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;text-align:right;line-height:1}',
+      '.hud-need-v .max{opacity:.40;font-weight:700;font-size:8px}',
       // CTA pie
       '.hud-cta{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
       '.hud-cta:hover{background:var(--ac-08);padding-left:20px}',
@@ -799,7 +801,7 @@ function _crearDialOverlay(){
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px 22px;padding:4px 18px 14px}',
+      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 14px;padding:8px 18px 14px}',
       // stats panel
       '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:6px;padding:12px 14px;height:100%;box-sizing:border-box}',
       '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:10px;min-width:0;padding:0 4px}',
@@ -1270,21 +1272,24 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════
-    //  ZONA SUPERIOR (3 sub-paneles full-width, alineados a misma altura)
+    //  ZONA SUPERIOR — anchos compactos, Sim alineado al ancho del dial
     // ══════════════════════════════════════════
     var topPad  = GAP;
     var topGap  = 14;
-    var topAvail = vW - topPad*2;
-    var wUser  = Math.min(260, Math.max(180, Math.round(topAvail * 0.16)));
-    var wStats = Math.min(340, Math.max(240, Math.round(topAvail * 0.24)));
-    var wSim   = topAvail - wUser - wStats - topGap*2;
-    if(wSim < 320){
-      wUser = 0; wStats = 0;
-      wSim = Math.min(720, vW - topPad*2);
-    }
     var pUser  = getTop('top-left')[0];
     var pSim   = getTop('top-center')[0];
     var pStats = getTop('top-right')[0];
+
+    // Anchos FIJOS y compactos (no porcentaje del viewport)
+    var wUser  = 220;
+    var wStats = 340;
+    // Sim ocupa el ancho del dial, NO el resto del viewport
+    var wSim   = Math.round(r.width);
+    // Si el viewport es muy estrecho, fallback: solo Sim centrado
+    if(vW < (wUser + wStats + wSim + topGap*4 + topPad*2)){
+      wUser = 0; wStats = 0;
+      wSim = Math.min(Math.round(r.width), vW - topPad*2);
+    }
 
     if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; }
     else if(pUser){ pUser.el.style.width='0px'; pUser.el.style.opacity='0'; pUser.el.style.visibility='hidden'; }
@@ -1292,19 +1297,16 @@ function _crearDialOverlay(){
     if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; }
     else if(pStats){ pStats.el.style.width='0px'; pStats.el.style.opacity='0'; pStats.el.style.visibility='hidden'; }
 
-    // ALTURA UNIFICADA de la fila top: la más alta de los 3 (Sim manda por su grid 2x5)
-    // Forzamos esa altura mínima a USER y Stats para alinearlos verticalmente.
+    // Altura uniforme entre USER, Sim y Stats
     var topMaxH = 0;
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
-        // limpiar minHeight previo para medir natural
         hp.el.style.minHeight = '';
         var h = hp.el.scrollHeight || hp.el.offsetHeight || 90;
         if(h>topMaxH) topMaxH = h;
       }
     });
     if(topMaxH===0) topMaxH = 100;
-    // Aplicar altura uniforme y centrar contenido vertical
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
         hp.el.style.minHeight = topMaxH+'px';
@@ -1317,27 +1319,23 @@ function _crearDialOverlay(){
     });
 
     var topY = topPad;
-    var curX = topPad;
-    if(pUser && wUser>0){
-      pUser.el.style.left = curX+'px';
-      pUser.el.style.top  = topY+'px';
-      pUser.el.style.clipPath = chamferRect;
-      curX += wUser + topGap;
-    }
+    // Sim CENTRADO en X igual que el dial
+    var simX = Math.round(r.left + (r.width - wSim) / 2);
     if(pSim){
-      if(wUser>0 && wStats>0){
-        pSim.el.style.left = curX+'px';
-        pSim.el.style.top  = topY+'px';
-      } else {
-        pSim.el.style.left = Math.round((vW - wSim)/2)+'px';
-        pSim.el.style.top  = topY+'px';
-      }
+      pSim.el.style.left = simX + 'px';
+      pSim.el.style.top  = topY + 'px';
       pSim.el.style.clipPath = chamferRect;
-      if(wUser>0 && wStats>0) curX += wSim + topGap;
     }
+    // USER pegado a la izquierda
+    if(pUser && wUser>0){
+      pUser.el.style.left = topPad + 'px';
+      pUser.el.style.top  = topY + 'px';
+      pUser.el.style.clipPath = chamferRect;
+    }
+    // Stats pegado a la derecha
     if(pStats && wStats>0){
-      pStats.el.style.left = (vW - topPad - wStats)+'px';
-      pStats.el.style.top  = topY+'px';
+      pStats.el.style.left = (vW - topPad - wStats) + 'px';
+      pStats.el.style.top  = topY + 'px';
       pStats.el.style.clipPath = chamferRect;
     }
 
@@ -1351,17 +1349,29 @@ function _crearDialOverlay(){
 
     var botPad  = GAP;
     var botGap  = 14;
-    var botAvail = vW - botPad*2;
-    var wMision = Math.round((botAvail - botGap*2)/3);
-    var wLogro  = wMision;
-    var wNivel  = botAvail - wMision - wLogro - botGap*2;
+
+    // En el objetivo: Misión a la izquierda con ancho fijo (similar a USER),
+    // Logro al centro alineado con el dial, Nivel a la derecha (similar a Stats).
+    // Para que no se aplasten en pantallas anchas, capeamos cada uno.
+    var wMision = 320;
+    var wNivel  = 360;
+    // Logro al centro: alineado con el dial
+    var wLogro  = Math.round(r.width);
+    // Si no caben los 3, repartir proporcional
+    var totalNeeded = wMision + wLogro + wNivel + botGap*2 + botPad*2;
+    if(totalNeeded > vW){
+      var avail = vW - botPad*2 - botGap*2;
+      wMision = Math.round(avail * 0.25);
+      wNivel  = Math.round(avail * 0.28);
+      wLogro  = avail - wMision - wNivel;
+    }
 
     if(pMision){ pMision.el.style.width = wMision+'px'; }
     if(pLogro){ pLogro.el.style.width = wLogro+'px'; }
     if(pNivel){ pNivel.el.style.width = wNivel+'px'; }
 
-    // Track horizontal: ancho relativo al dial
-    var trackW = Math.min(720, Math.max(440, r.width - 20));
+    // Track horizontal: ancho EXACTO del dial (no más, no menos)
+    var trackW = Math.round(r.width);
     if(pTrack){ pTrack.el.style.width = trackW+'px'; }
 
     var botH = 0;
@@ -1382,22 +1392,21 @@ function _crearDialOverlay(){
       pTrack.el.style.top  = trackY+'px';
       pTrack.el.style.clipPath = chamferRect;
     }
-    var bX = botPad;
     if(pMision){
-      pMision.el.style.left = bX+'px';
-      pMision.el.style.top  = botY+'px';
+      pMision.el.style.left = botPad + 'px';
+      pMision.el.style.top  = botY + 'px';
       pMision.el.style.clipPath = chamferRect;
-      bX += wMision + botGap;
     }
     if(pLogro){
-      pLogro.el.style.left = bX+'px';
-      pLogro.el.style.top  = botY+'px';
+      // Logro centrado en X igual que el dial
+      var logroX = Math.round(r.left + (r.width - wLogro) / 2);
+      pLogro.el.style.left = logroX + 'px';
+      pLogro.el.style.top  = botY + 'px';
       pLogro.el.style.clipPath = chamferRect;
-      bX += wLogro + botGap;
     }
     if(pNivel){
-      pNivel.el.style.left = (vW - botPad - wNivel)+'px';
-      pNivel.el.style.top  = botY+'px';
+      pNivel.el.style.left = (vW - botPad - wNivel) + 'px';
+      pNivel.el.style.top  = botY + 'px';
       pNivel.el.style.clipPath = chamferRect;
     }
 
@@ -1410,14 +1419,14 @@ function _crearDialOverlay(){
     var colBotY    = trackY - GAP;     // límite duro: arriba del track
     var colVAvail  = Math.max(200, colBotY - colTopY);
 
-    // Anchos laterales más conservadores (87% del espacio lateral)
+    // Anchos laterales conservadores con cap más bajo (objetivo: 220-260)
     var leftSpace  = r.left;
     var rightSpace = vW - r.right;
-    var leftW  = Math.min(Math.max(190, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.87));
-    var rightW = Math.min(Math.max(190, rightSpace - GAP*2), Math.floor(rightSpace * 0.87));
-    // Cap absoluto para que columnas no se vean infladas en pantallas anchas
-    leftW  = Math.min(leftW, 300);
-    rightW = Math.min(rightW, 300);
+    var leftW  = Math.min(Math.max(180, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.85));
+    var rightW = Math.min(Math.max(180, rightSpace - GAP*2), Math.floor(rightSpace * 0.85));
+    // Cap absoluto: máximo 260px (antes 300)
+    leftW  = Math.min(leftW, 260);
+    rightW = Math.min(rightW, 260);
     var leftX  = Math.floor((leftSpace  - leftW)  / 2);
     var rightX = r.right + Math.floor((rightSpace - rightW) / 2);
 
