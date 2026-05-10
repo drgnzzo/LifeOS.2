@@ -1,21 +1,26 @@
-/* RAW Entry — Core v.5.079
-   Cambios desde v5.078:
-   - Panel _p5 (Activity+Logros): se eliminan los nav buttons "Activity" y "Logros"
-       que estaban duplicados (ahora ya viven sólo en _p6, panel de Navegación).
-   - Panel _p6 (Navegación): completado con los 6 items del Hero del header
-       en UN SOLO PANEL: Activity · Logros · Nutrición · Bitácora · RAW Sheet · Actualizar.
-   ── (heredado de v5.078) ──
-   - Overlay del dial reestructurado en grid de 3 zonas (superior/central/inferior)
-   - Dial reducido (min(640px,68vw)) para acomodar zonas top/bottom
-   - Banda Sim estilo The Sims: 2 cols × 5 filas con barras horizontales largas
-       (label arriba, barra con gradiente crítico→color del need, sin flechas)
-   - Paneles zona superior: _pUser (USER/Nivel/XP), _pStats (Energía/Racha/Créditos)
-   - Paneles zona inferior: _pTrack (track de niveles), _pMision (Misión Diaria),
-       _pLogro (Logro Reciente), _pNivel (Nivel Siguiente)
-   - _reposicionarHUD soporta sides 'top-left','top-center','top-right',
-       'bottom-track','bottom-left','bottom-center','bottom-right' además de 'left'/'right'
-   - _calcXPNivel y _calcRachaCreditos derivan datos base de actData/logrosData/etc
-   - _refrescarEspejos actualiza todos los nuevos espejos
+/* RAW Entry — Core v.5.080
+   Cambios desde v5.079 (refactor de estructura y proporciones del overlay):
+   - Fila top alineada: USER, Estado del Sim y Stats forzados a misma altura
+       (topMaxH) con contenido centrado vertical → arrancan/terminan a misma Y.
+   - Columnas laterales arrancan a colTopY = topY + topMaxH + GAP*2
+       (uso de altura UNIFORME, no scrollHeight max — antes provocaba que
+       Patrimonio quedara más arriba que Financiero).
+   - Columnas laterales NUNCA invaden zona inferior: si no caben, gap entre
+       paneles se reduce a 6px en lugar de solapar con track o cards.
+   - Anchos laterales con cap absoluto de 300px (antes se inflaban).
+   - Dial ampliado: min(720px, 50vw) (antes 640px / 68vw).
+   - Track ampliado: min(720, max(440, dialW-20)) (antes 640).
+   - Headers de panel (_pH) con menú "···" a la derecha (estilo objetivo).
+   - NUEVO helper _pCTA: pie de panel con CTA (Ver detalle / Ver análisis /
+       Ver reporte financiero / Ir a Activity Check / Abrir Bitácora).
+   - Paddings y tamaños de _row, _maslow, _hero apretados (12-13px en vez
+       de 13-14px) para que los 3 paneles laterales quepan sin solapamientos.
+   - Panel Activity+Logros: racha ahora se muestra como "N días" + 7 iconos
+       de fuego (encendidos según racha actual) en vez de barra.
+   - Panel _p3 (Bitácora) usa _pCTA en lugar de _nav('Abrir Bitácora').
+   ── (heredado de v5.079) ──
+   - Panel _p6 con 6 items completos del Hero del header.
+   - _p5 sin nav buttons duplicados.
 */
 window._apartadosData = window._apartadosData || [];
 window._fijosData     = window._fijosData     || [];
@@ -568,7 +573,7 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(640px,68vw);height:min(640px,68vw);position:relative;pointer-events:auto;z-index:1';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(720px,50vw);height:min(720px,50vw);position:relative;pointer-events:auto;z-index:1';
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
@@ -670,35 +675,51 @@ function _crearDialOverlay(){
         '<i class="fas '+icon+'" style="font-size:12px;color:'+color+'"></i>'+
       '</div>'+
       '<span style="font-size:13px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;'+
-        'color:'+color+';text-shadow:0 0 12px '+color+'88">'+label+'</span>'+
+        'color:'+color+';text-shadow:0 0 12px '+color+'88;flex:1">'+label+'</span>'+
+      '<span style="font-size:14px;font-weight:800;color:rgba(220,220,240,0.40);letter-spacing:.10em;cursor:default;line-height:0;padding:0 4px;flex-shrink:0">···</span>'+
     '</div>'+
     '<div style="height:1px;background:linear-gradient(90deg,'+color+'50,rgba(140,100,220,0.08),transparent)"></div>';
   }
 
+  // CTA de pie de panel (Ver detalle / Ver análisis / etc.)
+  // Si la función no existe en window, el CTA se renderiza como decorativo (no clickeable).
+  function _pCTA(label, color, fn){
+    var clickable = fn && typeof window[fn] === 'function';
+    var onclick = clickable ? ('event.stopPropagation();window.'+fn+'();') : '';
+    return '<div '+(clickable?('onclick="'+onclick+'"'):'')+' '+
+      'style="display:flex;align-items:center;justify-content:space-between;'+
+      'padding:11px 16px;border-top:1px solid '+color+'22;'+
+      'background:linear-gradient(90deg,'+color+'08,transparent);'+
+      'cursor:'+(clickable?'pointer':'default')+';transition:background .15s">'+
+      '<span style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:'+color+';text-shadow:0 0 6px '+color+'55">'+label+'</span>'+
+      '<i class="fas fa-chevron-right" style="font-size:10px;color:'+color+';opacity:'+(clickable?'.7':'.35')+'"></i>'+
+    '</div>';
+  }
+
   function _hero(id, color, sublabel){
-    return '<div style="padding:12px 16px 8px">'+
-      '<div style="font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;'+
-        'color:rgba(200,208,230,0.30);margin-bottom:6px">'+sublabel+'</div>'+
-      '<div id="'+id+'" style="font-size:34px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;'+
+    return '<div style="padding:10px 16px 6px">'+
+      '<div style="font-size:9px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;'+
+        'color:rgba(200,208,230,0.30);margin-bottom:4px">'+sublabel+'</div>'+
+      '<div id="'+id+'" style="font-size:28px;font-weight:800;color:'+color+';letter-spacing:-.03em;line-height:1;'+
         'text-shadow:0 0 24px '+color+'55,0 0 48px '+color+'22;animation:hudValIn .5s ease-out">—</div>'+
     '</div>';
   }
 
   function _row(label, id, color, barId, emoji){
-    return '<div style="display:flex;align-items:center;gap:10px;padding:9px 16px;'+
+    return '<div style="display:flex;align-items:center;gap:10px;padding:7px 16px;'+
       'border-top:1px solid rgba(255,255,255,0.05)">'+
       '<div style="display:flex;align-items:center;gap:7px;flex:1;min-width:0">'+
         (emoji
-          ? '<span style="font-size:14px;flex-shrink:0">'+emoji+'</span>'
-          : '<div style="width:8px;height:8px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>')+
-        '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>'+
+          ? '<span style="font-size:13px;flex-shrink:0">'+emoji+'</span>'
+          : '<div style="width:7px;height:7px;border-radius:50%;background:'+color+';box-shadow:0 0 6px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>')+
+        '<span style="font-size:12px;font-weight:600;color:rgba(210,210,235,0.65);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+label+'</span>'+
       '</div>'+
       (barId
         ? '<div style="width:48px;height:3px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;flex-shrink:0">'+
             '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 4px '+color+'80;border-radius:2px;transition:width .8s ease"></div>'+
           '</div>' : '')+
-      '<span id="'+id+'" style="font-size:14px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;'+
-        'flex-shrink:0;text-shadow:0 0 8px '+color+'55;min-width:72px;text-align:right">—</span>'+
+      '<span id="'+id+'" style="font-size:13px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;'+
+        'flex-shrink:0;text-shadow:0 0 8px '+color+'55;min-width:68px;text-align:right">—</span>'+
     '</div>';
   }
 
@@ -718,13 +739,13 @@ function _crearDialOverlay(){
   }
 
   function _maslow(label, id, barId, color){
-    return '<div style="padding:9px 16px;border-top:1px solid rgba(255,255,255,0.04)">'+
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">'+
-        '<div style="width:8px;height:8px;border-radius:50%;background:'+color+';box-shadow:0 0 7px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>'+
-        '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.70);flex:1">'+label+'</span>'+
-        '<span id="'+id+'" style="font-size:13px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+color+'66">—</span>'+
+    return '<div style="padding:7px 16px;border-top:1px solid rgba(255,255,255,0.04)">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+        '<div style="width:7px;height:7px;border-radius:50%;background:'+color+';box-shadow:0 0 7px '+color+';flex-shrink:0;animation:hudDotPulse 2.5s ease-in-out infinite"></div>'+
+        '<span style="font-size:12px;font-weight:600;color:rgba(210,210,235,0.70);flex:1">'+label+'</span>'+
+        '<span id="'+id+'" style="font-size:12px;font-weight:700;color:'+color+';font-variant-numeric:tabular-nums;text-shadow:0 0 6px '+color+'66">—</span>'+
       '</div>'+
-      '<div style="height:4px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;margin-left:16px">'+
+      '<div style="height:3px;background:rgba(255,255,255,0.05);border-radius:2px;overflow:hidden;margin-left:15px">'+
         '<div id="'+barId+'" style="height:100%;width:0%;background:'+color+';box-shadow:0 0 6px '+color+'80;border-radius:2px;transition:width .9s ease"></div>'+
       '</div>'+
     '</div>';
@@ -864,7 +885,7 @@ function _crearDialOverlay(){
     _row('BEATS',    '_hud-beats', '#86EFAC','_hud-beats-bar','💳') +
     _row('Efectivo', '_hud-efec',  '#FCD34D',null,'💵') +
     _row('Apartados','_hud-apart', '#F59E0B',null,'🔒') +
-    '<div style="height:4px"></div>';
+    _pCTA('Ver detalle','#22C55E','irAPatrimonio');
 
   // ── Panel 2: Necesidades ──
   var _p2 = _mkFloatPanel('hud-necesidades','#A855F7','rgba(168,85,247,0.15)');
@@ -877,7 +898,7 @@ function _crearDialOverlay(){
     _maslow('Afiliación',     '_hud-nec-3','_hud-nec-3-bar','#22D3EE') +
     _maslow('Reconocimiento', '_hud-nec-4','_hud-nec-4-bar','#A855F7') +
     _maslow('Autorrealización','_hud-nec-5','_hud-nec-5-bar','#22C55E') +
-    '<div style="height:4px"></div>';
+    _pCTA('Ver análisis','#A855F7','irANecesidades');
 
   // ── Panel 3: Bitácora (con NUTRICIÓN agregada) ──
   var _p3 = _mkFloatPanel('hud-bitacora','#C084FC','rgba(192,132,252,0.15)');
@@ -890,8 +911,7 @@ function _crearDialOverlay(){
     _row('Salud',        '_hud-sal', '#EF4444',null,'❤️') +
     _row('Nutrición',    '_hud-nut', '#86EFAC',null,'🥗') +
     _row('Entrenamiento','_hud-ent', '#FB923C',null,'💪') +
-    '<div style="height:4px"></div>';
-  _p3.appendChild(_nav('Abrir Bitácora','fa-book-open','#C084FC','irABitacora'));
+    _pCTA('Abrir Bitácora','#C084FC','irABitacora');
 
   // ── Panel 4: Financiero ──
   var _p4 = _mkFloatPanel('hud-financiero','#22D3EE','rgba(34,211,238,0.15)');
@@ -904,7 +924,7 @@ function _crearDialOverlay(){
     _row('Ahorro %',  '_hud-fin-aho','#FACC15','_hud-aho-bar',null) +
     _row('Runway',    '_hud-runway', '#22D3EE',null,'🛫') +
     _row('Gasto/día','_hud-gastoDia','#A78BFA',null,'📊') +
-    '<div style="height:4px"></div>';
+    _pCTA('Ver reporte financiero','#22D3EE','irAFinanciero');
 
   // ── Panel 5: Activity + Logros ──
   var _p5 = _mkFloatPanel('hud-activity','#FB923C','rgba(251,146,60,0.15)');
@@ -913,18 +933,25 @@ function _crearDialOverlay(){
   document.getElementById('hud-activity-inner').innerHTML =
     _pH('Activity + Logros','#FB923C','fa-bolt') +
     _duo('_hud-act-done','Hábitos hoy','#FB923C','_hud-lgr-done','Logros','#FACC15') +
-    '<div style="padding:10px 16px 14px;border-top:1px solid rgba(255,255,255,0.05)">'+
+    '<div style="padding:9px 16px 12px;border-top:1px solid rgba(255,255,255,0.05)">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">'+
         '<div style="display:flex;align-items:center;gap:7px">'+
-          '<i class="fas fa-fire" style="font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
-          '<span style="font-size:13px;font-weight:600;color:rgba(210,210,235,0.55);text-transform:uppercase;letter-spacing:.10em">Racha</span>'+
+          '<i class="fas fa-fire" style="font-size:14px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)"></i>'+
+          '<span style="font-size:9px;font-weight:800;color:rgba(210,210,235,0.55);text-transform:uppercase;letter-spacing:.12em">Racha actual</span>'+
         '</div>'+
-        '<span id="_hud-racha" style="font-size:20px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">—</span>'+
+        '<span id="_hud-racha" style="font-size:18px;font-weight:800;color:#FB923C;text-shadow:0 0 10px rgba(251,146,60,.6)">— días</span>'+
       '</div>'+
-      '<div style="height:5px;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden">'+
-        '<div id="_hud-racha-bar" style="height:100%;width:25%;background:linear-gradient(90deg,#FB923C,#FCD34D);box-shadow:0 0 8px rgba(251,146,60,.5);border-radius:3px"></div>'+
+      '<div id="_hud-racha-fires" style="display:flex;align-items:center;gap:6px;justify-content:flex-end">'+
+        '<i class="fas fa-fire fire-1" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+        '<i class="fas fa-fire fire-2" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+        '<i class="fas fa-fire fire-3" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+        '<i class="fas fa-fire fire-4" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+        '<i class="fas fa-fire fire-5" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+        '<i class="fas fa-fire fire-6" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
+        '<i class="fas fa-fire fire-7" style="font-size:14px;color:rgba(100,100,110,0.35)"></i>'+
       '</div>'+
-    '</div>';
+    '</div>'+
+    _pCTA('Ir a Activity Check','#FB923C','irAActivity');
   // (los items de navegación viven solo en _p6 — un único panel)
 
   // ── Panel 6: Navegación ──
@@ -1084,53 +1111,63 @@ function _crearDialOverlay(){
     var r   = _dialCanvas.getBoundingClientRect();
     var vW  = window.innerWidth;
     var vH  = window.innerHeight;
-    var GAP = 12;
+    var GAP = 14;
 
     // Chamfers por posición
     var chamferRect = 'polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% calc(100% - 10px),calc(100% - 10px) 100%,10px 100%,0 calc(100% - 10px),0 10px)';
     var chamferLeft  = 'polygon(0 0,calc(100% - 14px) 0,100% 14px,100% 100%,14px 100%,0 calc(100% - 14px))';
     var chamferRight = 'polygon(14px 0,100% 0,100% calc(100% - 14px),calc(100% - 14px) 100%,0 100%,0 14px)';
 
-    // ══════════════════════════════════════════
-    //  ZONA SUPERIOR (3 sub-paneles full-width)
-    // ══════════════════════════════════════════
-    // Distribuye top-left / top-center / top-right en una banda horizontal arriba
-    var topPad  = GAP;
-    var topGap  = 12;
-    var topAvail = vW - topPad*2;
-    // Ancho fijo proporcional: USER 220, Stats 280, resto centro
-    var wUser  = Math.min(280, Math.max(180, Math.round(topAvail * 0.20)));
-    var wStats = Math.min(360, Math.max(220, Math.round(topAvail * 0.28)));
-    var wSim   = topAvail - wUser - wStats - topGap*2;
-    if(wSim < 320){
-      // viewport pequeño: dejar solo banda Sim centrada arriba
-      wUser = 0; wStats = 0;
-      wSim = Math.min(720, vW - topPad*2);
-    }
-    // Posicionar
     function getTop(side){
       return window._hudPanels.filter(function(hp){ return hp.el._side===side; });
+    }
+
+    // ══════════════════════════════════════════
+    //  ZONA SUPERIOR (3 sub-paneles full-width, alineados a misma altura)
+    // ══════════════════════════════════════════
+    var topPad  = GAP;
+    var topGap  = 14;
+    var topAvail = vW - topPad*2;
+    var wUser  = Math.min(260, Math.max(180, Math.round(topAvail * 0.16)));
+    var wStats = Math.min(340, Math.max(240, Math.round(topAvail * 0.24)));
+    var wSim   = topAvail - wUser - wStats - topGap*2;
+    if(wSim < 320){
+      wUser = 0; wStats = 0;
+      wSim = Math.min(720, vW - topPad*2);
     }
     var pUser  = getTop('top-left')[0];
     var pSim   = getTop('top-center')[0];
     var pStats = getTop('top-right')[0];
 
-    // Primera pasada: setear width para que scrollHeight sea correcto
     if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; }
     else if(pUser){ pUser.el.style.width='0px'; pUser.el.style.opacity='0'; pUser.el.style.visibility='hidden'; }
     if(pSim){ pSim.el.style.width = wSim+'px'; }
     if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; }
     else if(pStats){ pStats.el.style.width='0px'; pStats.el.style.opacity='0'; pStats.el.style.visibility='hidden'; }
 
-    // Calcular altura máxima de la fila top
-    var topH = 0;
+    // ALTURA UNIFICADA de la fila top: la más alta de los 3 (Sim manda por su grid 2x5)
+    // Forzamos esa altura mínima a USER y Stats para alinearlos verticalmente.
+    var topMaxH = 0;
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
+        // limpiar minHeight previo para medir natural
+        hp.el.style.minHeight = '';
         var h = hp.el.scrollHeight || hp.el.offsetHeight || 90;
-        if(h>topH) topH = h;
+        if(h>topMaxH) topMaxH = h;
       }
     });
-    if(topH===0) topH = 90;
+    if(topMaxH===0) topMaxH = 100;
+    // Aplicar altura uniforme y centrar contenido vertical
+    [pUser,pSim,pStats].forEach(function(hp){
+      if(hp && hp.el && hp.el.style.width !== '0px'){
+        hp.el.style.minHeight = topMaxH+'px';
+        var inner = hp.el.querySelector(':scope > [id$="-inner"]');
+        if(inner){
+          inner.style.minHeight = topMaxH+'px';
+          inner.style.justifyContent = 'center';
+        }
+      }
+    });
 
     var topY = topPad;
     var curX = topPad;
@@ -1141,7 +1178,6 @@ function _crearDialOverlay(){
       curX += wUser + topGap;
     }
     if(pSim){
-      // Centrar la banda Sim en el espacio disponible si hay laterales, o full si no
       if(wUser>0 && wStats>0){
         pSim.el.style.left = curX+'px';
         pSim.el.style.top  = topY+'px';
@@ -1167,7 +1203,7 @@ function _crearDialOverlay(){
     var pNivel  = getTop('bottom-right')[0];
 
     var botPad  = GAP;
-    var botGap  = 12;
+    var botGap  = 14;
     var botAvail = vW - botPad*2;
     var wMision = Math.round((botAvail - botGap*2)/3);
     var wLogro  = wMision;
@@ -1177,11 +1213,10 @@ function _crearDialOverlay(){
     if(pLogro){ pLogro.el.style.width = wLogro+'px'; }
     if(pNivel){ pNivel.el.style.width = wNivel+'px'; }
 
-    // Track horizontal: ancho relativo al dial, debajo del dial
-    var trackW = Math.min(640, Math.max(420, r.width - 40));
+    // Track horizontal: ancho relativo al dial
+    var trackW = Math.min(720, Math.max(440, r.width - 20));
     if(pTrack){ pTrack.el.style.width = trackW+'px'; }
 
-    // Altura máxima de la fila bottom (cards)
     var botH = 0;
     [pMision,pLogro,pNivel].forEach(function(hp){
       if(hp && hp.el){
@@ -1192,9 +1227,8 @@ function _crearDialOverlay(){
     if(botH===0) botH = 80;
     var trackH = (pTrack && pTrack.el) ? (pTrack.el.scrollHeight || pTrack.el.offsetHeight || 64) : 64;
 
-    // Y de la fila bottom: pegada al fondo
     var botY = vH - botPad - botH;
-    var trackY = botY - trackH - 8;
+    var trackY = botY - trackH - 10;
 
     if(pTrack){
       pTrack.el.style.left = Math.round((vW - trackW)/2)+'px';
@@ -1221,17 +1255,22 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════
-    //  COLUMNAS LATERALES — encima de la zona central
+    //  COLUMNAS LATERALES — entre fila top y track
+    //  IMPORTANTE: las columnas NUNCA invaden zona inferior (botY o trackY)
     // ══════════════════════════════════════════
-    // Espacio vertical disponible para columnas: entre topH y trackY
-    var colTopY    = topY + topH + GAP*2;
-    var colBotY    = trackY - GAP;
+    // Usamos topMaxH (altura UNIFORME de la fila top) en lugar de scrollHeight max
+    var colTopY    = topY + topMaxH + GAP*2;
+    var colBotY    = trackY - GAP;     // límite duro: arriba del track
     var colVAvail  = Math.max(200, colBotY - colTopY);
 
+    // Anchos laterales más conservadores (87% del espacio lateral)
     var leftSpace  = r.left;
     var rightSpace = vW - r.right;
-    var leftW  = Math.min(Math.max(190, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.82));
-    var rightW = Math.min(Math.max(190, rightSpace - GAP*2), Math.floor(rightSpace * 0.82));
+    var leftW  = Math.min(Math.max(190, leftSpace  - GAP*2), Math.floor(leftSpace  * 0.87));
+    var rightW = Math.min(Math.max(190, rightSpace - GAP*2), Math.floor(rightSpace * 0.87));
+    // Cap absoluto para que columnas no se vean infladas en pantallas anchas
+    leftW  = Math.min(leftW, 300);
+    rightW = Math.min(rightW, 300);
     var leftX  = Math.floor((leftSpace  - leftW)  / 2);
     var rightX = r.right + Math.floor((rightSpace - rightW) / 2);
 
@@ -1244,21 +1283,41 @@ function _crearDialOverlay(){
         hp.el.style.width = w + 'px';
         hp.el.style.left  = x + 'px';
         hp.el.style.top   = '-9999px';
+        // Limpiar transform por si quedó de iteración previa
+        hp.el.style.transform = '';
       });
-      var totalH = panels.reduce(function(s,hp){
-        return s + (hp.el.scrollHeight || hp.el.offsetHeight || 200) + GAP;
-      },0) - GAP;
-      // Centrar verticalmente entre colTopY y colBotY
-      var startY = Math.max(colTopY, colTopY + (colVAvail - totalH)/2);
-      // Si no cabe (totalH > colVAvail), arrancar en colTopY y dejar que se vea aunque se solape
-      if(totalH > colVAvail) startY = colTopY;
-      var curY   = startY;
+      // Medir alturas reales
+      var heights = panels.map(function(hp){
+        return hp.el.scrollHeight || hp.el.offsetHeight || 200;
+      });
+      var totalH = heights.reduce(function(s,h){ return s+h+GAP; },0) - GAP;
+
+      var startY, gapBetween;
+      if(totalH <= colVAvail){
+        // Cabe holgado: centrar verticalmente
+        startY = colTopY + (colVAvail - totalH)/2;
+        gapBetween = GAP;
+      } else {
+        // No cabe: arrancar pegado arriba y reducir gap (mínimo 6px) para evitar invasión
+        startY = colTopY;
+        // Distribuir el sobrante en gaps negativos hasta el mínimo
+        var extra = totalH - colVAvail;
+        var gapsCount = panels.length - 1;
+        if(gapsCount>0){
+          var reducedGap = Math.max(6, GAP - Math.ceil(extra/gapsCount));
+          gapBetween = reducedGap;
+        } else {
+          gapBetween = GAP;
+        }
+      }
+
+      var curY = startY;
       var chamfer = isLeft ? chamferLeft : chamferRight;
-      panels.forEach(function(hp){
-        var h = hp.el.scrollHeight || hp.el.offsetHeight || 200;
-        hp.el.style.top      = curY + 'px';
+      panels.forEach(function(hp, idx){
+        var h = heights[idx];
+        hp.el.style.top      = Math.round(curY) + 'px';
         hp.el.style.clipPath = chamfer;
-        curY += h + GAP;
+        curY += h + gapBetween;
       });
     }
 
@@ -1343,6 +1402,24 @@ function _crearDialOverlay(){
       set('_hud-energia', rc.energia);
       set('_hud-racha-dias', rc.racha);
       set('_hud-creditos', rc.creditos.toLocaleString('es-MX'));
+      // Panel _p5: racha en formato "N días" + iconos de fuego encendidos
+      var rachaEl = document.getElementById('_hud-racha');
+      if(rachaEl) rachaEl.textContent = rc.racha + ' día' + (rc.racha===1?'':'s');
+      var firesEl = document.getElementById('_hud-racha-fires');
+      if(firesEl){
+        var fires = firesEl.querySelectorAll('i');
+        for(var fi=0; fi<fires.length; fi++){
+          if(fi < rc.racha){
+            fires[fi].style.color = '#FB923C';
+            fires[fi].style.filter = 'drop-shadow(0 0 5px #FB923C)';
+            fires[fi].style.opacity = '1';
+          } else {
+            fires[fi].style.color = 'rgba(100,100,110,0.35)';
+            fires[fi].style.filter = 'none';
+            fires[fi].style.opacity = '1';
+          }
+        }
+      }
     }
 
     // ── Misión Diaria ──
