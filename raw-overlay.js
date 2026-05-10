@@ -1,28 +1,24 @@
-/* RAW Entry — Overlay v.5.090
-   Cambios desde v5.089:
-   - NUEVOS paneles _p7 (Fijos, cyan) y _p8 (Variables, índigo) en columnas
-     laterales. Distribución actualizada:
-     · Izquierda: Patrimonio + Necesidades + Bitácora + Fijos (4 paneles)
-     · Derecha:   Financiero + Activity+Logros + Variables (3 paneles)
-   - Estado colapsado: solo header + mensaje "Tabla y gráfico al expandir"
-     + CTA al pie. Sin contenido pesado en el panel chico.
-   - Estado EXPANDIDO con contenido REAL:
-     · Patrimonio expandido = renderPatrimonio(data, container) de Home.
-     · Financiero expandido = _renderCFO + renderFlujoMensual de Home.
-     · Fijos expandido = renderAnualidad + initGraficaFijos lado a lado
-       (tabla flex 1.1 izq, gráfico flex 0.9 der).
-     · Variables expandido = renderGastos + initGraficas lado a lado.
-   - Reusa funciones de raw-dashboard.js sin duplicar lógica:
-     las funciones aceptan un containerId opcional. Los gráficos Chart.js
-     se identifican por suffix para no chocar entre Home y overlay.
-   - CSS para tablas dentro del panel expandido con scroll horizontal,
-     sticky header, sticky primera columna.
-   - .hud-pnl.hud-expanded ahora es flex column para que el wrapper
-     interno crezca correctamente y los canvas tengan altura real.
+/* RAW Entry — Overlay v.5.091
+   Cambios desde v5.090:
+   - Bitácora expandida: tarjetas de Pensamientos, Relaciones, Salud,
+     Nutrición, Entrenamiento con últimos registros.
+   - Activity+Logros expandida: hábitos personales del día, hábitos
+     Electronics del día, logros con barra de progreso, lista de
+     logros recientes.
+   - Necesidades expandida: radar SVG (5 ejes) + barras de distribución
+     por nivel (Fisiológicas, Seguridad, Afiliación, Reconocimiento,
+     Autorrealización) con totales y porcentajes.
+   - Fijos/Variables: tabla y gráfico ahora centrados verticalmente.
+   - ANIMACIÓN AL REGRESAR del modo expandido: transitions activas
+     mantenidas durante el cambio de tamaño/posición. Antes el regreso
+     era instantáneo.
+   - Bug de paneles amontonados al regresar: limpieza explícita de
+     width/height/minHeight/clipPath del panel que se acaba de colapsar
+     (estaban quedando con valores expandidos inline y peleando con
+     el reposicionamiento normal).
 
    Pendiente:
-   - Bitácora, Activity+Logros, Necesidades, Misión, Logro, Nivel
-     todavía muestran placeholder al expandir.
+   - Misión, Logro, Nivel expandidos (siguen con placeholder).
 */
 
 var _dialOverlay   = null;
@@ -454,7 +450,7 @@ function _crearDialOverlay(){
       '.hud-pnl.hud-expanded > [id$="-inner"]{display:flex;flex-direction:column;flex:1;min-height:0}',
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
       '.hud-expanded-content{display:none;flex:1;min-height:0;overflow:auto;padding:14px 18px}',
-      '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px}',
+      '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:center}',
       '.hud-expanded .hud-collapsed-content{display:none}',
       // Tablas dentro del panel expandido: scroll horizontal mantenido
       '.hud-expanded-content .tbl-wrap{overflow-x:auto;overflow-y:auto;border-radius:8px;border:1px solid rgba(255,255,255,0.06);max-height:100%}',
@@ -1230,13 +1226,12 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    //  REGRESO DE MODO EXPANDIDO — limpieza robusta de TODOS los estilos
-    //  inline que se aplicaron en la rama expandida, para que el flujo
-    //  normal de abajo pueda re-posicionar limpiamente sin sobrescribir
-    //  con transitions raras que dejen los paneles encimados.
+    //  REGRESO DE MODO EXPANDIDO — limpieza de los estilos inline que la
+    //  rama expandida aplicó. NO TOCAMOS transition aquí porque _hudCollapse
+    //  acaba de setearla para animar suavemente el regreso; se limpiará
+    //  después de 500ms desde _hudCollapse.
     // ══════════════════════════════════════════════════════════════════════
-    // Restaurar el dial canvas al estado original COMPLETO
-    _dialCanvas.style.transition  = '';
+    // Restaurar el dial canvas (mantener transition activa para animar)
     _dialCanvas.style.position    = 'relative';
     _dialCanvas.style.left        = '';
     _dialCanvas.style.top         = '';
@@ -1249,20 +1244,15 @@ function _crearDialOverlay(){
     _dialCanvas.style.height      = 'min(836px,57vw)';
     _dialCanvas.title             = '';
 
-    // Limpiar TODOS los paneles: transitions, transforms, height/minHeight forzados,
-    // opacity y pointer-events que la rama expandida pudo haber dejado.
+    // Limpiar height/minHeight/opacity/pointer-events forzados, pero
+    // MANTENER transition para que la animación de regreso sea visible.
     window._hudPanels.forEach(function(hp){
       var el = hp.el;
-      // Quitar transition para que el reposicionamiento de abajo aplique sin animar
-      // de forma rara (el modo expandido las activa). Las animaciones del estado
-      // normal (entrada del overlay) son CSS class-based, no inline.
-      el.style.transition    = '';
       el.style.transform     = '';
       el.style.height        = '';
       el.style.minHeight     = '';
       el.style.opacity       = '';
       el.style.pointerEvents = '';
-      // El inner también tenía minHeight forzado en el modo expandido
       var inner = el.querySelector(':scope > [id$="-inner"]');
       if(inner){ inner.style.minHeight = ''; }
     });
@@ -1535,7 +1525,99 @@ function _crearDialOverlay(){
     Object.keys(props).forEach(function(k){ el.style[k] = props[k]; });
   }
 
-  // Configuración por panel: estructura HTML del wrapper expandido + función
+  // Helper para renderizar Necesidades dentro de containers del overlay
+  // (versión simplificada que dibuja el radar + lista de niveles con barras).
+  function _hudRenderNecesidadesEn(niveles, radarEl, listaEl){
+    if(!niveles || !niveles.length){
+      if(radarEl) radarEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin registros con necesidad asignada</div>';
+      return;
+    }
+    var COLORS = {
+      fisiologicas:    '#EF4444',
+      seguridad:       '#F59E0B',
+      afiliacion:      '#22D3EE',
+      reconocimiento:  '#A855F7',
+      autorrealizacion:'#4ADE80',
+    };
+    var LABELS = {
+      fisiologicas:    'Fisiológicas',
+      seguridad:       'Seguridad',
+      afiliacion:      'Afiliación',
+      reconocimiento:  'Reconocimiento',
+      autorrealizacion:'Autorrealización',
+    };
+    var ORDEN = ['fisiologicas','seguridad','afiliacion','reconocimiento','autorrealizacion'];
+    var totalAll = niveles.reduce(function(s,n){ return s + (n.total || 0); }, 0) || 1;
+
+    // Radar SVG con 5 ejes
+    if(radarEl){
+      var W = 280, H = 280, CX = W/2, CY = H/2, R = 100;
+      var pts = ORDEN.map(function(k, i){
+        var n = niveles.find(function(nv){ return nv.key === k; }) || {total:0};
+        var pct = Math.min(1, (n.total||0)/totalAll);
+        var ang = -Math.PI/2 + (Math.PI*2*i)/ORDEN.length;
+        return {
+          x: CX + Math.cos(ang) * R * pct,
+          y: CY + Math.sin(ang) * R * pct,
+          ax: CX + Math.cos(ang) * R,
+          ay: CY + Math.sin(ang) * R,
+          label: LABELS[k],
+          color: COLORS[k],
+        };
+      });
+      var grid = '';
+      [0.25, 0.5, 0.75, 1].forEach(function(r){
+        var poly = ORDEN.map(function(k,i){
+          var ang = -Math.PI/2 + (Math.PI*2*i)/ORDEN.length;
+          return (CX + Math.cos(ang)*R*r) + ',' + (CY + Math.sin(ang)*R*r);
+        }).join(' ');
+        grid += '<polygon points="'+poly+'" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>';
+      });
+      var spokes = pts.map(function(p){
+        return '<line x1="'+CX+'" y1="'+CY+'" x2="'+p.ax+'" y2="'+p.ay+'" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>';
+      }).join('');
+      var dataPoly = pts.map(function(p){ return p.x + ',' + p.y; }).join(' ');
+      var pointDots = pts.map(function(p){
+        return '<circle cx="'+p.x+'" cy="'+p.y+'" r="3" fill="'+p.color+'"/>';
+      }).join('');
+      var labels = pts.map(function(p, i){
+        var ang = -Math.PI/2 + (Math.PI*2*i)/ORDEN.length;
+        var lx = CX + Math.cos(ang) * (R + 24);
+        var ly = CY + Math.sin(ang) * (R + 24);
+        return '<text x="'+lx+'" y="'+ly+'" fill="'+p.color+'" font-size="10" font-weight="700" text-anchor="middle" dominant-baseline="middle">'+p.label+'</text>';
+      }).join('');
+      radarEl.innerHTML =
+        '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:10px;text-align:center">Radar</div>'+
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:340px;display:block;margin:0 auto">'+
+          grid + spokes +
+          '<polygon points="'+dataPoly+'" fill="rgba(168,85,247,0.18)" stroke="#A855F7" stroke-width="1.5"/>'+
+          pointDots + labels +
+        '</svg>';
+    }
+
+    // Lista de niveles con barras
+    if(listaEl){
+      var html = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:10px">Distribución</div>';
+      ORDEN.forEach(function(k){
+        var n = niveles.find(function(nv){ return nv.key === k; }) || {total:0};
+        var pct = Math.round(((n.total||0)/totalAll)*100);
+        var color = COLORS[k];
+        html +=
+          '<div style="margin-bottom:12px">'+
+            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">'+
+              '<span style="font-size:10px;font-weight:700;color:'+color+'">'+LABELS[k]+'</span>'+
+              '<span style="font-size:11px;font-weight:800;color:'+color+';font-family:JetBrains Mono,monospace">$ '+(n.total||0).toLocaleString('es-MX',{minimumFractionDigits:0})+' <span style="opacity:.55;font-weight:600">'+pct+'%</span></span>'+
+            '</div>'+
+            '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden">'+
+              '<div style="width:'+Math.max(2,pct)+'%;height:100%;background:'+color+';box-shadow:0 0 8px '+color+'80;border-radius:999px;transition:width .8s ease"></div>'+
+            '</div>'+
+          '</div>';
+      });
+      listaEl.innerHTML = html;
+    }
+  }
+
+
   // de hidratación que rellena los datos. Se ejecuta cada vez que se expande
   // (no solo la primera) para que los datos siempre reflejen lo último.
   var _EXPAND_CONFIG = {
@@ -1579,11 +1661,11 @@ function _crearDialOverlay(){
     'hud-fijos': {
       html: function(){
         return ''+
-          '<div style="display:flex;gap:14px;height:100%;min-height:0">'+
-            '<div id="hud-fijos-tabla" style="flex:1.1;min-width:0;overflow:auto"></div>'+
-            '<div id="hud-fijos-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0">'+
+          '<div style="display:flex;gap:14px;flex:1;min-height:0;align-items:stretch">'+
+            '<div id="hud-fijos-tabla" style="flex:1.1;min-width:0;overflow:auto;display:flex;align-items:center"></div>'+
+            '<div id="hud-fijos-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0;justify-content:center">'+
               '<div id="graf-fijos-loading-hud-fijos-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
-              '<canvas id="graf-fijos-canvas-hud-fijos-tabla" style="display:none;flex:1;min-height:0"></canvas>'+
+              '<canvas id="graf-fijos-canvas-hud-fijos-tabla" style="display:none;flex:1;min-height:200px;max-height:100%"></canvas>'+
               '<div id="graf-fijos-leyenda-hud-fijos-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
             '</div>'+
           '</div>';
@@ -1606,11 +1688,11 @@ function _crearDialOverlay(){
     'hud-variables': {
       html: function(){
         return ''+
-          '<div style="display:flex;gap:14px;height:100%;min-height:0">'+
-            '<div id="hud-var-tabla" style="flex:1.1;min-width:0;overflow:auto"></div>'+
-            '<div id="hud-var-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0">'+
+          '<div style="display:flex;gap:14px;flex:1;min-height:0;align-items:stretch">'+
+            '<div id="hud-var-tabla" style="flex:1.1;min-width:0;overflow:auto;display:flex;align-items:center"></div>'+
+            '<div id="hud-var-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0;justify-content:center">'+
               '<div id="graf-loading-hud-var-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
-              '<canvas id="graf-canvas-hud-var-tabla" style="display:none;flex:1;min-height:0"></canvas>'+
+              '<canvas id="graf-canvas-hud-var-tabla" style="display:none;flex:1;min-height:200px;max-height:100%"></canvas>'+
               '<div id="graf-leyenda-hud-var-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
             '</div>'+
           '</div>';
@@ -1631,9 +1713,113 @@ function _crearDialOverlay(){
         }
       },
     },
-    // ── BITÁCORA, ACTIVITY, NECESIDADES, MISIÓN, LOGRO, NIVEL ──
-    // Para estos, mostramos un placeholder con info básica hasta migrar las
-    // funciones de Home (siguiente turno).
+    // ── BITÁCORA — clonado del DOM de Home (sec-maslow-inline / col bitacora) ──
+    'hud-bitacora': {
+      html: function(){
+        return '<div id="hud-bit-clone" style="padding:0;display:flex;flex-direction:column;gap:14px;height:100%"></div>';
+      },
+      hydrate: function(){
+        var dest = document.getElementById('hud-bit-clone');
+        if(!dest) return;
+        dest.innerHTML = '';
+        // Clonar resúmenes de pensamientos, relaciones, salud, nutrición, entrena
+        var d = window._pensamientosData;
+        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">';
+        function tarjeta(titulo, color, icon, items, vacio){
+          var rows = '';
+          if(items && items.length){
+            rows = items.slice(0,8).map(function(it){
+              var fecha = it.fecha ? new Date(it.fecha).toLocaleDateString('es-MX',{day:'2-digit',month:'short'}) : '';
+              var txt = it.contenido || it.descripcion || it.actividad || it.persona || '';
+              return '<div style="padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.05);display:flex;justify-content:space-between;gap:8px"><span style="font-size:11px;color:rgba(220,224,235,0.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">'+txt+'</span><span style="font-size:9px;color:rgba(220,224,235,0.40);flex-shrink:0">'+fecha+'</span></div>';
+            }).join('');
+          } else {
+            rows = '<div style="padding:18px;text-align:center;color:rgba(220,224,235,0.35);font-size:10px">'+vacio+'</div>';
+          }
+          return '<div style="border:1px solid '+color+'33;border-radius:10px;background:'+color+'08;overflow:hidden"><div style="padding:9px 12px;border-bottom:1px solid '+color+'22;display:flex;align-items:center;gap:8px"><i class="fas '+icon+'" style="color:'+color+';font-size:12px"></i><span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:'+color+'">'+titulo+'</span></div><div>'+rows+'</div></div>';
+        }
+        html += tarjeta('Pensamientos', '#C084FC', 'fa-brain', (window._pensamientosData||{}).items, 'Sin pensamientos');
+        html += tarjeta('Relaciones', '#93C5FD', 'fa-users', (window._relacionesData||{}).items, 'Sin relaciones');
+        html += tarjeta('Salud', '#F87171', 'fa-heart-pulse', (window._saludData||{}).items, 'Sin registros');
+        html += tarjeta('Nutrición', '#86EFAC', 'fa-leaf', (window._nutData||{}).items, 'Sin registros');
+        html += tarjeta('Entrenamiento', '#FB923C', 'fa-dumbbell', (window._entData||{}).items, 'Sin sesiones');
+        html += '</div>';
+        dest.innerHTML = html;
+      },
+    },
+
+    // ── ACTIVITY + LOGROS expandido ──
+    'hud-activity': {
+      html: function(){
+        return '<div id="hud-act-expanded-body" style="padding:0;display:flex;flex-direction:column;gap:14px;height:100%"></div>';
+      },
+      hydrate: function(){
+        var dest = document.getElementById('hud-act-expanded-body');
+        if(!dest) return;
+        var act = window._actData || {};
+        var logros = window._logrosData || {items:[]};
+        var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+        // Hábitos personales con check hoy
+        var habitsP = (act.habitosPersonal||[]);
+        var doneP = habitsP.filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
+        var habitsE = (act.habitosElectronics||[]);
+        var doneE = habitsE.filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
+        var lgDone = (logros.items||[]).filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length;
+        var lgTotal = (logros.items||[]).length;
+        function bar(pct, color){ return '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:6px"><div style="width:'+Math.min(100,pct)+'%;height:100%;background:'+color+';box-shadow:0 0 8px '+color+'80;border-radius:999px"></div></div>'; }
+        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
+        // Hábitos personales
+        html += '<div style="padding:14px;border:1px solid rgba(251,146,60,0.30);border-radius:12px;background:rgba(251,146,60,0.04)"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#FB923C;margin-bottom:8px">Hábitos personales hoy</div><div style="font-size:24px;font-weight:800;color:#FB923C;font-family:JetBrains Mono,monospace">'+doneP+' / '+habitsP.length+'</div>'+bar(habitsP.length?(doneP/habitsP.length*100):0,'#FB923C')+'</div>';
+        // Electronics
+        html += '<div style="padding:14px;border:1px solid rgba(34,211,238,0.30);border-radius:12px;background:rgba(34,211,238,0.04)"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:8px">Hábitos Electronics hoy</div><div style="font-size:24px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace">'+doneE+' / '+habitsE.length+'</div>'+bar(habitsE.length?(doneE/habitsE.length*100):0,'#22D3EE')+'</div>';
+        // Logros
+        html += '<div style="padding:14px;border:1px solid rgba(250,204,21,0.30);border-radius:12px;background:rgba(250,204,21,0.04);grid-column:1 / -1"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#FACC15">Logros</div><div style="font-size:18px;font-weight:800;color:#FACC15;font-family:JetBrains Mono,monospace">'+lgDone+' / '+lgTotal+'</div></div>'+bar(lgTotal?(lgDone/lgTotal*100):0,'#FACC15')+'</div>';
+        // Lista logros recientes
+        var recientes = (logros.items||[]).slice(0,10);
+        if(recientes.length){
+          html += '<div style="grid-column:1 / -1;border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:10px"><div style="font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px">Logros recientes</div>';
+          recientes.forEach(function(l){
+            var done = l.completado==='Sí'||l.completado===true;
+            html += '<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);display:flex;align-items:center;gap:10px"><i class="fas '+(done?'fa-check-circle':'fa-circle')+'" style="color:'+(done?'#4ADE80':'rgba(220,224,235,0.30)')+';font-size:11px"></i><span style="font-size:11px;color:'+(done?'rgba(220,224,235,0.85)':'rgba(220,224,235,0.55)')+'">'+(l.titulo||l.nombre||'—')+'</span></div>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+        dest.innerHTML = html;
+      },
+    },
+
+    // ── NECESIDADES expandido — usa renderNecesidadesInline si los IDs existen ──
+    'hud-necesidades': {
+      html: function(){
+        return ''+
+          '<div style="display:flex;gap:14px;height:100%;min-height:0">'+
+            '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:8px"></div>'+
+            '<div id="nec-inline-container-overlay" style="flex:1;min-width:0;overflow:auto;padding:8px"></div>'+
+          '</div>';
+      },
+      hydrate: function(){
+        var radarDest = document.getElementById('nec-inline-radar-wrap-overlay');
+        var detDest   = document.getElementById('nec-inline-container-overlay');
+        if(!radarDest || !detDest) return;
+        var data = window._necInlineData || (window._hudDatos && window._hudDatos.necesidades);
+        if(!data || !data.niveles || !data.niveles.length){
+          radarDest.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px"><i class="fas fa-circle-notch fa-spin"></i> Cargando…</div>';
+          // Pedir si no hay datos
+          if(typeof api !== 'undefined' && api.getNecesidades){
+            var hoy = new Date();
+            api.getNecesidades(hoy.getFullYear(), String(hoy.getMonth()+1), null).then(function(d){
+              window._necInlineData = d;
+              if(d && d.ok && d.niveles){
+                _hudRenderNecesidadesEn(d.niveles, radarDest, detDest);
+              }
+            }).catch(function(){});
+          }
+          return;
+        }
+        _hudRenderNecesidadesEn(data.niveles, radarDest, detDest);
+      },
+    },
   };
 
   function _hudExpand(panelEl){
@@ -1694,7 +1880,42 @@ function _crearDialOverlay(){
     var panelEl = window._hudExpanded;
     panelEl.classList.remove('hud-expanded');
     window._hudExpanded = null;
+
+    // Limpiar AHORA los width/height/minHeight/clipPath del panel que se acaba
+    // de colapsar. Si no, quedan con su tamaño expandido inline y pelean con
+    // el reposicionamiento normal, causando amontonamiento.
+    panelEl.style.width = '';
+    panelEl.style.height = '';
+    panelEl.style.minHeight = '';
+    panelEl.style.clipPath = '';
+    var innerCol = panelEl.querySelector(':scope > [id$="-inner"]');
+    if(innerCol){ innerCol.style.minHeight = ''; }
+
+    // Asegurar transitions activas en TODOS los paneles antes del reposicionamiento
+    // para que el regreso al estado normal sea animado, no instantáneo.
+    if(typeof window._hudPanels !== 'undefined'){
+      window._hudPanels.forEach(function(hp){
+        if(!hp.el) return;
+        hp.el.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),opacity .35s ease';
+      });
+    }
+    if(_dialCanvas){
+      _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),box-shadow .35s ease';
+    }
     if(!sinReposicionar && typeof _reposicionarHUD === 'function') _reposicionarHUD();
+
+    // Después de la animación (~500ms) limpiar las transitions inline para que
+    // el flujo normal subsiguiente no anime cambios de layout (resize, DnD, etc.).
+    setTimeout(function(){
+      if(window._hudExpanded) return;
+      if(typeof window._hudPanels !== 'undefined'){
+        window._hudPanels.forEach(function(hp){
+          if(!hp.el) return;
+          hp.el.style.transition = '';
+        });
+      }
+      if(_dialCanvas) _dialCanvas.style.transition = '';
+    }, 500);
   }
 
   // Click en el dial cuando hay un panel expandido → colapsar.
