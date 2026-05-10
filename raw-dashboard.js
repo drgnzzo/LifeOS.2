@@ -62,6 +62,7 @@ function actualizarNecInline(forzarMes){
 
   api.getNecesidades(a, mesFinal, null).then(function(data){
     _necInlineData = data;
+    window._necInlineData = data;
     if(data && data.ok){
       var niveles = data.niveles || [];
       if(!niveles.length || niveles.every(function(n){ return !n.total; })){
@@ -645,6 +646,7 @@ var _necInlineData=null,_necInlineVista='piramide';
 function renderNecesidadesInline(data){
   if(!data) return;
   _necInlineData = data;
+  window._necInlineData = data;
   _initNecInlineSelectors();
 
   // Si ya tenemos niveles en los datos recibidos, dibujar directo sin nueva llamada a API
