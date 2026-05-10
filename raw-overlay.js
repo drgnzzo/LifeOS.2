@@ -1,8 +1,30 @@
-/* RAW Entry — Overlay v.5.103
-   Cambios desde v5.102:
-   - FIX BUG "columnas encimadas al regresar de modo expandido":
-     Cuando se daba click en el dial mini para colapsar, las columnas
-     laterales regresaban a posiciones encimadas sobre el dial central.
+/* RAW Entry — Overlay v.5.104
+   Cambios desde v5.103:
+   - TIMELINE de apertura ralentizado ~1.5x para sensación más cinematográfica:
+     · t=450  aro pulsante (antes 300)
+     · t=1700 cascada paneles (antes 1100), duración cascada 2800ms (antes 1800)
+     · t=4500 slots vacíos (antes 2900)
+     · t=5100 dial canvas (antes 3300) — transición 1700ms MUY suave (antes 800)
+     · t=7200 cleanup (antes 4800)
+     Backdrop fade: 720ms (antes 480). Aro pulsante fade: 1400ms (antes 900).
+     Paneles transition: 1200ms (antes 820).
+   - VIDA EN PANELES (perimeter scan + breathing):
+     · Ahora se aplica a TODOS los cards (antes solo 2-3 random con breathing
+       y 1-2 con scan).
+     · Breathing más lento: 5.5s (antes 4.2s).
+     · Scan principal con duración 7.5s (antes 5.8s) y offset rotacional
+       aleatorio por panel.
+     · NUEVO scan secundario ::after — gira en dirección opuesta a 11s,
+       offset distinto al principal forzado >120° aparte, color más tenue
+       (opacity .32 vs .55). Mismo concepto que los 2 arcos del dial.
+   - GAPS entre cards aumentados: GAP=22 (antes 14) en _reposicionarHUD y
+     raw-overlay-dnd.js. Las columnas siguen pegadas al dial pero ahora hay
+     más respiración vertical entre paneles de la misma columna.
+
+   ── Heredado v5.103 ──
+   FIX BUG "columnas encimadas al regresar de modo expandido":
+   Cuando se daba click en el dial mini para colapsar, las columnas
+   laterales regresaban a posiciones encimadas sobre el dial central.
      CAUSA: _reposicionarHUD() leía `r = _dialCanvas.getBoundingClientRect()`
      al inicio, pero en ese momento el dial todavía estaba animándose desde
      la posición mini (80px abajo, position:fixed) hacia el tamaño grande
@@ -689,13 +711,16 @@ function _crearDialOverlay(){
       // Mensaje placeholder para paneles que solo muestran info al expandir
       '.hud-empty-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px 16px;color:rgba(220,224,235,0.45)}',
       '.hud-empty-msg span{font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;text-align:center}',
-      // Breathing glow — sombra que pulsa suavemente
-      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 0 var(--hb-c,rgba(255,255,255,0.0)),inset 0 0 0 0 transparent}50%{box-shadow:0 0 24px 4px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 12px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
-      '.hud-breathing{animation:hudBreath 4.2s ease-in-out infinite}',
-      // Perimeter scan — pseudo-elemento conic-gradient que rota
+      // Breathing glow — sombra que pulsa suavemente (más lento: 5.5s)
+      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 0 var(--hb-c,rgba(255,255,255,0.0)),inset 0 0 0 0 transparent}50%{box-shadow:0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
+      '.hud-breathing{animation:hudBreath 5.5s ease-in-out infinite}',
+      // Perimeter scan principal — pseudo-elemento conic-gradient que rota (sentido horario)
       '@keyframes hudScanRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
+      '@keyframes hudScanRotRev{from{transform:rotate(360deg)}to{transform:rotate(0deg)}}',
       '.hud-scan{position:relative;overflow:hidden}',
-      '.hud-scan::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:conic-gradient(from var(--scan-from,0deg),transparent 0deg,transparent 270deg,var(--scan-c,#A855F7) 320deg,transparent 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:hudScanRot 5.8s linear infinite;pointer-events:none;opacity:.55;z-index:1}',
+      '.hud-scan::before{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:conic-gradient(from var(--scan-from,0deg),transparent 0deg,transparent 270deg,var(--scan-c,#A855F7) 320deg,transparent 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:hudScanRot 7.5s linear infinite;pointer-events:none;opacity:.55;z-index:1}',
+      // Perimeter scan SECUNDARIO (offset rotacional, dirección opuesta, más tenue) — segundo arco que recorre el borde
+      '.hud-scan-2::after{content:"";position:absolute;inset:-1px;border-radius:inherit;padding:1px;background:conic-gradient(from var(--scan-from-2,180deg),transparent 0deg,transparent 295deg,var(--scan-c-2,#A855F7) 335deg,transparent 360deg);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;animation:hudScanRotRev 11s linear infinite;pointer-events:none;opacity:.32;z-index:1}',
       // hero
       '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
       '.hud-hero-l{flex:1;min-width:0}',
@@ -1356,7 +1381,7 @@ function _crearDialOverlay(){
     var r   = _dialCanvas.getBoundingClientRect();
     var vW  = window.innerWidth;
     var vH  = window.innerHeight;
-    var GAP = 14;
+    var GAP = 22;
 
     // Override de r en dos casos donde getBoundingClientRect no refleja la
     // geometría FINAL del dial (con tamaño y posición normales):
@@ -3939,34 +3964,34 @@ function toggleEntradaDropdown(){
   if(_dialVisible) cerrarDial(); else abrirDial();
 }
 
-// P-D: Aplicar animaciones de "vida" (breathing + perimeter scan) a algunos
-// cards al azar — cada vez que se abre el overlay, el set puede ser distinto.
+// P-D: Aplicar animaciones de "vida" a TODOS los paneles del overlay:
+//  · Breathing perimetral (glow pulsante con el color del panel)
+//  · Perimeter scan principal (::before, sentido horario, ~7.5s)
+//  · Perimeter scan secundario (::after, sentido contrario, offset rotacional
+//    distinto por panel, ~11s, más tenue) — como en el dial que tiene 2 arcos
+//    girando en direcciones opuestas.
+// El set de paneles es siempre el mismo (todos), pero el OFFSET inicial del
+// scan se randomiza en cada apertura, así que ninguna apertura se ve igual.
 function _aplicarVidaPaneles(){
   if(!window._hudPanels || !window._hudPanels.length) return;
   // Limpiar de una apertura previa
   window._hudPanels.forEach(function(hp){
     if(!hp.el) return;
-    hp.el.classList.remove('hud-breathing','hud-scan');
+    hp.el.classList.remove('hud-breathing','hud-scan','hud-scan-2');
     hp.el.style.removeProperty('--hb-c');
     hp.el.style.removeProperty('--hb-i');
     hp.el.style.removeProperty('--scan-c');
     hp.el.style.removeProperty('--scan-from');
+    hp.el.style.removeProperty('--scan-c-2');
+    hp.el.style.removeProperty('--scan-from-2');
   });
-  // Excluir paneles muy chicos (track) y los que están animando entrada
-  var candidatos = window._hudPanels.filter(function(hp){
-    return hp.el && hp.el.id !== 'hud-track' && !hp.el._animatingEntry;
-  });
-  if(candidatos.length < 4) return;
-  // Shuffle y separar
-  var shuffled = candidatos.slice().sort(function(){ return Math.random()-0.5; });
-  var nBreath = 2 + Math.floor(Math.random()*2); // 2-3
-  var nScan   = 1 + Math.floor(Math.random()*2); // 1-2
-  // Color por panel id (mapeo aproximado)
+  // Color por panel id
   var COLOR_MAP = {
     'hud-patrimonio':'#22C55E','hud-necesidades':'#A855F7','hud-bitacora':'#C084FC',
     'hud-fijos':'#67E8F9','hud-financiero':'#22D3EE','hud-activity':'#FB923C',
     'hud-variables':'#A5B4FC','hud-mision':'#06B6D4','hud-logro':'#FACC15',
     'hud-nivel':'#A78BFA','hud-user':'#9CA3AF','hud-stats':'#FBBF24','hud-sim-band':'#A855F7',
+    'hud-track':'#A78BFA',
   };
   function _rgba2(hex, a){
     var h=hex.replace('#','');
@@ -3974,17 +3999,28 @@ function _aplicarVidaPaneles(){
     var r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
     return 'rgba('+r+','+g+','+b+','+a+')';
   }
-  shuffled.slice(0, nBreath).forEach(function(hp){
+  // TODOS los candidatos: cualquier panel del overlay (incluido track, mision,
+  // logro, nivel y la fila top). Excluimos solo paneles aún en cascada inicial.
+  var candidatos = window._hudPanels.filter(function(hp){
+    return hp.el && !hp.el._animatingEntry;
+  });
+  candidatos.forEach(function(hp){
     var col = COLOR_MAP[hp.el.id] || '#A855F7';
-    hp.el.style.setProperty('--hb-c', _rgba2(col, 0.30));
+    // Breathing
+    hp.el.style.setProperty('--hb-c', _rgba2(col, 0.32));
     hp.el.style.setProperty('--hb-i', _rgba2(col, 0.06));
     hp.el.classList.add('hud-breathing');
-  });
-  shuffled.slice(nBreath, nBreath + nScan).forEach(function(hp){
-    var col = COLOR_MAP[hp.el.id] || '#A855F7';
+    // Scan principal — offset aleatorio para que no coincidan entre paneles
     hp.el.style.setProperty('--scan-c', col);
     hp.el.style.setProperty('--scan-from', Math.floor(Math.random()*360)+'deg');
     hp.el.classList.add('hud-scan');
+    // Scan SECUNDARIO — color un poco distinto (más violeta tenue) y offset
+    // muy distinto al principal para que se vean como dos arcos separados
+    // girando en direcciones opuestas (como en el dial).
+    var offset2 = (Math.floor(Math.random()*360) + 140) % 360; // forzar separación >120°
+    hp.el.style.setProperty('--scan-c-2', col);
+    hp.el.style.setProperty('--scan-from-2', offset2 + 'deg');
+    hp.el.classList.add('hud-scan-2');
   });
 }
 window._aplicarVidaPaneles = _aplicarVidaPaneles;
@@ -4042,7 +4078,7 @@ function abrirDial(){
 
   // ═══ Backdrop fade-in (sucede en paralelo con la fase 1) ═══
   requestAnimationFrame(function(){
-    _dialOverlay.style.transition = 'opacity 480ms cubic-bezier(.16,1,.3,1)';
+    _dialOverlay.style.transition = 'opacity 720ms cubic-bezier(.16,1,.3,1)';
     _dialOverlay.style.opacity = '1';
   });
 
@@ -4055,35 +4091,35 @@ function abrirDial(){
 
   if(window._hudPanels && window.innerWidth>=900){
     // ═══════════════════════════════════════════════════════════════
-    //  TIMELINE DE APERTURA — orden estricto:
-    //   t = 300ms  → FASE 1: aro circular del breathing aparece
-    //   t = 1100ms → FASE 2: empieza cascada de paneles (todos al azar)
-    //   t = 2900ms → FASE 2b: aparecen slots vacíos punteados
-    //   t = 3300ms → FASE 3: aparece el dial canvas completo
-    //   t = 4800ms → limpieza final + vida (breathing/scan al azar)
+    //  TIMELINE DE APERTURA — orden estricto (v5.104 ralentizado ~1.5x):
+    //   t = 450ms  → FASE 1: aro circular del breathing aparece
+    //   t = 1700ms → FASE 2: empieza cascada de paneles (todos al azar)
+    //   t = 4500ms → FASE 2b: aparecen slots vacíos punteados
+    //   t = 5100ms → FASE 3: aparece el dial canvas (transición 1500ms muy suave)
+    //   t = 7200ms → limpieza final + vida (breathing/scan al azar)
     // ═══════════════════════════════════════════════════════════════
 
-    var T_RING_IN       = 300;
-    var T_CASCADA_START = 1100;
-    var T_CASCADA_DUR   = 1800; // ventana de la cascada
-    var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 2900
-    var T_DIAL_IN       = T_SLOTS_IN + 400;                // 3300
-    var T_CLEANUP       = T_DIAL_IN + 1500;                // 4800
+    var T_RING_IN       = 450;
+    var T_CASCADA_START = 1700;
+    var T_CASCADA_DUR   = 2800; // ventana de la cascada (antes 1800)
+    var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 4500
+    var T_DIAL_IN       = T_SLOTS_IN + 600;                // 5100
+    var T_CLEANUP       = T_DIAL_IN + 2100;                // 7200
 
-    // ── FASE 1: aro circular aparece ──
+    // ── FASE 1: aro circular aparece (más suave: 1400ms) ──
     setTimeout(function(){
       if(glowEl){
-        glowEl.style.transition = 'opacity 900ms cubic-bezier(.16,1,.3,1)';
+        glowEl.style.transition = 'opacity 1400ms cubic-bezier(.16,1,.3,1)';
         glowEl.style.opacity = '1';
       }
       if(ringEl){
-        ringEl.style.transition = 'opacity 900ms cubic-bezier(.16,1,.3,1),transform 900ms cubic-bezier(.16,1,.3,1)';
+        ringEl.style.transition = 'opacity 1400ms cubic-bezier(.16,1,.3,1),transform 1400ms cubic-bezier(.16,1,.3,1)';
         ringEl.style.opacity = '1';
         ringEl.style.transform = '';
       }
     }, T_RING_IN);
 
-    // ── FASE 2: cascada de paneles ──
+    // ── FASE 2: cascada de paneles (transición individual 1200ms) ──
     function _slideOrigin(side){
       switch(side){
         case 'top-left':       return 'translate(-22px,-16px)';
@@ -4102,7 +4138,7 @@ function abrirDial(){
     }
     window._hudPanels.forEach(function(hp){
       hp.el.style.transform = _slideOrigin(hp.el._side);
-      hp.el.style.transition = 'opacity 820ms cubic-bezier(.16,1,.3,1),transform 920ms cubic-bezier(.16,1,.3,1),filter 820ms ease';
+      hp.el.style.transition = 'opacity 1200ms cubic-bezier(.16,1,.3,1),transform 1300ms cubic-bezier(.16,1,.3,1),filter 1200ms ease';
       hp.el.style.filter = 'brightness(0.4) blur(2px)';
     });
     var nPanels = window._hudPanels.length;
@@ -4145,16 +4181,16 @@ function abrirDial(){
       }
     }, T_SLOTS_IN);
 
-    // ── FASE 3: dial canvas aparece ──
+    // ── FASE 3: dial canvas aparece (MUCHO más suave: 1700ms) ──
     setTimeout(function(){
       if(_dialCanvas){
-        _dialCanvas.style.transition = 'opacity 800ms cubic-bezier(.16,1,.3,1),transform 900ms cubic-bezier(.16,1,.3,1)';
+        _dialCanvas.style.transition = 'opacity 1700ms cubic-bezier(.16,1,.3,1),transform 1900ms cubic-bezier(.16,1,.3,1)';
         _dialCanvas.style.opacity = '1';
         _dialCanvas.style.transform = '';
       }
       // El aro pulsante se atenúa para no competir con el dial
       if(ringEl){
-        ringEl.style.transition = 'opacity 800ms ease';
+        ringEl.style.transition = 'opacity 1400ms ease';
         ringEl.style.opacity = '0.18';
       }
     }, T_DIAL_IN);
