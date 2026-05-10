@@ -1,21 +1,31 @@
-/* RAW Entry — Overlay v.5.086
-   Cambios desde v5.085:
-   FIX-A — Espacio fila top→columnas: paneles ya NO se centran verticalmente,
-            arrancan PEGADOS arriba (eliminado el aire de ~80px de centrado).
-   FIX-B — Banda Sim REDISEÑADA:
-     · Layout: grid 3 columnas × 3 filas (antes 9 cols × 1 fila → texto truncado)
-     · Cada need horizontal: ico + label (62px fijo) + barra (flex) + valor
-     · Labels ya NO se cortan ("ENTORNO", "TRABAJO" se leen completos)
-     · Sims values: TODOS empiezan en 0 si no hay datos (antes 50/40 inventados)
-       — _calcSimsNeeds reescrito para sumar SOLO cuando hay datos reales.
-     · Barra en gris translúcido si valor = 0 (visualmente "apagada")
-   FIX-C — Track más prominente: padding 14px (antes 11px), glow @18 (antes @12).
-   FIX-D — Fila de fuegos: label "RACHA" en color naranja con drop-shadow,
-            icono lead con drop-shadow propio (antes plano blanco).
-   FIX-E — Misión Diaria: barra +1px (6px), inset shadow para profundidad,
-            min-width:1px en fill para que algo asome cuando >0%.
-   FIX-F — Cards inferiores juntas centradas (P1b — heredado v5.085 confirmado).
-   DIAL — De vuelta a tamaño cómodo: min(760px, 52vw) (antes 720/50, target 850).
+/* RAW Entry — Overlay v.5.087
+   Cambios desde v5.086 (FASE 1 del expansor estilo carrusel):
+   - ELIMINADO panel _p6 Navegación (sus acciones siguen disponibles
+     en los botones del Hero del header).
+   - NUEVO botón ⛶ (expandir) en el header de cada panel, junto al "···".
+   - NUEVA mecánica del expansor:
+     · Click en ⛶ o en el CTA del pie → el panel crece al CENTRO ocupando
+       el área que tenía el dial.
+     · El dial se ACHICA y baja a la zona inferior (mini circular ~80px
+       arriba de las cards Misión/Nivel).
+     · Misión y Nivel se mueven a los lados (Logro y Track desaparecen
+       temporalmente con opacity:0).
+     · Click en el dial mini → todo regresa al estado normal con animación.
+   - Los demás paneles laterales se ACHICAN a 240px y siguen visibles
+     (P3a confirmado).
+   - Si ya hay un panel expandido y se hace click en otro → INTERCAMBIO
+     directo (P-Ca confirmado).
+   - DnD DESACTIVADO mientras hay panel expandido (P6 confirmado).
+   - Easing: cubic-bezier(.4,1.4,.5,1) — mismo de los anillos del dial (P7).
+
+   Vista expandida (Fase 1): por ahora muestra placeholder con spinner.
+   En Fase 2+ traeremos el contenido de Home (Patrimonio expandido,
+   Financiero con Identidad, Fijos y Variables con tabla+gráfico,
+   Necesidades con radar+distribución).
+
+   ── Heredado v5.086 ──
+   Sims needs en 0 si no hay datos, banda Sim en grid 3×3, ancho dial 760px,
+   dial centrado, cards inferiores juntas centradas (P1b).
 */
 
 var _dialOverlay   = null;
@@ -436,6 +446,17 @@ function _crearDialOverlay(){
       '.hud-h-ico i{font-size:12px}',
       '.hud-h-t{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-h-k{font-size:14px;font-weight:800;color:rgba(220,220,240,0.35);letter-spacing:.10em;cursor:default;line-height:0}',
+      '.hud-h-expand{background:transparent;border:0;cursor:pointer;padding:5px;border-radius:5px;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s;opacity:.55}',
+      '.hud-h-expand:hover{opacity:1;background:rgba(255,255,255,0.06);transform:scale(1.1)}',
+      '.hud-h-expand i{font-size:11px;line-height:1}',
+      // Panel expandido: ocupa la zona central donde estaba el dial
+      '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important}',
+      // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
+      '.hud-expanded-content{display:none;flex:1;min-height:0;overflow:auto;padding:14px 18px}',
+      '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px}',
+      '.hud-expanded .hud-collapsed-content{display:none}',
+      // Botón expandir cambia de icono cuando ya está expandido
+      '.hud-expanded .hud-h-expand i{transform:rotate(180deg)}',
       '.hud-h-bar{height:1px;margin:0 16px;background:linear-gradient(90deg,var(--ac-50),transparent)}',
       // hero
       '.hud-hero{padding:14px 16px 10px;display:flex;align-items:flex-start;justify-content:space-between;gap:12px}',
@@ -566,19 +587,24 @@ function _crearDialOverlay(){
         '<i class="fas '+icon+'" style="color:'+color+';filter:drop-shadow(0 0 4px '+color+')"></i>'+
       '</div>'+
       '<span class="hud-h-t" style="color:'+color+';text-shadow:0 0 12px '+_rgba(color,0.50)+'">'+label+'</span>'+
+      '<button class="hud-h-expand" data-color="'+color+'" title="Expandir" '+
+        'style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+
+        '<i class="fas fa-up-right-and-down-left-from-center"></i>'+
+      '</button>'+
       '<span class="hud-h-k">···</span>'+
     '</div>'+
     '<div class="hud-h-bar" style="--ac-50:'+_rgba(color,0.40)+'"></div>';
   }
 
   // Pie CTA sutil (link, no banner)
+  // Click → expande el panel padre (modo carrusel inline).
+  // El parámetro `fn` se ignora ahora — antes navegaba a un panel externo
+  // (irAPatrimonio, etc). Mantenemos el parámetro por compat con llamadas existentes.
   function _pCTA(label, color, fn){
-    var clickable = fn && typeof window[fn] === 'function';
-    var onclick = clickable ? ('event.stopPropagation();window.'+fn+'();') : '';
-    return '<div '+(clickable?('onclick="'+onclick+'"'):'')+' class="hud-cta" style="'+
+    return '<div class="hud-cta hud-cta-expand" style="'+
       '--ac-15:'+_rgba(color,0.12)+';'+
       '--ac-08:'+_rgba(color,0.08)+';'+
-      'cursor:'+(clickable?'pointer':'default')+'">'+
+      'cursor:pointer">'+
       '<span class="lbl" style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+label+'</span>'+
       '<i class="fas fa-chevron-right chev" style="color:'+color+'"></i>'+
     '</div>';
@@ -842,23 +868,10 @@ function _crearDialOverlay(){
     '</div>'+
     _pCTA('Ir a Activity Check','#FB923C','irAActivity');
 
-  // ── Panel 6: Navegación (grid 2x3) ──
-  var _p6 = _mkFloatPanel('hud-nav','#A78BFA','rgba(167,139,250,0.12)');
-  document.body.appendChild(_p6);
-  _p6.classList.add('hud-pnl');
-  _p6.style.animationDelay = '3.2s';
-  document.getElementById('hud-nav-inner').innerHTML =
-    _pH('Navegación','#A78BFA','fa-compass') +
-    '<div id="hud-navg-grid" class="hud-navg"></div>';
-  var _navGrid = document.getElementById('hud-navg-grid');
-  [
-    {label:'Activity',   icon:'fa-bolt',         fn:'irAActivity',  color:'#FB923C'},
-    {label:'Bitácora',   icon:'fa-book-open',    fn:'irABitacora',  color:'#C084FC'},
-    {label:'Logros',     icon:'fa-trophy',       fn:'irALogros',    color:'#FACC15'},
-    {label:'RAW Sheet',  icon:'fa-table',        fn:'irASheets',    color:'#A5B4FC'},
-    {label:'Nutrición',  icon:'fa-leaf',         fn:'irANutricion', color:'#4ADE80'},
-    {label:'Actualizar', icon:'fa-rotate-right', fn:'refreshTodo',  color:'#94A3B8'},
-  ].forEach(function(n){ _navGrid.appendChild(_navG(n.label,n.icon,n.color,n.fn)); });
+  // ── Panel Navegación: ELIMINADO en v5.087.
+  // Las acciones (Activity, Bitácora, Logros, RAW Sheet, Nutrición, Actualizar)
+  // ya están disponibles en los botones del Hero del header. Quitar el panel
+  // libera espacio en la columna derecha y simplifica el overlay.
 
   // ══════════════════════════════════════
   //  ZONA INFERIOR — track + 3 cards
@@ -962,7 +975,6 @@ function _crearDialOverlay(){
   _p3._side='left';    _p3._order=2;
   _p4._side='right';   _p4._order=0;
   _p5._side='right';   _p5._order=1;
-  _p6._side='right';   _p6._order=2;
   _pTrack._side='bottom-track';   _pTrack._order=0;
   _pMision._side='bottom-left';   _pMision._order=0;
   _pLogro._side='bottom-center';  _pLogro._order=0;
@@ -971,7 +983,7 @@ function _crearDialOverlay(){
   var _hudPanels = [
     {el:_pUser},{el:_pSim},{el:_pStats},
     {el:_p1},{el:_p2},{el:_p3},
-    {el:_p4},{el:_p5},{el:_p6},
+    {el:_p4},{el:_p5},
     {el:_pTrack},
     {el:_pMision},{el:_pLogro},{el:_pNivel},
   ];
@@ -992,6 +1004,144 @@ function _crearDialOverlay(){
     function getTop(side){
       return window._hudPanels.filter(function(hp){ return hp.el._side===side; });
     }
+
+    var expandedEl = window._hudExpanded;
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  MODO EXPANDIDO — un panel ocupa el centro, dial achicado abajo
+    // ══════════════════════════════════════════════════════════════════════
+    if(expandedEl){
+      // Calcular dimensiones del centro: el área que ocupaba el dial
+      // Lo ampliamos para aprovechar también un poco más arriba/abajo
+      var centerW = Math.min(900, vW - 480);    // ancho central deja columnas laterales
+      var centerH = Math.round(vH * 0.55);       // alto central ~55% del viewport
+      var topRowBottom = parseFloat(_pUser.style.top || 0) +
+                         (_pUser.offsetHeight || 100) + GAP*2;
+      var centerY = topRowBottom;
+      var centerX = Math.round((vW - centerW) / 2);
+
+      // Posicionar el panel expandido en el centro
+      expandedEl.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)';
+      expandedEl.style.left   = centerX + 'px';
+      expandedEl.style.top    = centerY + 'px';
+      expandedEl.style.width  = centerW + 'px';
+      expandedEl.style.height = centerH + 'px';
+      expandedEl.style.minHeight = centerH + 'px';
+      expandedEl.style.clipPath = chamferRect;
+
+      // Dial achicado abajo (donde estaba el track)
+      var dialMini = 80;
+      var dialMiniY = vH - dialMini - GAP - 90; // arriba de las cards bottom
+      var dialMiniX = Math.round((vW - dialMini) / 2);
+      _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1),transform .42s cubic-bezier(.4,1.4,.5,1)';
+      _dialCanvas.style.position = 'fixed';
+      _dialCanvas.style.left = dialMiniX + 'px';
+      _dialCanvas.style.top  = dialMiniY + 'px';
+      _dialCanvas.style.width  = dialMini + 'px';
+      _dialCanvas.style.height = dialMini + 'px';
+      _dialCanvas.style.zIndex = '9100';
+      _dialCanvas.style.cursor = 'pointer';
+      _dialCanvas.title = 'Volver al dial';
+      // Hint visual: glow alrededor del dial mini
+      _dialCanvas.style.boxShadow = '0 0 24px rgba(167,139,250,0.55),0 0 48px rgba(167,139,250,0.30)';
+      _dialCanvas.style.borderRadius = '50%';
+
+      // Posicionar el resto de paneles laterales (NO el expandido)
+      var leftPanels  = window._hudPanels.filter(function(hp){
+        return hp.el._side==='left' && hp.el !== expandedEl;
+      });
+      var rightPanels = window._hudPanels.filter(function(hp){
+        return hp.el._side==='right' && hp.el !== expandedEl;
+      });
+
+      var leftX  = GAP;
+      var rightX = vW - 240 - GAP;
+      function placeColExpanded(panels, x){
+        panels.sort(function(a,b){ return a.el._order - b.el._order; });
+        var y = topRowBottom;
+        panels.forEach(function(hp){
+          hp.el.style.transition = 'left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1)';
+          hp.el.style.left = x + 'px';
+          hp.el.style.top  = y + 'px';
+          hp.el.style.width = '240px';
+          hp.el.style.height = '';
+          hp.el.style.minHeight = '';
+          hp.el.style.clipPath = chamferRect;
+          var h = hp.el.scrollHeight || hp.el.offsetHeight || 200;
+          y += h + GAP;
+        });
+      }
+      placeColExpanded(leftPanels,  leftX);
+      placeColExpanded(rightPanels, rightX);
+
+      // Misión/Logro/Nivel a los lados (Misión en bottom-left,
+      // Nivel en bottom-right, Logro oculto temporalmente)
+      var pMisionEx = getTop('bottom-left')[0];
+      var pLogroEx  = getTop('bottom-center')[0];
+      var pNivelEx  = getTop('bottom-right')[0];
+      var pTrackEx  = getTop('bottom-track')[0];
+      var botYEx = vH - 90;
+      if(pMisionEx){
+        pMisionEx.el.style.transition = 'all .42s cubic-bezier(.4,1.4,.5,1)';
+        pMisionEx.el.style.left = GAP + 'px';
+        pMisionEx.el.style.top  = botYEx + 'px';
+        pMisionEx.el.style.width = '320px';
+      }
+      if(pNivelEx){
+        pNivelEx.el.style.transition = 'all .42s cubic-bezier(.4,1.4,.5,1)';
+        pNivelEx.el.style.left = (vW - 360 - GAP) + 'px';
+        pNivelEx.el.style.top  = botYEx + 'px';
+        pNivelEx.el.style.width = '360px';
+      }
+      // Logro y Track ocultos en modo expandido
+      if(pLogroEx){
+        pLogroEx.el.style.transition = 'opacity .3s ease';
+        pLogroEx.el.style.opacity = '0';
+        pLogroEx.el.style.pointerEvents = 'none';
+      }
+      if(pTrackEx){
+        pTrackEx.el.style.transition = 'opacity .3s ease';
+        pTrackEx.el.style.opacity = '0';
+        pTrackEx.el.style.pointerEvents = 'none';
+      }
+
+      // Top row: USER y Stats igual; Sim achicado pero presente
+      // (lo mantenemos en su misma posición del modo normal — solo la zona
+      // central debajo de la fila top cambia)
+      // Posicionamiento del top SIGUE el flujo normal de abajo, así que dejamos
+      // que continúe el código siguiente. Pero los paneles laterales y bottom
+      // ya están posicionados; debemos retornar.
+      return;
+    }
+
+    // ── Restaurar estado del dial si veníamos de modo expandido ──
+    if(_dialCanvas._wasMini){
+      _dialCanvas.style.transition = 'width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)';
+      // Siguen las líneas normales de tamaño/posición
+    }
+    // Limpiar opacidad/pointer-events de Logro y Track al volver
+    var pLogroBack = getTop('bottom-center')[0];
+    var pTrackBack = getTop('bottom-track')[0];
+    if(pLogroBack){ pLogroBack.el.style.opacity = ''; pLogroBack.el.style.pointerEvents = ''; }
+    if(pTrackBack){ pTrackBack.el.style.opacity = ''; pTrackBack.el.style.pointerEvents = ''; }
+    // Restaurar dial al tamaño/posición normal (fuera del flujo fixed)
+    _dialCanvas.style.position   = 'relative';
+    _dialCanvas.style.left       = '';
+    _dialCanvas.style.top        = '';
+    _dialCanvas.style.zIndex     = '1';
+    _dialCanvas.style.cursor     = 'pointer';
+    _dialCanvas.style.boxShadow  = '';
+    _dialCanvas.style.borderRadius = '';
+    _dialCanvas.style.width      = 'min(760px,52vw)';
+    _dialCanvas.style.height     = 'min(760px,52vw)';
+    _dialCanvas.title            = '';
+    // Limpiar tamaño/posición forzados de paneles laterales (volverán al flujo)
+    window._hudPanels.forEach(function(hp){
+      if(hp.el === expandedEl) return;
+      // Limpiar height y minHeight forzados (en panel expandido los habíamos puesto)
+      hp.el.style.height = '';
+      hp.el.style.minHeight = '';
+    });
 
     // ══════════════════════════════════════════
     //  ZONA SUPERIOR — anchos compactos, Sim alineado al ancho del dial
@@ -1237,6 +1387,113 @@ function _crearDialOverlay(){
   document.body.appendChild(_dialOverlay);
 
   window._hudPanels = _hudPanels;
+
+  // ══════════════════════════════════════════════════════════════════════
+  //  EXPANSOR — un panel a la vez ocupa el centro (donde estaba el dial).
+  //  El dial baja a la zona inferior achicado; los 3 paneles bottom
+  //  (Misión/Logro/Nivel) se mueven a los lados para hacer espacio.
+  //  Click en el dial chico → todo regresa al estado normal.
+  //  Mecánica P-Ca: si hay otro panel expandido, se contrae al hacer
+  //  click en uno nuevo (intercambio directo).
+  // ══════════════════════════════════════════════════════════════════════
+  window._hudExpanded = null; // panel actualmente expandido (DOM element) o null
+
+  function _animarSuave(el, props){
+    // Aplica un set de propiedades CSS con transición suave.
+    // Mismo easing que los anillos del dial: cubic-bezier(.4,1.4,.5,1).
+    Object.keys(props).forEach(function(k){ el.style[k] = props[k]; });
+  }
+
+  function _hudExpand(panelEl){
+    if(!panelEl) return;
+    if(window._hudExpanded === panelEl){
+      // Click sobre el ya expandido → contraer
+      _hudCollapse();
+      return;
+    }
+    // Si ya hay otro expandido, contraerlo primero (sin animación, porque vamos
+    // a expandir el nuevo y la transición se ejecuta junto).
+    if(window._hudExpanded){
+      _hudCollapse(/*sinReposicionar=*/true);
+    }
+    // Asegurar que existe el wrapper de contenido expandido dentro del panel
+    var inner = panelEl.querySelector(':scope > [id$="-inner"]');
+    if(inner && !inner.querySelector(':scope > .hud-expanded-content')){
+      var expContent = document.createElement('div');
+      expContent.className = 'hud-expanded-content';
+      // Marcador placeholder: se reemplaza cuando lleguen los renders de Fase 2+
+      var pid = panelEl.id.replace('hud-','');
+      expContent.id = 'hud-' + pid + '-expanded';
+      expContent.innerHTML = ''+
+        '<div style="display:flex;align-items:center;justify-content:center;'+
+          'min-height:200px;color:rgba(220,224,235,0.45);font-size:12px;'+
+          'letter-spacing:.10em;text-transform:uppercase;text-align:center;'+
+          'flex-direction:column;gap:8px">'+
+          '<i class="fas fa-circle-notch fa-spin" style="font-size:18px;opacity:.7"></i>'+
+          '<span>Vista expandida — pendiente de cargar contenido</span>'+
+        '</div>';
+      // Marcar el contenido original como collapsed para que se oculte cuando expandido
+      Array.from(inner.children).forEach(function(child){
+        if(!child.classList.contains('hud-expanded-content')){
+          child.classList.add('hud-collapsed-content');
+        }
+      });
+      inner.appendChild(expContent);
+    }
+    // Marcar el panel como expandido
+    panelEl.classList.add('hud-expanded');
+    panelEl._wasSide = panelEl._side;
+    panelEl._wasOrder = panelEl._order;
+    window._hudExpanded = panelEl;
+
+    // Reposicionar todo (el reposicionador detecta hud-expanded y mueve los paneles)
+    if(typeof _reposicionarHUD === 'function') _reposicionarHUD();
+  }
+
+  function _hudCollapse(sinReposicionar){
+    if(!window._hudExpanded) return;
+    var panelEl = window._hudExpanded;
+    panelEl.classList.remove('hud-expanded');
+    window._hudExpanded = null;
+    if(!sinReposicionar && typeof _reposicionarHUD === 'function') _reposicionarHUD();
+  }
+
+  // Click en el dial cuando hay un panel expandido → colapsar.
+  // El click handler del dial original también llama a este, pero damos
+  // prioridad al colapso.
+  if(_dialCanvas){
+    _dialCanvas.addEventListener('click', function(e){
+      if(window._hudExpanded){
+        e.stopPropagation();
+        e.preventDefault();
+        _hudCollapse();
+        return false;
+      }
+    }, true); // captura para correr antes de otros listeners
+  }
+
+  // Listener delegado: clicks en .hud-h-expand expanden el panel padre
+  document.addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('.hud-h-expand');
+    if(!btn) return;
+    e.stopPropagation();
+    var panel = btn.closest('.hud-pnl');
+    if(!panel) return;
+    _hudExpand(panel);
+  });
+
+  // Listener delegado: clicks en .hud-cta-expand también expanden el panel padre (P4c)
+  document.addEventListener('click', function(e){
+    var cta = e.target.closest && e.target.closest('.hud-cta-expand');
+    if(!cta) return;
+    e.stopPropagation();
+    var panel = cta.closest('.hud-pnl');
+    if(!panel) return;
+    _hudExpand(panel);
+  });
+
+  window._hudExpand = _hudExpand;
+  window._hudCollapse = _hudCollapse;
 
   // ══════════════════════════════════════
   //  REFRESCAR ESPEJOS — incluye Nutrición y banda Sim
