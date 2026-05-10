@@ -1,5 +1,30 @@
-/* RAW Entry — Overlay v.5.100
-   TIMELINE de apertura del overlay reescrita con fases estrictas:
+/* RAW Entry — Overlay v.5.101
+   DEBUG real del bug "la animación sigue iguaita":
+   ENCONTRÉ DOS LUGARES donde _reposicionarHUD pisaba el opacity:0 de la
+   cascada y hacía a los paneles INSTANTÁNEAMENTE visibles:
+
+   1) Líneas ~1538/1541 (zona top): pUser y pStats tenían inline-style:
+        pUser.el.style.visibility='visible'; pUser.el.style.opacity='';
+      Esto se ejecuta INCONDICIONALMENTE en cada _reposicionarHUD. Cuando
+      abrirDial llamaba _reposicionarHUD para colocar paneles, USER y
+      Stats se volvían visibles al instante, ignorando el opacity:0 que
+      la cascada acababa de aplicar.
+      FIX: solo aplicar visibility/opacity si !_animatingEntry.
+
+   2) Líneas ~1446 (forEach de "regreso de modo expandido"): este código
+      se ejecuta SIEMPRE que no haya panel expandido (incluyendo la
+      apertura inicial). Limpiaba opacity de TODOS los paneles.
+      FIX: skip si _animatingEntry está activo.
+
+   Ahora la cascada respetada por _reposicionarHUD y la timeline de
+   apertura funciona como debe:
+     t=0      backdrop fade-in
+     t=300ms  aro circular pulsante (P-1b)
+     t=1100ms cascada de paneles
+     t=2900ms slots vacíos punteados (P-2b)
+     t=3300ms dial canvas completo
+     t=4800ms limpieza + vida (breathing/scan al azar)
+
      t=0      → backdrop fade-in (sin nada visible)
      t=300ms  → FASE 1: aro circular pulsante aparece (P-1b)
                 · Glow ambiental + 2 círculos SVG delineados (uno principal
@@ -1443,8 +1468,11 @@ function _crearDialOverlay(){
 
     // Limpiar height/minHeight/opacity/pointer-events forzados, pero
     // MANTENER transition para que la animación de regreso sea visible.
+    // EXCEPCIÓN: si el panel está en cascada de entrada (_animatingEntry),
+    // NO tocamos opacity/transform/transition para no romper la animación.
     window._hudPanels.forEach(function(hp){
       var el = hp.el;
+      if(el._animatingEntry) return; // cascada en curso: no tocar
       el.style.transform     = '';
       el.style.height        = '';
       el.style.minHeight     = '';
@@ -1535,11 +1563,30 @@ function _crearDialOverlay(){
       wSim = topBarTotalW - wUser - wStats;
     }
 
-    if(pUser && wUser>0){ pUser.el.style.width = wUser+'px'; pUser.el.style.visibility='visible'; pUser.el.style.opacity=''; }
-    else if(pUser){ pUser.el.style.width='0px'; pUser.el.style.opacity='0'; pUser.el.style.visibility='hidden'; }
+    if(pUser && wUser>0){
+      pUser.el.style.width = wUser+'px';
+      // Solo hacer visible si NO está en cascada de entrada
+      if(!pUser.el._animatingEntry){
+        pUser.el.style.visibility='visible';
+        pUser.el.style.opacity='';
+      }
+    } else if(pUser){
+      pUser.el.style.width='0px';
+      pUser.el.style.opacity='0';
+      pUser.el.style.visibility='hidden';
+    }
     if(pSim){ pSim.el.style.width = wSim+'px'; }
-    if(pStats && wStats>0){ pStats.el.style.width = wStats+'px'; pStats.el.style.visibility='visible'; pStats.el.style.opacity=''; }
-    else if(pStats){ pStats.el.style.width='0px'; pStats.el.style.opacity='0'; pStats.el.style.visibility='hidden'; }
+    if(pStats && wStats>0){
+      pStats.el.style.width = wStats+'px';
+      if(!pStats.el._animatingEntry){
+        pStats.el.style.visibility='visible';
+        pStats.el.style.opacity='';
+      }
+    } else if(pStats){
+      pStats.el.style.width='0px';
+      pStats.el.style.opacity='0';
+      pStats.el.style.visibility='hidden';
+    }
 
     // Medir altura natural (Sim será la más alta por sus 2 renglones)
     var topMaxH = 0;
