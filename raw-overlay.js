@@ -1,37 +1,42 @@
-/* RAW Entry — Overlay v.5.120
-   FIX adicional para el bug "Nueva rompe layout":
-   
-   ── 3 cambios coordinados ──
+/* RAW Entry — Overlay v.5.121
+   FIX CAUSA RAÍZ del bug del botón "Nueva" — paneles duplicados en DOM.
 
-   1) RE-REPOSICIONAR DESPUÉS DE _refrescarEspejos
-      _refrescarEspejos() rellena los paneles con datos reales
-      (Patrimonio BBVA/BEATS, Bitácora con pensamientos/registros, USER
-      con XP actual). Eso cambia las ALTURAS de los paneles cuando los
-      rows se llenan con contenido. v5.119 reposicionaba después del
-      render del Sim banda pero NO después de _refrescarEspejos, así que
-      las medidas se basaban en paneles vacíos. Resultado: Bitácora
-      crecía y se metía sobre la fila bottom (Misión quedaba oculta
-      atrás de Bitácora).
-      Fix: encadenar setTimeout(50ms) → _refrescarEspejos → doble rAF →
-      _reposicionarHUD para usar las alturas reales.
+   ── Diagnóstico ──
+   raw-core.js (código legacy) y raw-overlay.js crean AMBOS paneles con
+   los MISMOS IDs: hud-user, hud-stats, hud-sim-band, hud-patrimonio,
+   etc., y los appendean a document.body. Como raw-core se carga antes
+   que raw-overlay, sus paneles existen primero en el DOM.
 
-   2) EXPONER abrirDial/cerrarDial/toggleEntradaDropdown A window
-      Hay duplicados de estas funciones en raw-core.js (legacy) y en
-      raw-overlay.js (versión nueva con cascada). Dependíamos del orden
-      de carga para que la versión overlay sobreescribiera la legacy.
-      Si por algún cambio de carga eso fallara, "Nueva" llamaría a la
-      versión legacy y rompería el overlay. Asignamos explícitamente
-      window.abrirDial = abrirDial (etc.) para garantizar el binding.
+   Cuando raw-overlay ejecuta:
+       document.getElementById('hud-user-inner').innerHTML = ...
+   getElementById retorna el PRIMER elemento encontrado (el huérfano de
+   raw-core), NO el que acaba de crear raw-overlay. Resultado:
+     · El panel del overlay queda con su inner VACÍO
+     · El panel huérfano de raw-core queda con HTML legacy
+     · Cuando el overlay se abre, las posiciones se calculan basadas en
+       paneles vacíos (alturas chicas), pero VISUALMENTE se ven los
+       huérfanos (con HTML antiguo)
+     · Misión, Logro, Nivel etc. quedan invisibles o mal posicionados
+       porque el overlay opera sobre los paneles VACÍOS
 
-   3) CACHE BUST: ?v=5106 → ?v=5120
-      El parámetro de versión en index.html estaba congelado en v5.106
-      desde hace varias versiones. Sin actualizarlo, el navegador podía
-      servir versiones cacheadas de raw-overlay.js sin los fixes
-      recientes. Ahora cada commit incrementa el query string.
+   Este bug existió desde la introducción de raw-core como código
+   paralelo, pero se manifestaba más al abrir el overlay desde el botón
+   "Nueva" porque allí la cascada y los timings exponen la inconsistencia.
+
+   ── Fix ──
+   Antes de crear los paneles del overlay, eliminar TODOS los elementos
+   del DOM que tengan los IDs huérfanos. La variable local _pUser etc.
+   de raw-core sigue referenciándolos pero ya no están en el DOM. Cuando
+   raw-overlay luego asigna window._hudPanels con SUS paneles, el sistema
+   queda consistente: un solo elemento por ID, todos creados por overlay.
+
+   ── Heredado v5.120 ──
+   _refrescarEspejos → re-reposicionar (paneles crecen con datos reales).
+   window.abrirDial/cerrarDial expuestos. Cache bust.
 
    ── Heredado v5.119 ──
-   FIX A: cerrarDial setTimeout(290ms) ya no pisa estado si reabriste.
-   FIX B: re-_reposicionarHUD con doble rAF después del render Sim.
+   cerrarDial setTimeout no pisa estado si reabriste.
+   Re-reposicionar después del render Sim banda.
 
    ── Heredado v5.118 ──
    Sub-ring se anima al desaparecer.
@@ -1129,6 +1134,34 @@ function _crearDialOverlay(){
     b.addEventListener('click',function(e){ e.stopPropagation(); cerrarDial(); if(typeof window[fn]==='function') window[fn](); });
     return b;
   }
+
+  // ══════════════════════════════════════
+  //  CLEANUP: eliminar paneles huérfanos creados por raw-core.js
+  // ══════════════════════════════════════
+  // raw-core.js es código LEGACY que también crea paneles con los mismos
+  // IDs (hud-user, hud-stats, hud-sim-band, hud-patrimonio, etc.) y los
+  // appendea a document.body. Como raw-core se carga ANTES que raw-overlay,
+  // sus paneles existen primero en el DOM. Cuando raw-overlay luego corre
+  // document.getElementById('hud-user-inner').innerHTML = ..., getElementById
+  // retorna el PRIMERO encontrado (el huérfano de raw-core), no el del
+  // overlay. Resultado: el panel del overlay queda con HTML vacío y se ven
+  // contenidos viejos en los paneles huérfanos.
+  // Fix: eliminar los huérfanos antes de crear los nuevos. La variable local
+  // _pUser de raw-core sigue referenciándolos pero ya no están en el DOM, así
+  // que sus asignaciones de style no afectan. window._hudPanels se sobreescribe
+  // más adelante con los paneles del overlay.
+  var _HUERFANOS_IDS = [
+    'hud-user','hud-sim-band','hud-stats',
+    'hud-patrimonio','hud-necesidades','hud-bitacora',
+    'hud-financiero','hud-activity','hud-fijos','hud-variables',
+    'hud-track','hud-mision','hud-logro','hud-nivel'
+  ];
+  _HUERFANOS_IDS.forEach(function(id){
+    // Puede haber MÁS de un elemento con el mismo id (raw-core + raw-overlay
+    // en una sesión donde se cargó dos veces). Removerlos TODOS.
+    var existentes = document.querySelectorAll('#'+id);
+    existentes.forEach(function(el){ el.remove(); });
+  });
 
   // ══════════════════════════════════════
   //  ZONA SUPERIOR
@@ -4274,6 +4307,10 @@ function _confirmarEditarId(){
 }
 
 function toggleEntradaDropdown(){
+  // v5.121 DIAG: marcar que esta apertura viene del botón "Nueva" para
+  // poder loggear el flujo y comparar con apertura por DOMContentLoaded.
+  window._dialOpenedVia = 'nueva';
+  window._dialDiagStart = performance.now();
   if(_dialVisible) cerrarDial(); else abrirDial();
 }
 
