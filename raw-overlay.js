@@ -1,26 +1,24 @@
-/* RAW Entry — Overlay v.5.109
-   Cambios desde v5.108:
-   - FIX BUG "todo encimado, paneles de la columna interna no se ven, zoom
-     out lo descompone todo y no se recupera". Causa raíz: positionCol
-     usaba la altura natural (scrollHeight) de cada panel para calcular el
-     totalH de la columna, y cuando excedía colVAvail solo reducía el gap
-     entre ellos. Si Patrimonio mide 480px y Bitácora mide 280px,
-     suma=760px y colVAvail=648px: el gap reducido (max 16px) no compensa
-     los 112px de exceso, así que Bitácora aterrizaba debajo del track
-     (fuera de zona) y se veía cortada/encimada. Con zoom out vH crecía,
-     los paneles bottom se posicionaban más abajo, colVAvail crecía pero
-     el caché de scrollHeight aplicado por inline maxHeight de pasadas
-     anteriores se auto-perpetuaba.
-   - FIX: positionCol ahora REPARTE colVAvail equitativamente entre los
-     paneles de la columna. Cada panel recibe perPanelMaxH=(colVAvail-
-     gaps)/n como techo. Si su natural es menor, se respeta el natural.
-     Si excede, se trunca con overflowY:auto y maxHeight inline. Garantía:
-     las columnas JAMÁS rebasan su zona disponible.
-   - positionCol limpia maxHeight inline antes de medir natural.
-   - _hudCollapse y rama de regreso limpian también maxHeight y overflowY.
-   - resize event: además de window.resize, escuchamos visualViewport.
-     resize con debounce de 80ms. Cubre casos donde el zoom no dispara
-     window.resize de forma garantizada.
+/* RAW Entry — Overlay v.5.110
+   Cambios desde v5.109:
+   - QUITAR SCROLL VERTICAL en las cards laterales. v5.109 había agregado
+     maxHeight + overflowY:auto para evitar el encimado, pero eso introdujo
+     scroll interno feo en Patrimonio/Necesidades/Bitácora/Financiero. El
+     usuario prefiere ver el contenido natural completo aunque dos paneles
+     de la misma columna se solapen ligeramente con el track.
+     Ahora: positionCol limpia maxHeight/overflowY/height en cada pasada y
+     deja que cada panel tome su altura natural. Si la suma excede colVAvail,
+     se reduce el gap entre paneles (min 8px) para minimizar overflow.
+   - FIX zoom in/out → 100% no regresa al estado original. Causa: el inner
+     del panel top retenía minHeight de pasadas anteriores, y scrollHeight
+     en pasadas siguientes lo medía considerando ese valor, auto-
+     perpetuándolo. Fix: limpiar inner.style.minHeight ANTES de medir
+     topMaxH (no solo el panel). Garantiza que cada _reposicionarHUD mida
+     el natural real, no el residual.
+
+   ── Heredado v5.109 ──
+   FIX BUG "todo encimado, paneles de la columna interna no se ven, zoom
+   out lo descompone". Causa: positionCol usaba altura natural y solo
+   reducía gap, insuficiente para columnas con paneles altos.
 
    ── Heredado v5.108 ──
    Fix DnD: estado consistente con _normalizarOrders() después de cada drop,
@@ -1795,7 +1793,13 @@ function _crearDialOverlay(){
     var topMaxH = 0;
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
+        // CRÍTICO para zoom: limpiar minHeight del panel Y del inner ANTES
+        // de medir scrollHeight. Si no, valores de pasadas anteriores se
+        // auto-perpetúan y el layout no regresa al estado limpio al volver
+        // a zoom 100%.
         hp.el.style.minHeight = '';
+        var innerM = hp.el.querySelector(':scope > [id$="-inner"]');
+        if(innerM){ innerM.style.minHeight = ''; }
         var h = hp.el.scrollHeight || hp.el.offsetHeight || 90;
         if(h>topMaxH) topMaxH = h;
       }
@@ -1959,44 +1963,39 @@ function _crearDialOverlay(){
         hp.el.style.width = w + 'px';
         hp.el.style.left  = x + 'px';
         hp.el.style.top   = '-9999px';
+        // Limpieza CRÍTICA para que el zoom in/out vuelva siempre al estado limpio:
+        // borrar maxHeight/overflowY/height de pasadas anteriores antes de medir.
+        hp.el.style.maxHeight = '';
+        hp.el.style.overflowY = '';
+        hp.el.style.height    = '';
         // Limpiar transform SOLO si no está animando entrada
         if(!hp.el._animatingEntry) hp.el.style.transform = '';
       });
-      // FIX v5.109: en lugar de medir altura natural (que puede exceder
-      // colVAvail y romper el layout), repartir colVAvail equitativamente
-      // entre los paneles de la columna. Cada panel recibe una altura máxima
-      // calculada de: (colVAvail - gaps_totales) / n_paneles.
-      // Esto GARANTIZA que las columnas nunca rebasen su zona y que paneles
-      // de la misma columna queden visibles uno arriba del otro sin pisarse.
-      var n = panels.length;
-      var gapsCount = n - 1;
-      var totalGaps = gapsCount * GAP;
-      var perPanelMaxH = Math.floor((colVAvail - totalGaps) / n);
-      // Mínimo razonable: 120px (para que un header + 2 rows sea legible)
-      if(perPanelMaxH < 120) perPanelMaxH = 120;
-
-      // Medir alturas naturales para usar lo mínimo entre natural y maxH.
-      // Si un panel mide 240 de natural pero perPanelMaxH=380, usamos 240
-      // (no estirar más allá del contenido). Si mide 520 y perPanelMaxH=380,
-      // usamos 380 y dejamos que el contenido haga overflow:hidden con clip.
+      // Medir alturas naturales SIN forzar maxHeight (sin scroll vertical).
+      // Si la suma excede colVAvail, los paneles se extienden hacia abajo
+      // libremente y pueden solaparse con la zona del track. Es preferible
+      // a tener scroll interno en cada panel, que se siente mal.
       var heights = panels.map(function(hp){
-        // Quitar maxHeight temporal por si quedó de una pasada anterior
-        hp.el.style.maxHeight = '';
-        var natural = hp.el.scrollHeight || hp.el.offsetHeight || 200;
-        return Math.min(natural, perPanelMaxH);
+        return hp.el.scrollHeight || hp.el.offsetHeight || 200;
       });
+      var totalH = heights.reduce(function(s,h){ return s+h+GAP; },0) - GAP;
+
+      // Gap entre paneles: GAP normal. Si no cabe, reducir un poco
+      // (sin llegar a 0) para minimizar el overflow.
+      var gapBetween = GAP;
+      if(totalH > colVAvail && panels.length > 1){
+        var extra = totalH - colVAvail;
+        var gapsCount = panels.length - 1;
+        gapBetween = Math.max(8, GAP - Math.ceil(extra / gapsCount));
+      }
 
       var curY = colTopY;
       var chamfer = isLeft ? chamferLeft : chamferRight;
       panels.forEach(function(hp, idx){
         var h = heights[idx];
         hp.el.style.top      = Math.round(curY) + 'px';
-        hp.el.style.maxHeight = h + 'px';
-        // Si el natural excede perPanelMaxH, el panel se trunca con scroll
-        // interno. Si es menor, se respeta el natural.
-        hp.el.style.overflowY = (hp.el.scrollHeight > h) ? 'auto' : 'visible';
         hp.el.style.clipPath = chamfer;
-        curY += h + GAP;
+        curY += h + gapBetween;
       });
     }
 
