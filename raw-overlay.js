@@ -1,46 +1,32 @@
-/* RAW Entry — Overlay v.5.116
-   Reestructuración mayor del layout: top 2 zonas + bottom 4 cards.
+/* RAW Entry — Overlay v.5.117
+   Hacer el dial más grande compactando las fila top y bottom.
 
-   ── TOP — 2 zonas únicamente ──
-   · Zona 1 (esquina sup izq): USER+Stats FUSIONADOS dentro de _pUser
-     (2 renglones: USER ribbon arriba + Energía/Racha/Créditos abajo,
-     separados por una línea fina). Ancho = COL_W (col-A).
-   · Zona 2 (resto): Sim banda extendido — desde el fin de col-A hasta
-     el fin de col-D. Mucho más ancho que antes; las 9 tabs y 9 needs
-     quedan más holgadas.
-   · _pStats permanece en el DOM pero oculto (width=0, opacity=0,
-     pointer-events=none). Mantiene compatibilidad con DnD.
+   ── Compactaciones ──
+   1) Sim banda — header inline FUSIONADO con grid de 9 needs en la
+      misma fila horizontal (antes eran 2 sub-renglones apilados).
+      Nueva clase .hud-sim-row-compact con flex horizontal. El header
+      ("Estado del Sim · 9 needs") queda a la izquierda separado por
+      una línea fina, y las 9 needs ocupan el resto.
+      Altura: ~170 → ~110 (-60px)
+   2) Megatabs — padding reducido 6px→4px arriba/abajo, gap 3→2, ico
+      12px→11px. Altura: ~50 → ~38 (-12px)
+   3) Bottom cards — .hud-card padding 13px→8px, ico 42→34, fuentes
+      11→10.5, bar 6→5.
+      Altura: ~80 → ~65 (-15px)
 
-   ── BOTTOM — 4 cards en UNA SOLA fila ──
-   Track horizontal ELIMINADO. _pTrack reutilizado como card "Nivel
-   Actual" en posición 'bottom-2nd' (col-B). Las 4 cards bottom alineadas
-   con las 4 columnas verticales:
-   · Misión Diaria (col-A)
-   · Nivel Actual (col-B) — antes era el track horizontal
-   · Logro Reciente (col-C)
-   · Nivel Siguiente (col-D)
-   El contenido del Nivel Actual usa la clase .hud-card normal con
-   .hud-card-ico-hex (hexagonal) y stops inline (.hud-track-stops-inline).
+   ── Recálculo _calcDialSize ──
+   RESERVA_TOP: 192 → 132 (Sim banda más bajo)
+   RESERVA_BOT: 102 → 87  (cards más bajas)
+   Resultados:
+   · vH=960  → dial 696 (antes 564, +132)
+   · vH=1080 → dial 828→cap 836 (antes 696)
+   · vH=1350 → dial 836 cap
 
-   ── Beneficio para el dial ──
-   _calcDialSize ahora considera DOS cotas (top y bot). Reserva bot baja
-   de 174 a 102 (sin track). Aún así el cuello sigue siendo el top porque
-   Sim banda mide ~170. Resultados:
-   · vH=960  → dial 564
-   · vH=1080 → dial 696
-   · vH=1350 → dial 836 (cap)
-
-   ── Compatibilidad ──
-   ALLOWED_SIDES en raw-overlay-dnd.js incluye 'bottom-2nd'. Modo expandido
-   actualizado: pTrackEx lookup usa 'bottom-2nd'. Reset opacity en regreso
-   incluye 'bottom-2nd'. Cascada entry incluye transform para 'bottom-2nd'.
+   ── Heredado v5.116 ──
+   Top 2 zonas: USER+Stats fusionados en col-A, Sim extendido hasta col-D.
+   Bottom 4 cards en una sola fila: Misión / Nivel Actual / Logro / Siguiente.
 
    ── Heredado v5.115 ──
-   Primer intento ribbon: USER y Stats compactos con centrado vertical
-   contra Sim. Track aún horizontal. COL_W con escalones dinámicos
-   340/300/270/240/210.
-
-   ── Heredado v5.114 ──
    Dial dinámico responsivo con _calcDialSize().
 
    ── Heredado v5.113 ──
@@ -926,12 +912,12 @@ function _crearDialOverlay(){
       '.hud-user-xp{font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);text-align:right;font-family:JetBrains Mono,monospace}',
       // sim panel band
       // ── MEGA-CARD TOP: tabs + contenido ──
-      '.hud-megatabs{display:flex;align-items:stretch;gap:4px;padding:6px 10px 0;border-bottom:1px solid rgba(255,255,255,0.06)}',
-      '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;'+
-        'padding:6px 8px;border-radius:8px 8px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
+      '.hud-megatabs{display:flex;align-items:stretch;gap:4px;padding:4px 8px 0;border-bottom:1px solid rgba(255,255,255,0.06)}',
+      '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'+
+        'padding:4px 6px;border-radius:8px 8px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
         'cursor:pointer;font-family:inherit;font-weight:800;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;'+
         'color:rgba(220,224,235,0.55);transition:all .18s;flex:1;min-width:0;position:relative;top:1px}',
-      '.hud-megatab i{font-size:12px;color:rgba(220,224,235,0.65);transition:color .18s}',
+      '.hud-megatab i{font-size:11px;color:rgba(220,224,235,0.65);transition:color .18s}',
       '.hud-megatab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
       '.hud-megatab:hover{background:rgba(255,255,255,0.04);color:rgba(220,224,235,0.85)}',
       '.hud-megatab:hover i{color:var(--tc)}',
@@ -939,18 +925,20 @@ function _crearDialOverlay(){
         'box-shadow:0 -2px 12px var(--tc-glow),inset 0 -2px 0 var(--tc);color:var(--tc);text-shadow:0 0 6px var(--tc-glow)}',
       '.hud-megatab.active i{color:var(--tc);filter:drop-shadow(0 0 4px var(--tc))}',
       '.hud-sim-content{padding:0}',
-      '.hud-sim-h-inline{display:flex;align-items:center;gap:8px;padding:6px 14px 4px}',
-      '.hud-sim-h-inline i{font-size:13px;flex-shrink:0}',
+      // v5.117: header inline + grid en misma fila horizontal
+      '.hud-sim-row-compact{display:flex;align-items:center;gap:10px;padding:4px 12px 4px}',
+      '.hud-sim-h-inline{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0;border-right:1px solid rgba(255,255,255,0.08);padding-right:10px;min-height:32px}',
+      '.hud-sim-h-inline i{font-size:12px;flex-shrink:0}',
       '.hud-sim-h-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
-      '.hud-sim-h-txt .t{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;text-shadow:0 0 8px rgba(167,139,250,0.40)}',
-      '.hud-sim-h-txt .meta{font-size:8.5px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
+      '.hud-sim-h-txt .t{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 0 8px rgba(167,139,250,0.40);white-space:nowrap}',
+      '.hud-sim-h-txt .meta{font-size:7.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.45);white-space:nowrap}',
       // ── BANDA SIM: 9 columnas en UNA SOLA fila horizontal ──
       '.hud-sim-h{display:flex;align-items:center;gap:10px;padding:13px 18px 8px}',
       '.hud-sim-h .ico{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
       '.hud-sim-h .ico i{font-size:11px}',
       '.hud-sim-h .t{font-size:12px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
       '.hud-sim-h .meta{font-size:9px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.40)}',
-      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 10px;padding:2px 14px 8px}',
+      '.hud-sim-grid{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:0 10px;padding:0;flex:1;min-width:0}',
       // stats panel
       '.hud-stats-row{display:flex;align-items:stretch;justify-content:space-around;gap:4px;padding:8px 10px;height:100%;box-sizing:border-box}',
       '.hud-stats-cell{flex:1;display:flex;align-items:center;gap:8px;min-width:0;padding:0 3px}',
@@ -982,17 +970,18 @@ function _crearDialOverlay(){
       '.hud-stats-l-sm{font-size:7.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.50);white-space:nowrap;flex-shrink:0}',
       '.hud-stats-sep{width:1px;height:18px;background:rgba(255,255,255,0.10);flex-shrink:0}',
       // bottom cards (mision, logro, nivel)
-      '.hud-card{display:flex;align-items:center;gap:12px;padding:13px 16px}',
-      '.hud-card-ico{width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px}',
-      '.hud-card-ico-hex{width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)}',
-      '.hud-card-ico-hex span{font-size:15px;font-weight:800;color:#fff}',
-      '.hud-card-ico i{font-size:16px}',
-      '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}',
-      '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px}',
-      '.hud-card-l{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}',
-      '.hud-card-r{font-size:11px;font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap}',
-      '.hud-card-sub{font-size:11px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-card-bar{height:6px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 2px rgba(0,0,0,0.40)}',
+      // v5.117: bottom cards compactas (padding 13px→9px, ico 42→34)
+      '.hud-card{display:flex;align-items:center;gap:10px;padding:8px 12px}',
+      '.hud-card-ico{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:9px}',
+      '.hud-card-ico-hex{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)}',
+      '.hud-card-ico-hex span{font-size:13px;font-weight:800;color:#fff}',
+      '.hud-card-ico i{font-size:14px}',
+      '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}',
+      '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:6px}',
+      '.hud-card-l{font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}',
+      '.hud-card-r{font-size:10.5px;font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap}',
+      '.hud-card-sub{font-size:10.5px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-card-bar{height:5px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 2px rgba(0,0,0,0.40)}',
       '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease;min-width:1px}',
       '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       // track
@@ -1215,15 +1204,18 @@ function _crearDialOverlay(){
       }).join('')+
     '</div>'+
     // Renglón 2: contenido del tab activo (por defecto Sim)
+    // v5.117: header inline + needs grid en MISMA fila horizontal para reducir altura
     '<div class="hud-sim-content">'+
-      '<div class="hud-sim-h-inline">'+
-        '<i class="fas fa-heart-pulse" style="color:#A78BFA;filter:drop-shadow(0 0 4px '+_rgba('#A78BFA',0.55)+')"></i>'+
-        '<div class="hud-sim-h-txt">'+
-          '<span class="t" style="color:#A78BFA">Estado del Sim</span>'+
-          '<span class="meta">9 needs activos</span>'+
+      '<div class="hud-sim-row-compact">'+
+        '<div class="hud-sim-h-inline">'+
+          '<i class="fas fa-heart-pulse" style="color:#A78BFA;filter:drop-shadow(0 0 4px '+_rgba('#A78BFA',0.55)+')"></i>'+
+          '<div class="hud-sim-h-txt">'+
+            '<span class="t" style="color:#A78BFA">Estado del Sim</span>'+
+            '<span class="meta">9 needs</span>'+
+          '</div>'+
         '</div>'+
+        '<div id="hud-sim-band-grid" class="hud-sim-grid"></div>'+
       '</div>'+
-      '<div id="hud-sim-band-grid" class="hud-sim-grid"></div>'+
     '</div>';
   if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
 
@@ -1532,18 +1524,20 @@ function _crearDialOverlay(){
   ];
 
   // ── Calcular tamaño dinámico del dial ──
-  // En v5.116 el track se eliminó. La fila bottom solo tiene 4 cards
-  // (~80px alto). Esto libera ~72px de espacio vertical.
-  // El dial respeta DOS cotas verticales:
-  //   1) Sub-ring no se mete en la fila top (USER stack + Sim banda).
-  //   2) Sub-ring no se mete en la fila bottom (4 cards).
-  // Ambas son: dial_radio <= (vH/2 - reserva - margen) / 0.913
+  // v5.117: Sim banda compactado (header inline con grid en misma fila)
+  // y cards bottom compactas (padding 13→8, ico 42→34).
+  //   RESERVA_TOP = topPad(22) + Sim banda compactada (110) = 132
+  //   RESERVA_BOT = botPad(22) + card compacta (65)         = 87
+  // Resultados:
+  //   vH=960  → radio = (480-132-30)/0.913 = 348 → diám 696
+  //   vH=1080 → radio = (540-132-30)/0.913 = 414 → diám 828 → cap 836
+  //   vH=1350 → cap 836
   function _calcDialSize(){
     var DIAL_MAX = 836;
     var SR_RATIO = 0.913;
     var MARGEN = 30;
-    var RESERVA_TOP = 192; // topPad(22) + altura Sim banda estimada (170)
-    var RESERVA_BOT = 102; // botPad(22) + altura card bottom estimada (80)
+    var RESERVA_TOP = 132;
+    var RESERVA_BOT = 87;
     var vW = window.innerWidth;
     var vH = window.innerHeight;
     var radioMaxTop = (vH / 2 - RESERVA_TOP - MARGEN) / SR_RATIO;
