@@ -1,34 +1,44 @@
-/* RAW Entry — Overlay v.5.121
-   FIX CAUSA RAÍZ del bug del botón "Nueva" — paneles duplicados en DOM.
+/* RAW Entry — Overlay v.5.122
+   Apertura RÁPIDA para +Nueva + fix de scroll vertical + posicionamiento.
 
-   ── Diagnóstico ──
-   raw-core.js (código legacy) y raw-overlay.js crean AMBOS paneles con
-   los MISMOS IDs: hud-user, hud-stats, hud-sim-band, hud-patrimonio,
-   etc., y los appendean a document.body. Como raw-core se carga antes
-   que raw-overlay, sus paneles existen primero en el DOM.
+   ── 3 cambios coordinados ──
 
-   Cuando raw-overlay ejecuta:
-       document.getElementById('hud-user-inner').innerHTML = ...
-   getElementById retorna el PRIMER elemento encontrado (el huérfano de
-   raw-core), NO el que acaba de crear raw-overlay. Resultado:
-     · El panel del overlay queda con su inner VACÍO
-     · El panel huérfano de raw-core queda con HTML legacy
-     · Cuando el overlay se abre, las posiciones se calculan basadas en
-       paneles vacíos (alturas chicas), pero VISUALMENTE se ven los
-       huérfanos (con HTML antiguo)
-     · Misión, Logro, Nivel etc. quedan invisibles o mal posicionados
-       porque el overlay opera sobre los paneles VACÍOS
+   1) MODO APERTURA RÁPIDA desde +Nueva
+      toggleEntradaDropdown ahora setea window._modoAperturaRapida=true.
+      En abrirDial, si la flag está activa:
+        · Glow + aro aparecen al instante (fade 700ms)
+        · Todas las cards aparecen JUNTAS (fade 700ms, sin translate)
+        · Slots vacíos se construyen a 750ms
+        · Dial aparece a 800ms con fade lento (3200ms, igual que normal)
+        · Limpieza a 4200ms (vs 11200ms en modo cascada)
+      Total: ~4s en lugar de ~11s.
+      DOMContentLoaded NO setea la flag, así que la carga inicial sigue
+      con cascada larga.
 
-   Este bug existió desde la introducción de raw-core como código
-   paralelo, pero se manifestaba más al abrir el overlay desde el botón
-   "Nueva" porque allí la cascada y los timings exponen la inconsistencia.
+   2) ORDEN SÍNCRONO DE PRE-CARGAS (eliminamos múltiples setTimeout)
+      Antes había 6 llamadas dispersas a _reposicionarHUD en abrirDial,
+      algunas dentro de setTimeout(50ms) + doble rAF. Eso causaba que
+      _reposicionarHUD corriera con diferentes estados (algunas con
+      Sim vacío, otras con datos). Resultados intermedios desfasaban
+      las cards (scrollbar temporal, posiciones empujadas).
+      Ahora síncrono:
+        1) renderSimsBandSimsStyle + renderSimsNeeds
+        2) _refrescarEspejos (datos en DOM)
+        3) Doble rAF → UN solo _reposicionarHUD (mide tras paint)
+        4) _iniciarFaseAparicion (visibilidad cards/dial)
+      La fase de aparición visual (rápida o cascada) está envuelta en
+      una función anidada que se llama DESPUÉS del posicionamiento.
+      Garantía: cuando los paneles se hacen visibles, ya están en su
+      lugar correcto.
 
-   ── Fix ──
-   Antes de crear los paneles del overlay, eliminar TODOS los elementos
-   del DOM que tengan los IDs huérfanos. La variable local _pUser etc.
-   de raw-core sigue referenciándolos pero ya no están en el DOM. Cuando
-   raw-overlay luego asigna window._hudPanels con SUS paneles, el sistema
-   queda consistente: un solo elemento por ID, todos creados por overlay.
+   3) BLOQUEO DE OVERFLOW DEL BODY DURANTE APERTURA
+      Mientras _reposicionarHUD corre con paneles invisibles, sus
+      inline left/top temporales podían exceder el viewport y aparecer
+      scrollbar. Ahora document.body.style.overflow='hidden' durante el
+      primer pase y se restaura 100ms después.
+
+   ── Heredado v5.121 ──
+   Eliminar paneles huérfanos creados por raw-core (mismo ID).
 
    ── Heredado v5.120 ──
    _refrescarEspejos → re-reposicionar (paneles crecen con datos reales).
@@ -4307,10 +4317,12 @@ function _confirmarEditarId(){
 }
 
 function toggleEntradaDropdown(){
-  // v5.121 DIAG: marcar que esta apertura viene del botón "Nueva" para
-  // poder loggear el flujo y comparar con apertura por DOMContentLoaded.
-  window._dialOpenedVia = 'nueva';
-  window._dialDiagStart = performance.now();
+  // v5.122: +Nueva activa modo de apertura RÁPIDA del overlay.
+  // En lugar de la cascada larga (11.2s) que usa DOMContentLoaded, en
+  // +Nueva queremos solo 2 fases:
+  //   1) Todas las cards aparecen de golpe con fade suave (~700ms)
+  //   2) Dial aparece después con su fade existente (3200ms)
+  window._modoAperturaRapida = true;
   if(_dialVisible) cerrarDial(); else abrirDial();
 }
 
@@ -4432,37 +4444,114 @@ function abrirDial(){
     _dialOverlay.style.opacity = '1';
   });
 
-  // Reposicionar antes de que aparezcan las cosas (para que cuando aparezcan
-  // ya estén en sus coordenadas correctas)
-  if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
-  // v5.120: _refrescarEspejos rellena los paneles con datos (Patrimonio,
-  // Bitácora, USER XP, etc.) y eso cambia las alturas reales. Hay que
-  // reposicionar DESPUÉS de que esos datos están en el DOM. Encadenamos:
-  //   t+50ms  → _refrescarEspejos (datos)
-  //   t+120ms → _reposicionarHUD (medir con datos nuevos)
-  if(typeof window._refrescarEspejos==='function'){
-    setTimeout(function(){
-      window._refrescarEspejos();
-      // Doble rAF para que el navegador haya pintado los datos antes de medir
-      requestAnimationFrame(function(){
-        requestAnimationFrame(function(){
-          if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
-        });
-      });
-    }, 50);
-  }
+  // v5.122: ORDEN SÍNCRONO de pre-cargas (sin múltiples setTimeout):
+  //   1) Renderear Sim banda y needs (necesita estar pintado para medir)
+  //   2) _refrescarEspejos: rellenar paneles con datos reales. Cambia las
+  //      alturas naturales (Bitácora pasa de ~120px vacía a ~280px con
+  //      pensamientos/salud/entrenamiento).
+  //   3) UN SOLO _reposicionarHUD con doble rAF (esperar paint del browser
+  //      antes de medir scrollHeight).
+  // También bloqueamos overflow del body para evitar scrollbar temporal
+  // mientras las posiciones se calculan en el primer pase.
   if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
   if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
-  // v5.119: re-reposicionar DESPUÉS del render del Sim banda. Sin esto, el
-  // primer _reposicionarHUD midió scrollHeight del Sim antes de que se
-  // pintaran las 9 needs, dejando posiciones equivocadas hasta T_CLEANUP
-  // (11s). Al hacer click en "Nueva" cuando se viene del anverso, eso
-  // resultaba en paneles encimados/mal posicionados toda la apertura.
+  if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
+  var _bodyOverflowPrev = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  // Flag para que la fase de aparición visual espere al primer
+  // posicionamiento correcto antes de mostrar nada.
+  var _faseAparicionLista = false;
   requestAnimationFrame(function(){
     requestAnimationFrame(function(){
       if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+      _faseAparicionLista = true;
+      // Restaurar overflow después del primer pase de posicionamiento
+      setTimeout(function(){
+        document.body.style.overflow = _bodyOverflowPrev;
+      }, 100);
+      // Disparar fase de aparición visual (modo rápido o cascada según flag)
+      if(typeof _iniciarFaseAparicion === 'function') _iniciarFaseAparicion();
     });
   });
+
+  // ════════════════════════════════════════════════════════════════
+  // v5.122: FASE DE APARICIÓN VISUAL
+  // Se ejecuta DESPUÉS de que _reposicionarHUD posicionó todos los
+  // paneles correctamente (dentro del doble-rAF arriba). Esto garantiza
+  // que cuando los paneles se hacen visibles, sus posiciones ya están
+  // correctas y no hay "jump" visual.
+  // Dos modos:
+  //   - _modoAperturaRapida=true (desde +Nueva): 2 fases simples
+  //   - normal (DOMContentLoaded): cascada larga de 11s
+  // ════════════════════════════════════════════════════════════════
+  function _iniciarFaseAparicion(){
+
+  // ════════════════════════════════════════════════════════════════
+  // APERTURA RÁPIDA desde +Nueva (modo simplificado)
+  // ════════════════════════════════════════════════════════════════
+  if(window._modoAperturaRapida && window._hudPanels && window.innerWidth>=900){
+    window._modoAperturaRapida = false; // resetear flag (consumido)
+
+    // FASE 1 RÁPIDA: glow + aro aparecen al instante con fade
+    if(glowEl){
+      glowEl.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1)';
+      glowEl.style.opacity = '1';
+    }
+    if(ringEl){
+      ringEl.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1), transform 700ms cubic-bezier(.16,1,.3,1)';
+      ringEl.style.opacity = '0.18'; // misma opacidad final que en modo normal
+      ringEl.style.transform = '';
+    }
+
+    // FASE 2 RÁPIDA: todas las cards aparecen al MISMO TIEMPO con fade suave.
+    // No hay translate de origen ni filter blur (las animaciones de cascada
+    // que dependen de side). Solo opacity + visibility.
+    window._hudPanels.forEach(function(hp){
+      if(!hp.el) return;
+      hp.el.style.transition = 'opacity 700ms cubic-bezier(.16,1,.3,1)';
+      hp.el.style.transform = '';
+      hp.el.style.filter = '';
+      hp.el.style.visibility = 'visible';
+      requestAnimationFrame(function(){
+        hp.el.style.opacity = '1';
+      });
+    });
+
+    // FASE 2b: slots vacíos del DnD reconstruir (sin esperar cascada)
+    window._hudCascadaEnCurso = false;
+    setTimeout(function(){
+      if(window._overlayDnd && typeof window._overlayDnd.buildGhostSlots === 'function'){
+        window._overlayDnd.buildGhostSlots();
+      }
+    }, 750);
+
+    // FASE 3: DIAL aparece con su fade lento normal (3200ms) después de
+    // que las cards estén ya visibles (delay 800ms para que se vea el orden)
+    setTimeout(function(){
+      if(_dialCanvas){
+        _dialCanvas.style.transition = 'opacity 3200ms cubic-bezier(.16,1,.3,1),transform 3400ms cubic-bezier(.16,1,.3,1)';
+        _dialCanvas.style.opacity = '1';
+        _dialCanvas.style.transform = '';
+      }
+    }, 800);
+
+    // Limpieza final: quitar _animatingEntry y aplicar vida a los paneles
+    setTimeout(function(){
+      if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
+      if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+      if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+      if(window._hudPanels){
+        window._hudPanels.forEach(function(hp){
+          hp.el.style.transition = '';
+          hp.el._animatingEntry = false;
+        });
+      }
+      if(_dialCanvas) _dialCanvas.style.transition = '';
+      if(typeof _aplicarVidaPaneles==='function') _aplicarVidaPaneles();
+    }, 4200);
+
+    return; // saltar el resto del flujo de cascada larga
+  }
 
   if(window._hudPanels && window.innerWidth>=900){
     // ═══════════════════════════════════════════════════════════════
@@ -4609,6 +4698,7 @@ function abrirDial(){
     }, 100);
 
   }
+  } // ← cierre de function _iniciarFaseAparicion
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.add('active');
 }
