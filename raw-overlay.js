@@ -1,37 +1,58 @@
-/* RAW Entry — Overlay v.5.114
-   Cambios desde v5.113:
-   - DIAL DINÁMICO RESPONSIVO. Fijo en 580 era demasiado chico para tu
-     pantalla grande (2280×1350) donde se veía perdido en el centro y a
-     la vez justo en 1920×1080. La solución correcta no es un tamaño
-     fijo sino una fórmula que respete:
-       1. Que el sub-ring (radio dial * 0.913) respire de la fila top
-          con un margen de 30px.
-       2. Que no exceda 836 (cap absoluto, para que no se vea desproporcionado).
-       3. Que no abarque más del 45% del ancho del viewport.
-     Nueva función _calcDialSize() corre en cada _reposicionarHUD y
-     calcula:
-       radioMax = (vH/2 - 242 - 30) / 0.913
-       diametro = min(836, radioMax*2, vW*0.45)
-     Resultados por viewport:
-       · 1366×768  → dial 245px
-       · 1920×1080 → dial 586px
-       · 2280×1350 → dial 836px  (tu pantalla, vuelve al tamaño original)
-       · 2560×1440 → dial 836px
-     Aplicado en 4 lugares: bloque inicial de _reposicionarHUD (aplica
-     style.width/height al canvas y al SVG del aro), override en
-     _hudReturningFromExpand, override en _hayApertura, y reset en rama
-     de regreso de modo expandido.
+/* RAW Entry — Overlay v.5.115
+   Reestructuración mayor del top/bottom para que el dial respire y las
+   columnas se vean visualmente alineadas.
+
+   ── Cambios ──
+
+   1) USER y Stats convertidos a RIBBON delgados:
+      · USER: una sola fila horizontal (avatar pequeño + USER + Nv1 + barra
+        XP fina + número XP). Antes era 2 renglones apilados que parecían
+        vacíos. Nuevo CSS: .hud-user-ribbon, .hud-user-av-sm, etc.
+      · Stats: 3 cells horizontales compactas (Energía / Racha / Créditos),
+        separadas por líneas finas. Antes eran cells con ícono grande +
+        texto en bloques.
+      · Altura natural de ambas: ~40-50px (vs ~80-120px antes).
+
+   2) Quitado el CAP de 220px en topMaxH. Antes el código forzaba que
+      USER/Sim/Stats tuvieran la misma altura, estirando USER y Stats
+      hasta igualar Sim. Ahora cada panel toma su altura natural y USER
+      y Stats se centran VERTICALMENTE contra Sim (que es el más alto).
+      Cálculo:
+         topYUser  = topY + (hSim - hUser) / 2
+         topYStats = topY + (hSim - hStats) / 2
+
+   3) _calcDialSize: RESERVA_TOP reducida de 242 a 192 (porque ya no hay
+      cap de 220; Sim banda mide ~170 naturalmente).
+      Resultados:
+         · vH=960  → dial 564 (era 245, ridículo)
+         · vH=1080 → dial 696 (era 586)
+         · vH=1350 → dial 836 (cap, igual que antes)
+         · vH=768  → dial 354 (era 245)
+
+   4) Bottom alineado con columnas:
+      · Misión.left = leftX (mismo X que col-A)
+      · Logro centrado bajo el dial, ancho = ancho del dial
+      · Nivel pegado a la derecha de col-D (rightX + rightW - wNivel)
+      · Misión y Nivel toman el ancho de leftW/rightW respectivamente,
+        para que las cards verticales (Patrimonio↔Misión, Activity↔Nivel)
+        se vean como una sola columna visual.
+
+   5) COL_W dinámico con varios escalones (340/300/270/240/210), elige
+      el mayor que quepa. Esto evita que las cards queden estrechas y
+      corten info en 2 renglones.
+
+   ── Heredado v5.114 ──
+   Dial dinámico responsivo con _calcDialSize().
 
    ── Heredado v5.113 ──
-   Primer intento dial fijo en 580 para respiro del sub-ring. Funcionaba
-   bien en 1920 pero ridículo en pantalla grande del usuario.
+   Primer intento dial fijo en 580.
 
    ── Heredado v5.112 ──
-   FIX bug "zoom no regresa al 100%": _resetDuroLayout() limpia inline
-   styles antes de cada _reposicionarHUD por resize.
+   FIX bug zoom: _resetDuroLayout() limpia inline styles antes de
+   _reposicionarHUD por resize.
 
    ── Heredado v5.111 ──
-   Primer intento dial 10% más chico: min(836,57vw) → min(752,51vw).
+   Primer intento dial 10% más chico.
 
    ── Heredado v5.110 ──
    Sin scroll vertical en cards laterales. Limpieza preventiva de
@@ -941,6 +962,22 @@ function _crearDialOverlay(){
       '.hud-stats-v{font-size:16px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap}',
       '.hud-stats-v .max{opacity:.40;font-weight:700;font-size:9px;margin-left:2px}',
       '.hud-stats-l{font-size:7.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
+      // ── RIBBON STYLES (v5.115): USER y Stats en una sola fila compacta ──
+      '.hud-user-ribbon{display:flex;align-items:center;gap:8px;padding:8px 12px;height:100%;box-sizing:border-box;min-height:0}',
+      '.hud-user-av-sm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0}',
+      '.hud-user-name-sm{font-size:12px;font-weight:800;letter-spacing:.06em;color:#fff;flex-shrink:0}',
+      '.hud-user-niv-sm{font-size:9px;font-weight:700;color:rgba(167,139,250,0.85);letter-spacing:.05em;background:rgba(167,139,250,0.14);border:1px solid rgba(167,139,250,0.40);padding:2px 6px;border-radius:4px;flex-shrink:0}',
+      '.hud-user-niv-sm span{margin-left:3px}',
+      '.hud-user-bar-sm{flex:1;height:4px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;min-width:30px}',
+      '.hud-user-bar-sm > div{height:100%;border-radius:999px;transition:width .8s ease}',
+      '.hud-user-xp-sm{font-size:9px;font-weight:700;color:rgba(220,224,235,0.65);font-family:JetBrains Mono,monospace;white-space:nowrap;flex-shrink:0}',
+      '.hud-stats-ribbon{display:flex;align-items:center;justify-content:space-around;gap:6px;padding:8px 12px;height:100%;box-sizing:border-box;min-height:0}',
+      '.hud-stats-cell-sm{display:flex;align-items:center;gap:6px;min-width:0;flex:1;justify-content:center}',
+      '.hud-stats-cell-sm i{font-size:12px;flex-shrink:0}',
+      '.hud-stats-v-sm{font-size:13px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap;flex-shrink:0}',
+      '.hud-stats-v-sm .max{opacity:.45;font-weight:700;font-size:8px;margin-left:1px}',
+      '.hud-stats-l-sm{font-size:7.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.50);white-space:nowrap;flex-shrink:0}',
+      '.hud-stats-sep{width:1px;height:18px;background:rgba(255,255,255,0.10);flex-shrink:0}',
       // bottom cards (mision, logro, nivel)
       '.hud-card{display:flex;align-items:center;gap:12px;padding:13px 16px}',
       '.hud-card-ico{width:42px;height:42px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:10px}',
@@ -1099,19 +1136,14 @@ function _crearDialOverlay(){
   _pUser.style.animationDelay = '0s';
   _pUser.style.borderRadius = '14px';
   document.getElementById('hud-user-inner').innerHTML =
-    '<div class="hud-user">'+
-      '<div class="hud-user-av" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 16px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
-        '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 8px #A78BFA"></i>'+
+    '<div class="hud-user-ribbon">'+
+      '<div class="hud-user-av-sm" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 12px '+_rgba('#A78BFA',0.45)+',inset 0 0 6px '+_rgba('#A78BFA',0.18)+'">'+
+        '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 6px #A78BFA;font-size:11px"></i>'+
       '</div>'+
-      '<div class="hud-user-c">'+
-        '<div class="hud-user-row1">'+
-          '<span class="hud-user-name">USER</span>'+
-          '<span class="hud-user-niv">Nivel <span id="_hud-user-nivel">1</span></span>'+
-          '<span class="hud-user-niv-badge" style="background:'+_rgba('#A78BFA',0.20)+';border:1px solid '+_rgba('#A78BFA',0.45)+';color:#A78BFA"><i class="fas fa-shield-halved"></i></span>'+
-        '</div>'+
-        '<div class="hud-user-bar"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px '+_rgba('#A78BFA',0.55)+'"></div></div>'+
-        '<div class="hud-user-xp" id="_hud-user-xp">0 / 1,000 XP</div>'+
-      '</div>'+
+      '<span class="hud-user-name-sm">USER</span>'+
+      '<span class="hud-user-niv-sm">Nv<span id="_hud-user-nivel">1</span></span>'+
+      '<div class="hud-user-bar-sm"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px '+_rgba('#A78BFA',0.55)+'"></div></div>'+
+      '<span class="hud-user-xp-sm" id="_hud-user-xp">0/1,000</span>'+
     '</div>';
 
   // ── _pSim (top-center): MEGA-CARD con 2 renglones ──
@@ -1193,36 +1225,26 @@ function _crearDialOverlay(){
   _pStats.style.animationDelay = '0.8s';
   _pStats.style.borderRadius = '14px';
   document.getElementById('hud-stats-inner').innerHTML =
-    '<div class="hud-stats-row">'+
+    '<div class="hud-stats-ribbon">'+
       // Energía
-      '<div class="hud-stats-cell">'+
-        '<div class="hud-stats-ico" style="background:'+_rgba('#FBBF24',0.14)+';border:1px solid '+_rgba('#FBBF24',0.40)+';box-shadow:0 0 12px '+_rgba('#FBBF24',0.25)+'">'+
-          '<i class="fas fa-bolt" style="color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
-        '</div>'+
-        '<div class="hud-stats-txt">'+
-          '<span class="hud-stats-v" style="color:#FBBF24"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
-          '<span class="hud-stats-l">Energía</span>'+
-        '</div>'+
+      '<div class="hud-stats-cell-sm">'+
+        '<i class="fas fa-bolt" style="color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
+        '<span class="hud-stats-v-sm" style="color:#FBBF24"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
+        '<span class="hud-stats-l-sm">Energía</span>'+
       '</div>'+
+      '<div class="hud-stats-sep"></div>'+
       // Racha
-      '<div class="hud-stats-cell">'+
-        '<div class="hud-stats-ico" style="background:'+_rgba('#FB923C',0.14)+';border:1px solid '+_rgba('#FB923C',0.40)+';box-shadow:0 0 12px '+_rgba('#FB923C',0.25)+'">'+
-          '<i class="fas fa-fire" style="color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
-        '</div>'+
-        '<div class="hud-stats-txt">'+
-          '<span class="hud-stats-v" style="color:#FB923C"><span id="_hud-racha-dias">—</span><span class="max"> días</span></span>'+
-          '<span class="hud-stats-l">Racha actual</span>'+
-        '</div>'+
+      '<div class="hud-stats-cell-sm">'+
+        '<i class="fas fa-fire" style="color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
+        '<span class="hud-stats-v-sm" style="color:#FB923C"><span id="_hud-racha-dias">—</span><span class="max">d</span></span>'+
+        '<span class="hud-stats-l-sm">Racha</span>'+
       '</div>'+
+      '<div class="hud-stats-sep"></div>'+
       // Créditos
-      '<div class="hud-stats-cell">'+
-        '<div class="hud-stats-ico" style="background:'+_rgba('#22D3EE',0.14)+';border:1px solid '+_rgba('#22D3EE',0.40)+';box-shadow:0 0 12px '+_rgba('#22D3EE',0.25)+'">'+
-          '<i class="fas fa-gem" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
-        '</div>'+
-        '<div class="hud-stats-txt">'+
-          '<span id="_hud-creditos" class="hud-stats-v" style="color:#22D3EE">—</span>'+
-          '<span class="hud-stats-l">Créditos</span>'+
-        '</div>'+
+      '<div class="hud-stats-cell-sm">'+
+        '<i class="fas fa-gem" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
+        '<span id="_hud-creditos" class="hud-stats-v-sm" style="color:#22D3EE">—</span>'+
+        '<span class="hud-stats-l-sm">Créditos</span>'+
       '</div>'+
     '</div>';
 
@@ -1484,26 +1506,20 @@ function _crearDialOverlay(){
   //   2. El sub-ring (radio dial * 0.913) NO debe pasarse de la fila top
   //      con un margen de respiro (MARGEN_SR_TOP). Esto fija la cota por
   //      altura: dial_radio <= (vH/2 - reservaTop - MARGEN_SR_TOP) / 0.913
-  //   3. Nunca más de 45% del ancho del viewport (estética, evita que en
-  //      pantallas anchas se vea sobredimensionado).
-  // Reserva top fija: topPad(22) + topMaxH cap(220) = 242
-  // Reserva bot fija: botPad(22) + botH(80) + trackH(64) + gap(8) = 174
-  //
-  // En tu pantalla grande (vW=2280, vH=1350): cota altura permite ~882 →
-  // cap a 836. Dial vuelve a su tamaño "completo".
-  // En 1920×1080: cota altura ≈ 586 → dial se achica. Sub-ring respira.
-  // En 1366×768: cota altura ≈ 245 → dial bien proporcionado.
+  //   3. Nunca más de 45% del ancho del viewport.
+  // Reserva top en v5.115: el ribbon top (USER+Sim+Stats) ya no tiene cap
+  // de 220. Sim banda mide ~170px naturalmente (2 renglones: tabs +
+  // 9 needs). USER y Stats son ribbon delgados centrados verticalmente
+  // dentro del Sim. Usamos 170 como estimación + topPad 22 = 192.
   function _calcDialSize(){
     var DIAL_MAX = 836;
-    var SR_RATIO = 0.913; // radio del sub-ring / radio del dial (R_SO/center)
-    var RESERVA_TOP = 242;
+    var SR_RATIO = 0.913;
+    var RESERVA_TOP = 192;
     var MARGEN_SR_TOP = 30;
     var vW = window.innerWidth;
     var vH = window.innerHeight;
-    // Cota por altura: que el sub-ring respire contra la fila top.
     var radioMaxAlto = (vH / 2 - RESERVA_TOP - MARGEN_SR_TOP) / SR_RATIO;
     var diametroMaxAlto = Math.max(280, radioMaxAlto * 2);
-    // Cota por ancho: dial nunca abarca más del 45% del ancho.
     var diametroMaxAncho = vW * 0.45;
     var dial = Math.min(DIAL_MAX, diametroMaxAlto, diametroMaxAncho);
     return Math.round(dial);
@@ -1751,22 +1767,22 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════
     var leftSpace  = r.left;          // espacio total a la izquierda del dial
     var rightSpace = vW - r.right;    // espacio total a la derecha del dial
-    // COL_W dinámico: 288 (20% más ancho) si la pantalla tiene espacio para
-    // 4 columnas a ese tamaño; si no, fallback a 240. Esto cubre tanto
-    // pantallas grandes (>=2100px aprox) como pantallas estándar 1920px.
-    var COL_GAP = GAP;                // gap entre columnas dentro del mismo lado
+    // v5.115: COL_W más dinámico con varios escalones, prefiere el mayor
+    // que quepa en el espacio disponible. Esto evita que en pantallas
+    // grandes las cards queden estrechas y corten info en 2 renglones.
+    var COL_GAP = GAP;
     var COL_W;
-    if((leftSpace  >= (288 * 2 + COL_GAP * 3)) &&
-       (rightSpace >= (288 * 2 + COL_GAP * 3))){
-      COL_W = 288;
-    } else {
-      COL_W = 240;
+    var _candidates = [340, 300, 270, 240, 210];
+    var _fits = null;
+    for(var _ci=0; _ci<_candidates.length; _ci++){
+      var _w = _candidates[_ci];
+      if((leftSpace  >= (_w * 2 + COL_GAP * 3)) &&
+         (rightSpace >= (_w * 2 + COL_GAP * 3))){
+        _fits = _w; break;
+      }
     }
-
-    // Si hay espacio para 2 columnas + gap a cada lado, usar 4 columnas.
-    // Si no, fallback a 1 columna (modo compacto).
-    var fourCols = (leftSpace  >= (COL_W * 2 + COL_GAP * 3)) &&
-                   (rightSpace >= (COL_W * 2 + COL_GAP * 3));
+    COL_W = _fits || 210;
+    var fourCols = !!_fits;
 
     var colA_X, colB_X, colC_X, colD_X, leftW, rightW, leftX, rightX;
     if(fourCols){
@@ -1859,44 +1875,43 @@ function _crearDialOverlay(){
       pStats.el.style.visibility='hidden';
     }
 
-    // Medir altura natural (Sim será la más alta por sus 2 renglones)
-    var topMaxH = 0;
+    // Medir altura natural de cada panel top de forma independiente.
+    // En v5.115 USER y Stats son ribbon delgados (~40-50px), Sim es el más
+    // alto (~170px) por sus 2 renglones (tabs + needs). NO forzar uniformidad:
+    // USER y Stats se centran verticalmente dentro de la zona del Sim banda
+    // para alinearse visualmente sin estirarse.
+    var hUser=0, hSim=0, hStats=0;
     [pUser,pSim,pStats].forEach(function(hp){
       if(hp && hp.el && hp.el.style.width !== '0px'){
-        // CRÍTICO para zoom: limpiar minHeight del panel Y del inner ANTES
-        // de medir scrollHeight. Si no, valores de pasadas anteriores se
-        // auto-perpetúan y el layout no regresa al estado limpio al volver
-        // a zoom 100%.
+        // Limpiar minHeight del panel Y del inner antes de medir (zoom safe)
         hp.el.style.minHeight = '';
         var innerM = hp.el.querySelector(':scope > [id$="-inner"]');
-        if(innerM){ innerM.style.minHeight = ''; }
-        var h = hp.el.scrollHeight || hp.el.offsetHeight || 90;
-        if(h>topMaxH) topMaxH = h;
-      }
-    });
-    if(topMaxH===0) topMaxH = 130;
-    // CAP de seguridad: los paneles top jamás deben ser más altos que 220px.
-    // Si la medición devuelve algo mayor, es porque el navegador midió en un
-    // estado intermedio (transición del dial, panel sin width aplicado, etc.).
-    // Limitar evita columnas verticales gigantes que rompen el layout.
-    if(topMaxH > 220) topMaxH = 220;
-    // Forzar altura uniforme para alinearse como UNA barra
-    [pUser,pSim,pStats].forEach(function(hp){
-      if(hp && hp.el && hp.el.style.width !== '0px'){
-        hp.el.style.minHeight = topMaxH+'px';
-        var inner = hp.el.querySelector(':scope > [id$="-inner"]');
-        if(inner){
-          inner.style.minHeight = topMaxH+'px';
-          inner.style.justifyContent = 'center';
+        if(innerM){
+          innerM.style.minHeight = '';
+          innerM.style.justifyContent = '';
         }
+        var h = hp.el.scrollHeight || hp.el.offsetHeight || 50;
+        if(hp===pUser) hUser=h;
+        else if(hp===pSim) hSim=h;
+        else if(hp===pStats) hStats=h;
       }
     });
+    // topMaxH = altura del Sim (la mayor) — usada para calcular colTopY.
+    var topMaxH = Math.max(hUser, hSim, hStats, 50);
+    // USER y Stats NO se estiran. Solo se centran verticalmente con Sim:
+    // aplicamos un transform translateY a sus inline top.
 
     var topY = topPad;
+    // Sim banda toma su altura natural. USER y Stats se centran verticalmente
+    // contra el Sim banda calculando un top ajustado:
+    //   top_user = topY + (hSim - hUser)/2
+    // así sus centros verticales coinciden.
+    var topYUser  = topY + Math.max(0, Math.round((hSim - hUser) / 2));
+    var topYStats = topY + Math.max(0, Math.round((hSim - hStats) / 2));
     // PEGADAS sin gaps entre ellas, comenzando en topBarStartX
     if(pUser && wUser>0){
       pUser.el.style.left = topBarStartX + 'px';
-      pUser.el.style.top  = topY + 'px';
+      pUser.el.style.top  = topYUser + 'px';
       pUser.el.style.clipPath = chamferRect;
     }
     if(pSim){
@@ -1906,7 +1921,7 @@ function _crearDialOverlay(){
     }
     if(pStats && wStats>0){
       pStats.el.style.left = (topBarStartX + wUser + wSim) + 'px';
-      pStats.el.style.top  = topY + 'px';
+      pStats.el.style.top  = topYStats + 'px';
       pStats.el.style.clipPath = chamferRect;
     }
 
@@ -1921,20 +1936,22 @@ function _crearDialOverlay(){
     var botPad  = GAP;
     var botGap  = 12;
 
-    // P1b: las 3 cards JUNTAS y CENTRADAS como un bloque.
-    // Misión y Nivel anchos fijos; Logro al ancho del dial. Si el total
-    // excede el viewport, se reparten proporcionales.
-    var wMision = 320;
-    var wNivel  = 360;
+    // v5.115: Misión usa ancho de col-A (leftW), Nivel usa ancho de col-D
+    // (rightW), Logro al ancho del dial. Esto alinea las columnas
+    // verticalmente: USER↔Patrimonio↔Misión a la izquierda; Stats↔Activity↔
+    // Nivel a la derecha; Sim↔(dial)↔Logro en el centro.
+    var wMision = leftW;
+    var wNivel  = rightW;
     var wLogro  = Math.round(r.width);
-    var totalCards = wMision + wLogro + wNivel + botGap*2;
-    if(totalCards > vW - botPad*2){
-      var availBot = vW - botPad*2 - botGap*2;
-      wMision = Math.round(availBot * 0.25);
-      wNivel  = Math.round(availBot * 0.28);
+    // Si el bloque centrado excede el ancho disponible, comprime
+    var availBotTotal = vW - botPad*2;
+    if(wMision + wLogro + wNivel + botGap*2 > availBotTotal){
+      var availBot = availBotTotal - botGap*2;
+      wMision = Math.round(availBot * 0.22);
+      wNivel  = Math.round(availBot * 0.22);
       wLogro  = availBot - wMision - wNivel;
-      totalCards = wMision + wLogro + wNivel + botGap*2;
     }
+    var totalCards = wMision + wLogro + wNivel + botGap*2;
 
     if(pMision){ pMision.el.style.width = wMision+'px'; }
     if(pLogro){ pLogro.el.style.width = wLogro+'px'; }
@@ -1970,20 +1987,25 @@ function _crearDialOverlay(){
       pTrack.el.style.top  = trackY+'px';
       pTrack.el.style.clipPath = chamferRect;
     }
-    // Bloque de 3 cards CENTRADO en el viewport
-    var cardsStartX = Math.round((vW - totalCards) / 2);
+    // Bottom cards alineadas con sus columnas:
+    //   Misión → leftX (mismo X que col-A)
+    //   Logro  → centrado bajo el dial
+    //   Nivel  → rightX + (rightW - wNivel) → alineado a la derecha como Stats
     if(pMision){
-      pMision.el.style.left = cardsStartX + 'px';
+      pMision.el.style.left = leftX + 'px';
       pMision.el.style.top  = botY + 'px';
       pMision.el.style.clipPath = chamferRect;
     }
     if(pLogro){
-      pLogro.el.style.left = (cardsStartX + wMision + botGap) + 'px';
+      // Centrar Logro bajo el dial (su ancho == ancho del dial)
+      var logroX = Math.round(r.left + (r.width - wLogro)/2);
+      pLogro.el.style.left = logroX + 'px';
       pLogro.el.style.top  = botY + 'px';
       pLogro.el.style.clipPath = chamferRect;
     }
     if(pNivel){
-      pNivel.el.style.left = (cardsStartX + wMision + botGap + wLogro + botGap) + 'px';
+      // Nivel: alinear borde derecho con borde derecho de col-D (rightX+rightW)
+      pNivel.el.style.left = (rightX + rightW - wNivel) + 'px';
       pNivel.el.style.top  = botY + 'px';
       pNivel.el.style.clipPath = chamferRect;
     }
