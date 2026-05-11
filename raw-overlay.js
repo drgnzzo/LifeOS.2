@@ -1,4 +1,32 @@
-/* RAW Entry — Overlay v.5.107
+/* RAW Entry — Overlay v.5.109
+   Cambios desde v5.108:
+   - FIX BUG "todo encimado, paneles de la columna interna no se ven, zoom
+     out lo descompone todo y no se recupera". Causa raíz: positionCol
+     usaba la altura natural (scrollHeight) de cada panel para calcular el
+     totalH de la columna, y cuando excedía colVAvail solo reducía el gap
+     entre ellos. Si Patrimonio mide 480px y Bitácora mide 280px,
+     suma=760px y colVAvail=648px: el gap reducido (max 16px) no compensa
+     los 112px de exceso, así que Bitácora aterrizaba debajo del track
+     (fuera de zona) y se veía cortada/encimada. Con zoom out vH crecía,
+     los paneles bottom se posicionaban más abajo, colVAvail crecía pero
+     el caché de scrollHeight aplicado por inline maxHeight de pasadas
+     anteriores se auto-perpetuaba.
+   - FIX: positionCol ahora REPARTE colVAvail equitativamente entre los
+     paneles de la columna. Cada panel recibe perPanelMaxH=(colVAvail-
+     gaps)/n como techo. Si su natural es menor, se respeta el natural.
+     Si excede, se trunca con overflowY:auto y maxHeight inline. Garantía:
+     las columnas JAMÁS rebasan su zona disponible.
+   - positionCol limpia maxHeight inline antes de medir natural.
+   - _hudCollapse y rama de regreso limpian también maxHeight y overflowY.
+   - resize event: además de window.resize, escuchamos visualViewport.
+     resize con debounce de 80ms. Cubre casos donde el zoom no dispara
+     window.resize de forma garantizada.
+
+   ── Heredado v5.108 ──
+   Fix DnD: estado consistente con _normalizarOrders() después de cada drop,
+   saveLayout ordena por _order, restoreLayout valida IDs.
+
+   ── Heredado v5.107 ──
    Cambios desde v5.106:
    - APERTURA RALENTIZADA (a petición). El dial sentía un "pop" demasiado
      rápido y la cascada se veía apurada. Ajustes:
@@ -1640,6 +1668,8 @@ function _crearDialOverlay(){
       el.style.transform     = '';
       el.style.height        = '';
       el.style.minHeight     = '';
+      el.style.maxHeight     = '';
+      el.style.overflowY     = '';
       el.style.opacity       = '';
       el.style.pointerEvents = '';
       var inner = el.querySelector(':scope > [id$="-inner"]');
@@ -1932,35 +1962,41 @@ function _crearDialOverlay(){
         // Limpiar transform SOLO si no está animando entrada
         if(!hp.el._animatingEntry) hp.el.style.transform = '';
       });
-      // Medir alturas reales
+      // FIX v5.109: en lugar de medir altura natural (que puede exceder
+      // colVAvail y romper el layout), repartir colVAvail equitativamente
+      // entre los paneles de la columna. Cada panel recibe una altura máxima
+      // calculada de: (colVAvail - gaps_totales) / n_paneles.
+      // Esto GARANTIZA que las columnas nunca rebasen su zona y que paneles
+      // de la misma columna queden visibles uno arriba del otro sin pisarse.
+      var n = panels.length;
+      var gapsCount = n - 1;
+      var totalGaps = gapsCount * GAP;
+      var perPanelMaxH = Math.floor((colVAvail - totalGaps) / n);
+      // Mínimo razonable: 120px (para que un header + 2 rows sea legible)
+      if(perPanelMaxH < 120) perPanelMaxH = 120;
+
+      // Medir alturas naturales para usar lo mínimo entre natural y maxH.
+      // Si un panel mide 240 de natural pero perPanelMaxH=380, usamos 240
+      // (no estirar más allá del contenido). Si mide 520 y perPanelMaxH=380,
+      // usamos 380 y dejamos que el contenido haga overflow:hidden con clip.
       var heights = panels.map(function(hp){
-        return hp.el.scrollHeight || hp.el.offsetHeight || 200;
+        // Quitar maxHeight temporal por si quedó de una pasada anterior
+        hp.el.style.maxHeight = '';
+        var natural = hp.el.scrollHeight || hp.el.offsetHeight || 200;
+        return Math.min(natural, perPanelMaxH);
       });
-      var totalH = heights.reduce(function(s,h){ return s+h+GAP; },0) - GAP;
 
-      var startY, gapBetween;
-      if(totalH <= colVAvail){
-        startY = colTopY;
-        gapBetween = GAP;
-      } else {
-        startY = colTopY;
-        var extra = totalH - colVAvail;
-        var gapsCount = panels.length - 1;
-        if(gapsCount>0){
-          var reducedGap = Math.max(6, GAP - Math.ceil(extra/gapsCount));
-          gapBetween = reducedGap;
-        } else {
-          gapBetween = GAP;
-        }
-      }
-
-      var curY = startY;
+      var curY = colTopY;
       var chamfer = isLeft ? chamferLeft : chamferRight;
       panels.forEach(function(hp, idx){
         var h = heights[idx];
         hp.el.style.top      = Math.round(curY) + 'px';
+        hp.el.style.maxHeight = h + 'px';
+        // Si el natural excede perPanelMaxH, el panel se trunca con scroll
+        // interno. Si es menor, se respeta el natural.
+        hp.el.style.overflowY = (hp.el.scrollHeight > h) ? 'auto' : 'visible';
         hp.el.style.clipPath = chamfer;
-        curY += h + gapBetween;
+        curY += h + GAP;
       });
     }
 
@@ -3087,6 +3123,8 @@ function _crearDialOverlay(){
         hp.el.style.width         = '';
         hp.el.style.height        = '';
         hp.el.style.minHeight     = '';
+        hp.el.style.maxHeight     = '';
+        hp.el.style.overflowY     = '';
         hp.el.style.transform     = '';
         hp.el.style.clipPath      = '';
         // Logro y Track tenían opacity:0 + pointer-events:none en modo expandido
@@ -4591,6 +4629,18 @@ window.addEventListener('DOMContentLoaded',()=>{
   window.addEventListener('resize', function(){
     if(_dialVisible && typeof _reposicionarHUD==='function') _reposicionarHUD();
   });
+  // Zoom out/in en Chrome dispara `resize` pero a veces con vH/vW intermedios
+  // antes de estabilizarse. Además, visualViewport.resize cubre casos en mobile
+  // y zoom donde window.resize no llega. Usar AMBOS con debounce.
+  if(window.visualViewport){
+    var _vvT = null;
+    window.visualViewport.addEventListener('resize', function(){
+      if(_vvT) clearTimeout(_vvT);
+      _vvT = setTimeout(function(){
+        if(_dialVisible && typeof _reposicionarHUD==='function') _reposicionarHUD();
+      }, 80);
+    });
+  }
 
   var _origCerrarDial = cerrarDial;
   cerrarDial = function(){
