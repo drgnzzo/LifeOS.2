@@ -1,21 +1,30 @@
-/* RAW Entry — Overlay v.5.111
-   Cambios desde v5.110:
-   - DIAL 10% MÁS PEQUEÑO. El sub-ring (segundo anillo que aparece al
-     activar una opción del dial) se extiende a R_SO=420 del centro
-     (radio 0.913 del dial completo). En el tamaño anterior min(836,57vw),
-     el sub-ring alcanzaba y≈922 en vH=1080, encimándose con el track
-     que está en y≈906. También las cards bottom (Misión/Logro/Nivel)
-     quedaban apretadas contra el dial.
-     Fix: dial cambia a min(752px, 51vw) (≈10% menos en ambas dimensiones).
-     Aplica a 4 lugares: _dialCanvas.style.cssText, SVG del aro pulsante,
-     override de r en _hudReturningFromExpand, override de r en _hayApertura,
-     y reset width/height en rama de regreso.
-     Con dial=752 en vH=1080:
-       · Sub-ring bottom: 540 + 343 = 883
-       · Track top:       906
-       · Margen libre:    23px ✓ (antes -16px, encimado)
-     El canvas INTERNO sigue siendo 920x920 (resolución de dibujo), solo
-     cambia el display size CSS. Iconos y textos se ven igual de nítidos.
+/* RAW Entry — Overlay v.5.112
+   Cambios desde v5.111:
+   - FIX DEFINITIVO del bug "zoom in/out y al volver al 100% el layout
+     no regresa a su estado original". Causa raíz identificada después
+     de 3 intentos fallidos previos:
+     · raw-overlay.js tenía listener resize directo (sin debounce).
+     · raw-overlay.js tenía listener visualViewport.resize (80ms debounce).
+     · raw-overlay-dnd.js tenía su PROPIO listener resize (250ms debounce)
+       que llamaba a _reposicionarHUD otra vez.
+     Tres listeners disparando _reposicionarHUD en momentos distintos
+     creaban un estado intermedio donde inline styles de un cálculo viejo
+     (zoom 125% → fourCols=false → width:260) se mezclaban con cálculos
+     nuevos (zoom 100% → fourCols=true → width:240) que se aplicaban en
+     callbacks asíncronos pisándose mutuamente.
+   - SOLUCIÓN: nuevo helper _resetDuroLayout() que limpia TODOS los inline
+     styles de layout (left/top/width/height/min/maxHeight/transform/
+     clipPath/overflowY de cada panel + minHeight/justifyContent del inner)
+     ANTES de cada _reposicionarHUD disparado por resize. Garantiza que
+     _reposicionarHUD mida sobre un estado completamente limpio sin
+     residuos de pasadas con otro vW/vH.
+   - raw-overlay-dnd.js: removido su listener directo a _reposicionarHUD.
+     El listener resize del DnD ahora SOLO reconstruye slots vacíos
+     después de 300ms (espera a que el overlay termine de reposicionar).
+
+   ── Heredado v5.111 ──
+   Dial 10% más pequeño: min(836,57vw) → min(752,51vw) en 5 lugares del
+   código. El sub-ring ya no se encima con el track.
 
    ── Heredado v5.110 ──
    Sin scroll vertical en cards laterales. Limpieza preventiva de
@@ -4632,8 +4641,41 @@ window.addEventListener('DOMContentLoaded',()=>{
   _dialOverlay.addEventListener('click', function(e){
     if(e.target === _dialOverlay) cerrarDial();
   });
+  // Helper: "reset duro" antes de un reposicionamiento de zoom.
+  // Limpia TODOS los inline styles de layout en cada panel (left, top, width,
+  // height, minHeight, maxHeight, transform, clipPath, overflowY). Esto
+  // garantiza que _reposicionarHUD mida sobre un estado completamente limpio
+  // sin residuos de pasadas anteriores con otro vW/vH.
+  // Conserva: opacity, visibility, transition (los maneja el animation flow).
+  function _resetDuroLayout(){
+    if(!window._hudPanels) return;
+    window._hudPanels.forEach(function(hp){
+      if(!hp.el) return;
+      if(hp.el._animatingEntry) return; // cascada en curso, no tocar
+      hp.el.style.left       = '';
+      hp.el.style.top        = '';
+      hp.el.style.width      = '';
+      hp.el.style.height     = '';
+      hp.el.style.minHeight  = '';
+      hp.el.style.maxHeight  = '';
+      hp.el.style.overflowY  = '';
+      hp.el.style.transform  = '';
+      hp.el.style.clipPath   = '';
+      var inner = hp.el.querySelector(':scope > [id$="-inner"]');
+      if(inner){
+        inner.style.minHeight = '';
+        inner.style.justifyContent = '';
+      }
+    });
+    // Forzar reflow para que las mediciones siguientes sean limpias
+    void document.body.offsetHeight;
+  }
+
   window.addEventListener('resize', function(){
-    if(_dialVisible && typeof _reposicionarHUD==='function') _reposicionarHUD();
+    if(_dialVisible && typeof _reposicionarHUD==='function'){
+      _resetDuroLayout();
+      _reposicionarHUD();
+    }
   });
   // Zoom out/in en Chrome dispara `resize` pero a veces con vH/vW intermedios
   // antes de estabilizarse. Además, visualViewport.resize cubre casos en mobile
@@ -4643,7 +4685,10 @@ window.addEventListener('DOMContentLoaded',()=>{
     window.visualViewport.addEventListener('resize', function(){
       if(_vvT) clearTimeout(_vvT);
       _vvT = setTimeout(function(){
-        if(_dialVisible && typeof _reposicionarHUD==='function') _reposicionarHUD();
+        if(_dialVisible && typeof _reposicionarHUD==='function'){
+          _resetDuroLayout();
+          _reposicionarHUD();
+        }
       }, 80);
     });
   }
