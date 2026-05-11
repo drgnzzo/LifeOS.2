@@ -1,32 +1,42 @@
-/* RAW Entry — Overlay v.5.117
-   Hacer el dial más grande compactando las fila top y bottom.
+/* RAW Entry — Overlay v.5.120
+   FIX adicional para el bug "Nueva rompe layout":
+   
+   ── 3 cambios coordinados ──
 
-   ── Compactaciones ──
-   1) Sim banda — header inline FUSIONADO con grid de 9 needs en la
-      misma fila horizontal (antes eran 2 sub-renglones apilados).
-      Nueva clase .hud-sim-row-compact con flex horizontal. El header
-      ("Estado del Sim · 9 needs") queda a la izquierda separado por
-      una línea fina, y las 9 needs ocupan el resto.
-      Altura: ~170 → ~110 (-60px)
-   2) Megatabs — padding reducido 6px→4px arriba/abajo, gap 3→2, ico
-      12px→11px. Altura: ~50 → ~38 (-12px)
-   3) Bottom cards — .hud-card padding 13px→8px, ico 42→34, fuentes
-      11→10.5, bar 6→5.
-      Altura: ~80 → ~65 (-15px)
+   1) RE-REPOSICIONAR DESPUÉS DE _refrescarEspejos
+      _refrescarEspejos() rellena los paneles con datos reales
+      (Patrimonio BBVA/BEATS, Bitácora con pensamientos/registros, USER
+      con XP actual). Eso cambia las ALTURAS de los paneles cuando los
+      rows se llenan con contenido. v5.119 reposicionaba después del
+      render del Sim banda pero NO después de _refrescarEspejos, así que
+      las medidas se basaban en paneles vacíos. Resultado: Bitácora
+      crecía y se metía sobre la fila bottom (Misión quedaba oculta
+      atrás de Bitácora).
+      Fix: encadenar setTimeout(50ms) → _refrescarEspejos → doble rAF →
+      _reposicionarHUD para usar las alturas reales.
 
-   ── Recálculo _calcDialSize ──
-   RESERVA_TOP: 192 → 132 (Sim banda más bajo)
-   RESERVA_BOT: 102 → 87  (cards más bajas)
-   Resultados:
-   · vH=960  → dial 696 (antes 564, +132)
-   · vH=1080 → dial 828→cap 836 (antes 696)
-   · vH=1350 → dial 836 cap
+   2) EXPONER abrirDial/cerrarDial/toggleEntradaDropdown A window
+      Hay duplicados de estas funciones en raw-core.js (legacy) y en
+      raw-overlay.js (versión nueva con cascada). Dependíamos del orden
+      de carga para que la versión overlay sobreescribiera la legacy.
+      Si por algún cambio de carga eso fallara, "Nueva" llamaría a la
+      versión legacy y rompería el overlay. Asignamos explícitamente
+      window.abrirDial = abrirDial (etc.) para garantizar el binding.
 
-   ── Heredado v5.116 ──
-   Top 2 zonas: USER+Stats fusionados en col-A, Sim extendido hasta col-D.
-   Bottom 4 cards en una sola fila: Misión / Nivel Actual / Logro / Siguiente.
+   3) CACHE BUST: ?v=5106 → ?v=5120
+      El parámetro de versión en index.html estaba congelado en v5.106
+      desde hace varias versiones. Sin actualizarlo, el navegador podía
+      servir versiones cacheadas de raw-overlay.js sin los fixes
+      recientes. Ahora cada commit incrementa el query string.
 
-   ── Heredado v5.115 ──
+   ── Heredado v5.119 ──
+   FIX A: cerrarDial setTimeout(290ms) ya no pisa estado si reabriste.
+   FIX B: re-_reposicionarHUD con doble rAF después del render Sim.
+
+   ── Heredado v5.118 ──
+   Sub-ring se anima al desaparecer.
+
+   ── Heredado v5.117 ──
    Dial dinámico responsivo con _calcDialSize().
 
    ── Heredado v5.113 ──
@@ -3868,11 +3878,31 @@ function _dialDrawCentro(ctx, dc, isHov, pulseT){
 
 function _animarSubRing(targetSub){
   if(_subRingRAF){ cancelAnimationFrame(_subRingRAF); _subRingRAF=null; }
+  // v5.118: si el click es sobre el mismo gajo, animar SALIDA (1→0) con el
+  // mismo easing en lugar de saltar a 0. _dialActiveSub permanece durante
+  // la animación para que se siga dibujando, y al final se pone -1.
   if(targetSub === _subRingPrevSub){
-    _dialActiveSub = -1;
-    _subRingPrevSub = -1;
-    _subRingProg = 0;
-    _dialDraw();
+    var startTimeC = null;
+    var DURATION_C = 320;
+    var fromProgC  = _subRingProg; // suele ser 1, pero si abren+cierran rápido podría ser <1
+    function stepClose(ts){
+      if(!startTimeC) startTimeC = ts;
+      var elapsedC = ts - startTimeC;
+      var tC = Math.min(1, elapsedC / DURATION_C);
+      var easedC = 1 - Math.pow(1 - tC, 3);
+      _subRingProg = fromProgC * (1 - easedC);
+      _dialDraw();
+      if(tC < 1){
+        _subRingRAF = requestAnimationFrame(stepClose);
+      } else {
+        _subRingRAF = null;
+        _subRingProg = 0;
+        _dialActiveSub = -1;
+        _subRingPrevSub = -1;
+        _dialDraw();
+      }
+    }
+    _subRingRAF = requestAnimationFrame(stepClose);
     return;
   }
   _dialActiveSub  = targetSub;
@@ -4368,9 +4398,34 @@ function abrirDial(){
   // Reposicionar antes de que aparezcan las cosas (para que cuando aparezcan
   // ya estén en sus coordenadas correctas)
   if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
-  if(typeof window._refrescarEspejos==='function') setTimeout(function(){ window._refrescarEspejos(); }, 50);
+  // v5.120: _refrescarEspejos rellena los paneles con datos (Patrimonio,
+  // Bitácora, USER XP, etc.) y eso cambia las alturas reales. Hay que
+  // reposicionar DESPUÉS de que esos datos están en el DOM. Encadenamos:
+  //   t+50ms  → _refrescarEspejos (datos)
+  //   t+120ms → _reposicionarHUD (medir con datos nuevos)
+  if(typeof window._refrescarEspejos==='function'){
+    setTimeout(function(){
+      window._refrescarEspejos();
+      // Doble rAF para que el navegador haya pintado los datos antes de medir
+      requestAnimationFrame(function(){
+        requestAnimationFrame(function(){
+          if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+        });
+      });
+    }, 50);
+  }
   if(typeof renderSimsBandSimsStyle==='function') renderSimsBandSimsStyle('hud-sim-band-grid');
   if(typeof renderSimsNeeds==='function' && document.getElementById('hud-sim-needs-grid')) renderSimsNeeds('hud-sim-needs-grid');
+  // v5.119: re-reposicionar DESPUÉS del render del Sim banda. Sin esto, el
+  // primer _reposicionarHUD midió scrollHeight del Sim antes de que se
+  // pintaran las 9 needs, dejando posiciones equivocadas hasta T_CLEANUP
+  // (11s). Al hacer click en "Nueva" cuando se viene del anverso, eso
+  // resultaba en paneles encimados/mal posicionados toda la apertura.
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      if(typeof window._reposicionarHUD==='function') window._reposicionarHUD();
+    });
+  });
 
   if(window._hudPanels && window.innerWidth>=900){
     // ═══════════════════════════════════════════════════════════════
@@ -4551,6 +4606,12 @@ function cerrarDial(){
     ringE.style.opacity = '0';
   }
   setTimeout(function(){
+    // v5.119: si entre el cerrarDial y este setTimeout (290ms) el usuario
+    // ya REABRIÓ el overlay (_dialVisible=true), NO ejecutar limpieza:
+    // abrirDial ya configuró su propio estado de cascada y pisarlo aquí
+    // rompe el layout (los paneles quedan con _animatingEntry=false y la
+    // cascada no los excluye, sus posiciones se atropellan).
+    if(_dialVisible) return;
     if(_dialOverlay && !_dialVisible) _dialOverlay.style.display='none';
     if(window._hudPanels){ window._hudPanels.forEach(function(hp){
       hp.el.style.opacity='0';
@@ -4564,6 +4625,17 @@ function cerrarDial(){
     }
   }, 290);
 }
+
+// v5.120: exponer EXPLÍCITAMENTE las versiones del overlay a window, para
+// que el botón "Nueva" del HTML (que usa onclick="toggleEntradaDropdown()")
+// garantizado llame a la versión del overlay (con cascada, _calcDialSize,
+// etc) y NO a la versión legacy que existe duplicada en raw-core.js.
+// Sin esto, dependemos del orden de declaración: si por algún cambio de
+// carga raw-core.js terminara ganando el binding global, "Nueva" rompería
+// el overlay. Esto blinda el flujo.
+window.abrirDial = abrirDial;
+window.cerrarDial = cerrarDial;
+window.toggleEntradaDropdown = toggleEntradaDropdown;
 
 function abrirFormulario(modo){
   var dd=document.getElementById('entrada-dropdown');
