@@ -1,28 +1,43 @@
-/* RAW Entry — Overlay v.5.126
-   FIX: cards laterales conservan su ancho original al entrar a modo expandido.
+/* RAW Entry — Overlay v.5.127
+   FIX: clicks no funcionaban en +Nueva (carrusel, expansiones, dial).
 
-   ── Bug ──
-   Al expandir una card (ej. Patrimonio), las demás cards laterales se
-   movían a los extremos como "tabs" pero forzaban su ancho a 240px
-   hardcodeado. En pantallas donde COL_W normal es 270, 300 o 340, eso
-   las hacía verse más angostas que en el overlay normal.
+   ── Causa raíz ──
+   En v5.125 toggleEntradaDropdown hacía `hp.el.style.cssText = ''` para
+   "resetear" los paneles antes de abrirDial. Pero eso eliminaba TODO el
+   styling visual original (background, border, box-shadow, animation,
+   font-family, CSS variables --pc-dim/--pc-mid/--pc-glow). Yo
+   reaplicaba solo unos pocos (position, opacity, visibility, etc.).
+   
+   Resultado: los paneles perdían su aspecto visual y POSIBLEMENTE su
+   capacidad de capturar clicks (algunos hovers CSS dependen del border
+   y de las variables que se borraron).
 
-   ── Fix ──
-   En el bloque `if(expandedEl)` de _reposicionarHUD, calcular COL_W_exp
-   con la misma lógica de escalones (340/300/270/240/210) que usa el
-   overlay normal, basándose en r.left (que mide el espacio disponible).
-   Aplicar ese ancho a las cards laterales en lugar de 240 fijo.
-   También ajustar centerW (ancho del panel expandido) para reservar el
-   espacio correcto basado en COL_W_exp: reservaLat = (COL_W_exp+GAP*2)*2.
+   ── Fix v5.127 ──
+   Limpieza QUIRÚRGICA en lugar de cssText=''. Solo limpiar las
+   propiedades que abrirDial/reposicionarHUD necesitan recalcular:
+     · left/top/right/bottom
+     · width/height/min*/max*
+     · overflowY/transform/clipPath
+     · opacity/visibility/transition (para que abrirDial los maneje)
+     · pointer-events (vacío = hereda default auto)
+   NO se tocan: background, border, box-shadow, backdrop-filter,
+   animation, font-family, CSS variables --pc-*.
+
+   El listener del CARRUSEL (megatabs) y los listeners de los botones
+   de EXPANSIÓN están registrados en los paneles, que NO se destruyen.
+   Como ahora no rompemos su styling, sus interacciones funcionan.
+
+   El listener del DIAL CANVAS se recrea en _crearDialOverlay junto con
+   el canvas nuevo, así que ese también funciona.
+
+   ── Heredado v5.126 ──
+   Cards laterales conservan COL_W dinámico al entrar a modo expandido.
 
    ── Heredado v5.125 ──
-   +Nueva destruye overlay y reusa el mismo flujo que DOMContentLoaded.
-   Modo rápido eliminado.
+   +Nueva destruye _dialOverlay y usa el mismo flujo de DOMContentLoaded.
 
    ── Heredado v5.121 ──
    Eliminar paneles huérfanos creados por raw-core.
-
-   ── Heredado v5.120 ──
    _refrescarEspejos → re-reposicionar (paneles crecen con datos reales).
    window.abrirDial/cerrarDial expuestos. Cache bust.
 
@@ -4322,24 +4337,25 @@ function toggleEntradaDropdown(){
     cerrarDial();
     return;
   }
-  // v5.125: hacer que +Nueva ejecute EXACTAMENTE el mismo flujo de
-  // apertura que DOMContentLoaded. La clave: que abrirDial vea el mismo
-  // estado inicial que ve en la primera carga.
+  // v5.127: hacer que +Nueva produzca el mismo estado que DOMContentLoaded.
   //
-  // En la PRIMERA carga: _dialOverlay=null, paneles existen recién creados
-  // sin estilos inline aplicados (solo los iniciales de _mkFloatPanel:
-  // opacity:0, visibility:hidden, transition:opacity 500ms).
+  // En la PRIMERA carga: _dialOverlay=null. Después abrirDial llama
+  // _crearDialOverlay que crea canvas+glow+ring Y REGISTRA todos los
+  // listeners del dial. Los paneles _pUser etc. ya existen en el DOM
+  // desde el IIFE inicial, con todos sus listeners (megatabs, expand
+  // buttons, etc.) ya registrados al momento de su creación.
   //
-  // En +Nueva: _dialOverlay existe, paneles existen pero tienen estilos
-  // inline aplicados de cierres/aperturas previos (left/top/width/etc).
-  // Eso contaminaba el primer _reposicionarHUD.
+  // En +Nueva: _dialOverlay existe con su canvas y sus listeners ya
+  // registrados. Si NO destruyo _dialOverlay, los listeners siguen
+  // funcionando pero el canvas tiene estilos residuales que rompen el
+  // primer _reposicionarHUD. Si SÍ destruyo _dialOverlay, _crearDialOverlay
+  // recrea canvas+listeners → todo bien por ese lado.
   //
-  // Solución: ELIMINAR el _dialOverlay del DOM y resetear sus referencias.
-  // Cuando abrirDial corra _crearDialOverlay, recreará canvas+glow+ring
-  // desde cero. Y al estar el canvas recién creado SIN style.width inline
-  // y SIN transform residual, getBoundingClientRect medirá igual que en
-  // la primera carga. Los paneles (en document.body) los conservamos
-  // porque su HTML interno es correcto; solo limpiamos sus inline styles.
+  // Los paneles NO se tocan (sus listeners siguen vivos). Solo limpio
+  // QUIRÚRGICAMENTE las propiedades de posicionamiento que abrirDial
+  // necesita resetear (left/top/width/etc.). NO tocar cssText ni los
+  // estilos visuales (background/border/animation), porque eso rompe
+  // el aspecto de los paneles y los listeners CSS-driven (hovers, etc.)
   if(_dialOverlay && _dialOverlay.parentNode){
     _dialOverlay.parentNode.removeChild(_dialOverlay);
   }
@@ -4347,24 +4363,33 @@ function toggleEntradaDropdown(){
   _dialCanvas  = null;
   _dialCtx     = null;
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
-  // Limpiar inline styles de TODOS los paneles para que abrirDial parta
-  // del mismo estado que en la carga inicial.
+  // Limpieza QUIRÚRGICA: solo propiedades de layout, no styling visual.
   if(window._hudPanels){
     window._hudPanels.forEach(function(hp){
       if(!hp.el) return;
       hp.el._animatingEntry = false;
-      hp.el.style.cssText = '';
-      // Re-aplicar los estilos base de _mkFloatPanel (lo crítico: position
-      // fixed, transition opacity, opacity 0, visibility hidden). Como no
-      // tenemos _mkFloatPanel a mano aquí, reseteamos a los valores
-      // mínimos que sabemos que son correctos.
-      hp.el.style.position    = 'fixed';
-      hp.el.style.zIndex      = '9001';
-      hp.el.style.opacity     = '0';
-      hp.el.style.visibility  = 'hidden';
-      hp.el.style.transition  = 'opacity 500ms ease-out';
-      hp.el.style.borderRadius= '14px';
-      hp.el.style.overflow    = 'hidden';
+      // Solo limpiar propiedades de POSICIONAMIENTO/LAYOUT que abrirDial
+      // y _reposicionarHUD van a recalcular. NO tocar background, border,
+      // box-shadow, animation, filter, font-family, etc.
+      hp.el.style.left       = '';
+      hp.el.style.top        = '';
+      hp.el.style.right      = '';
+      hp.el.style.bottom     = '';
+      hp.el.style.width      = '';
+      hp.el.style.height     = '';
+      hp.el.style.minHeight  = '';
+      hp.el.style.maxHeight  = '';
+      hp.el.style.minWidth   = '';
+      hp.el.style.maxWidth   = '';
+      hp.el.style.overflowY  = '';
+      hp.el.style.transform  = '';
+      hp.el.style.clipPath   = '';
+      // Reset opacity/visibility/transition para que abrirDial los maneje
+      hp.el.style.opacity    = '0';
+      hp.el.style.visibility = 'hidden';
+      hp.el.style.transition = 'opacity 500ms ease-out';
+      // pointer-events vacío permite que herede default (auto)
+      hp.el.style.pointerEvents = '';
       hp.el.classList.remove('hud-breathing','hud-scan','hud-scan-2');
       var inner = hp.el.querySelector(':scope > [id$="-inner"]');
       if(inner){
@@ -4373,8 +4398,7 @@ function toggleEntradaDropdown(){
       }
     });
   }
-  // Forzar reflow para asegurar que los resets se aplican antes de abrirDial
-  void document.body.offsetHeight;
+  void document.body.offsetHeight; // reflow
   abrirDial();
 }
 
