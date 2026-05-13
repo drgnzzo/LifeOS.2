@@ -1,27 +1,27 @@
-/* RAW Entry — Overlay v.5.127
-   FIX: clicks no funcionaban en +Nueva (carrusel, expansiones, dial).
+/* RAW Entry — Overlay v.5.128
+   FIX urgente: error de sintaxis que rompía toda la página.
 
-   ── Causa raíz ──
-   En v5.125 toggleEntradaDropdown hacía `hp.el.style.cssText = ''` para
-   "resetear" los paneles antes de abrirDial. Pero eso eliminaba TODO el
-   styling visual original (background, border, box-shadow, animation,
-   font-family, CSS variables --pc-dim/--pc-mid/--pc-glow). Yo
-   reaplicaba solo unos pocos (position, opacity, visibility, etc.).
-   
-   Resultado: los paneles perdían su aspecto visual y POSIBLEMENTE su
-   capacidad de capturar clicks (algunos hovers CSS dependen del border
-   y de las variables que se borraron).
+   ── Bug ──
+   El header en v5.127 contenía la secuencia "asterisco-slash" dentro
+   de un comentario de bloque. Esa secuencia cierra el comentario
+   prematuramente, dejando todo el código siguiente como tokens sueltos
+   y produciendo SyntaxError. El navegador no podía cargar el archivo.
 
-   ── Fix v5.127 ──
+   ── Fix ──
+   Reemplazar el patrón problemático por guiones. El asterisco solo
+   está prohibido inmediatamente antes de un slash dentro de comentarios
+   de bloque.
+
+   ── Heredado v5.127 ──
    Limpieza QUIRÚRGICA en lugar de cssText=''. Solo limpiar las
    propiedades que abrirDial/reposicionarHUD necesitan recalcular:
      · left/top/right/bottom
-     · width/height/min*/max*
+     · width/height/min-max
      · overflowY/transform/clipPath
      · opacity/visibility/transition (para que abrirDial los maneje)
      · pointer-events (vacío = hereda default auto)
    NO se tocan: background, border, box-shadow, backdrop-filter,
-   animation, font-family, CSS variables --pc-*.
+   animation, font-family, CSS variables --pc-X.
 
    El listener del CARRUSEL (megatabs) y los listeners de los botones
    de EXPANSIÓN están registrados en los paneles, que NO se destruyen.
