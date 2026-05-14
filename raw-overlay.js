@@ -1,27 +1,39 @@
-/* RAW Entry — Overlay v.5.128
-   FIX urgente: error de sintaxis que rompía toda la página.
+/* RAW Entry — Overlay v.5.129
+   FIX clicks no funcionan en +Nueva + logger de diagnóstico.
 
-   ── Bug ──
-   El header en v5.127 contenía la secuencia "asterisco-slash" dentro
-   de un comentario de bloque. Esa secuencia cierra el comentario
-   prematuramente, dejando todo el código siguiente como tokens sueltos
-   y produciendo SyntaxError. El navegador no podía cargar el archivo.
+   ── Hipótesis del bug ──
+   En +Nueva, el _dialOverlay se destruye y se recrea con z-index:9000.
+   Los paneles flotantes en document.body tienen z-index:9001 declarado
+   inline en _mkFloatPanel cuando se crearon. Pero la limpieza quirúrgica
+   de v5.127 limpiaba muchas propiedades inline. Aunque no tocaba z-index
+   directamente, otros mecanismos (resize, _resetDuroLayout) pueden haber
+   limpiado el z-index inline, dejando los paneles sin él. Sin z-index
+   inline, el browser usa el default "auto", y aunque visualmente quedan
+   encima por orden DOM, el stacking context del _dialOverlay recreado
+   puede capturar los clicks primero (porque tiene z-index:9000 explícito).
 
-   ── Fix ──
-   Reemplazar el patrón problemático por guiones. El asterisco solo
-   está prohibido inmediatamente antes de un slash dentro de comentarios
-   de bloque.
+   ── Fix v5.129 ──
+   En toggleEntradaDropdown (+Nueva), después de la limpieza quirúrgica,
+   FORZAR en cada panel:
+     · pointer-events: auto  (en lugar de '')
+     · z-index: 9001         (explícito, garantiza estar encima)
+   Esto asegura que los paneles capturan los clicks antes que el overlay.
+
+   ── Logger de diagnóstico ──
+   Si después de v5.129 los clicks siguen muertos, activar en consola:
+       window._dbgClicks = true
+   y luego hacer click sobre cualquier panel. La consola mostrará:
+     · target element y sus styles computados
+     · panel padre y su visibility/pointerEvents/opacity/zIndex
+     · qué elemento captura el click via document.elementFromPoint
+     · path del DOM hasta body
+   Con esa info se puede identificar exactamente qué bloquea los clicks.
+
+   ── Heredado v5.128 ──
+   Fix de SyntaxError por asterisco-slash en comentarios.
 
    ── Heredado v5.127 ──
-   Limpieza QUIRÚRGICA en lugar de cssText=''. Solo limpiar las
-   propiedades que abrirDial/reposicionarHUD necesitan recalcular:
-     · left/top/right/bottom
-     · width/height/min-max
-     · overflowY/transform/clipPath
-     · opacity/visibility/transition (para que abrirDial los maneje)
-     · pointer-events (vacío = hereda default auto)
-   NO se tocan: background, border, box-shadow, backdrop-filter,
-   animation, font-family, CSS variables --pc-X.
+   Limpieza quirúrgica en toggleEntradaDropdown sin borrar styling visual.
 
    El listener del CARRUSEL (megatabs) y los listeners de los botones
    de EXPANSIÓN están registrados en los paneles, que NO se destruyen.
@@ -4388,8 +4400,14 @@ function toggleEntradaDropdown(){
       hp.el.style.opacity    = '0';
       hp.el.style.visibility = 'hidden';
       hp.el.style.transition = 'opacity 500ms ease-out';
-      // pointer-events vacío permite que herede default (auto)
-      hp.el.style.pointerEvents = '';
+      // v5.129: GARANTIZAR pointer-events:auto y z-index alto.
+      // En +Nueva, el _dialOverlay recreado tiene z-index:9000. Los paneles
+      // deben quedar por encima (z-index:9001+) para capturar clicks. Si por
+      // algún motivo perdieron z-index inline (heredado del CSS de
+      // _mkFloatPanel), los clicks pasan al overlay debajo en lugar de
+      // llegar a los paneles → carrusel/expand/dial parecen "muertos".
+      hp.el.style.pointerEvents = 'auto';
+      hp.el.style.zIndex        = '9001';
       hp.el.classList.remove('hud-breathing','hud-scan','hud-scan-2');
       var inner = hp.el.querySelector(':scope > [id$="-inner"]');
       if(inner){
@@ -4772,6 +4790,32 @@ function cerrarDial(){
 window.abrirDial = abrirDial;
 window.cerrarDial = cerrarDial;
 window.toggleEntradaDropdown = toggleEntradaDropdown;
+
+// v5.129 DEBUG: logger de clicks para diagnosticar bug "+Nueva sin clicks".
+// Activar con window._dbgClicks=true antes de hacer click.
+// Loggea: el elemento clickeado, su padre _hudPanel si existe, y el path completo.
+document.addEventListener('click', function(e){
+  if(!window._dbgClicks) return;
+  var target = e.target;
+  var panel = target.closest && target.closest('.hud-pnl');
+  var path = [];
+  var n = target;
+  while(n && n !== document.body){
+    var desc = n.tagName + (n.id?'#'+n.id:'') + (n.className?'.'+String(n.className).split(' ').slice(0,2).join('.'):'');
+    path.push(desc);
+    n = n.parentNode;
+  }
+  console.log('🖱️ CLICK', {
+    target: target.tagName + (target.id?'#'+target.id:'') + (target.className?'.'+String(target.className).slice(0,40):''),
+    panel: panel ? panel.id : 'NO PANEL',
+    panelVisibility: panel ? getComputedStyle(panel).visibility : '?',
+    panelPointerEvents: panel ? getComputedStyle(panel).pointerEvents : '?',
+    panelOpacity: panel ? getComputedStyle(panel).opacity : '?',
+    panelZIndex: panel ? getComputedStyle(panel).zIndex : '?',
+    elementAtPoint: document.elementFromPoint(e.clientX, e.clientY),
+    path: path.slice(0, 8).join(' > ')
+  });
+}, true); // capture phase para correr antes que cualquier otro listener
 
 function abrirFormulario(modo){
   var dd=document.getElementById('entrada-dropdown');
