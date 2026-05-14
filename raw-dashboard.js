@@ -378,7 +378,20 @@ function refreshTodo(){
   const btn=document.getElementById('btn-rf');
   if(btn){btn.classList.add('spinning');btn.disabled=true;}
   progStart();setChip('load','Actualizando');
+  // v5.130 DEBUG: capturar el error real que dispara el toast.
+  // Los .catch() vacíos enmascaraban el error original.
+  console.log('🔄 refreshTodo: empezando');
   Promise.all([api.getAll(),consultarSaldo()]).then(([d])=>{
+    console.log('🔄 refreshTodo: api.getAll respondió', {
+      ok: d && d.ok,
+      tieneCatalogos: !!(d && d.catalogos),
+      tieneFijos: !!(d && d.fijos),
+      tipoFijos: d && d.fijos ? (Array.isArray(d.fijos) ? 'array['+d.fijos.length+']' : typeof d.fijos) : 'NULL',
+      tieneApartados: !!(d && d.apartados),
+      tienePatrimonio: !!(d && d.patrimonio),
+      keys: d ? Object.keys(d).slice(0,20) : null,
+      errorEnD: d && d.error
+    });
     if(d&&d.catalogos)onCats(d.catalogos);
     if(d&&d.apartados)renderApartados(d.apartados);
     if(d&&d.fijos)renderEntes(d.fijos);
@@ -391,16 +404,27 @@ function refreshTodo(){
     if(d&&d.activityCheck){window._actData=d.activityCheck;}
     if(d&&d.nutricion)   { window._nutData=d.nutricion;        if(typeof renderNutricion==='function') renderNutricion(d.nutricion); }
     if(d&&d.entrenamiento){ window._entData=d.entrenamiento; }
-    api.getPensamientos().then(r=>{window._pensamientosData=r;renderPensamientos(r);renderSimsPanel();}).catch(()=>{});
-    api.getRelaciones().then(r=>{window._relacionesData=r;renderRelaciones(r);renderSimsPanel();}).catch(()=>{});
-    api.getSalud().then(renderSalud).catch(()=>{});
-    api.getPatrimonio().then(function(d){window._patrimonioData=d;renderPatrimonio(d);}).catch(()=>{});
+    api.getPensamientos().then(r=>{window._pensamientosData=r;renderPensamientos(r);renderSimsPanel();}).catch(e=>console.warn('getPensamientos falló:',e));
+    api.getRelaciones().then(r=>{window._relacionesData=r;renderRelaciones(r);renderSimsPanel();}).catch(e=>console.warn('getRelaciones falló:',e));
+    api.getSalud().then(renderSalud).catch(e=>console.warn('getSalud falló:',e));
+    api.getPatrimonio().then(function(d){
+      console.log('🔄 getPatrimonio respondió', { ok: d && d.ok, banco: d && d.banco && d.banco.items && d.banco.items.length, fisico: d && d.fisico && d.fisico.items && d.fisico.items.length });
+      window._patrimonioData=d;renderPatrimonio(d);
+    }).catch(e=>console.warn('getPatrimonio falló:',e));
     if(typeof cargarScore==='function')cargarScore();
     cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
     // Refrescar la banda Sim del dashboard
     renderSimsPanel();
     if(btn){btn.classList.remove('spinning');btn.disabled=false;}progDone();showToast('Datos actualizados');
-  }).catch(()=>{if(btn){btn.classList.remove('spinning');btn.disabled=false;}progDone();showToast('Error al actualizar',false);});
+    console.log('🔄 refreshTodo: completado OK');
+  }).catch((err)=>{
+    // v5.130: ahora vemos el error real en consola.
+    console.error('❌ refreshTodo FALLÓ:', err);
+    console.error('   stack:', err && err.stack);
+    if(btn){btn.classList.remove('spinning');btn.disabled=false;}
+    progDone();
+    showToast('Error al actualizar',false);
+  });
 }
 
 // ══════════════════════════════════════════
