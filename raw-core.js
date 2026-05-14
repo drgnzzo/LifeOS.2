@@ -1532,7 +1532,7 @@ function renderEntes(data){
     const {txt,cls}=fmtMoneda(f.monto);const excluido=f.nombre==='P';
     const bancKey=(f.nombre||'').trim().toUpperCase();const apBanco=apartadosPorBanco[bancKey]||0;
     const disponible=(f.monto||0)-apBanco;const {txt:dTxt}=fmtMoneda(disponible);
-    return `<div class="ente-row${excluido?' excluido-total':''}" onclick="togEnteEdit(${f.fila})">
+    return `<div class="ente-row${excluido?' excluido-total':''}" onclick="togEnteEdit(${f.fila},event)">
       <div class="ente-nombre">${f.nombre}</div>
       <div class="ente-right">
         <div style="text-align:right">
@@ -1544,51 +1544,92 @@ function renderEntes(data){
     </div>
     <div class="ente-edit" id="ee-${f.fila}">
       <input type="number" value="${f.monto!==null?f.monto:''}" step="0.01" inputmode="decimal" id="ei-${f.fila}" placeholder="0.00"
-        onkeydown="if(event.key==='Enter')guardarEnte(${f.fila});if(event.key==='Escape')togEnteEdit(${f.fila})">
-      <button class="btn-check" id="ec-${f.fila}" onclick="guardarEnte(${f.fila})"><i class="fas fa-check" id="ei-ico-${f.fila}"></i></button>
+        onkeydown="if(event.key==='Enter')guardarEnte(${f.fila},event);if(event.key==='Escape')togEnteEdit(${f.fila},event)">
+      <button class="btn-check" id="ec-${f.fila}" onclick="guardarEnte(${f.fila},event)"><i class="fas fa-check" id="ei-ico-${f.fila}"></i></button>
     </div>`;
   }).join('')+(hayExcluidos?'<div class="ente-excluido-nota">* excluido del total</div>':'');
 }
-function togEnteEdit(fila){
-  // v5.131 DEBUG: ver si la función se llama y por qué retorna
-  console.log('🔧 togEnteEdit llamado con fila=', fila, 'tipo=', typeof fila);
-  const ee=document.getElementById('ee-'+fila);
-  if(!ee){
-    console.warn('❌ togEnteEdit: no encuentra ee-'+fila+'. ¿Existe en el DOM?',
-      'Todos los ee-*:', Array.from(document.querySelectorAll('[id^="ee-"]')).map(e=>e.id));
-    return;
+function togEnteEdit(fila, evt){
+  // v5.132: hay IDs ee-FILA duplicados en el DOM porque renderEntes y
+  // renderPatrimonio generan ambos sus propias filas editables con los
+  // mismos IDs. getElementById('ee-3') retorna el PRIMERO del DOM, que
+  // puede no ser el visible. Solución: usar el event para encontrar el
+  // .ente-row clickeado y de ahí navegar al .ente-edit que le sigue.
+  evt = evt || window.event;
+  var ee = null;
+  if(evt && evt.currentTarget && evt.currentTarget.classList && evt.currentTarget.classList.contains('ente-row')){
+    // El elemento clickeado es el .ente-row. El .ente-edit es su hermano siguiente.
+    ee = evt.currentTarget.nextElementSibling;
+    if(!ee || !ee.classList.contains('ente-edit')) ee = null;
   }
-  console.log('✓ togEnteEdit: ee-'+fila+' encontrado, abriendo editor');
-  const isOpen=ee.classList.contains('open');
-  document.querySelectorAll('.ente-edit').forEach(e=>e.classList.remove('open'));
-  if(!isOpen){ee.classList.add('open');document.getElementById('ei-'+fila).focus();}
-}
-window.togEnteEdit = togEnteEdit; // v5.131: garantizar acceso desde onclick=
-
-function guardarEnte(fila){
-  console.log('💾 guardarEnte llamado fila=', fila);
-  const inp=document.getElementById('ei-'+fila);
-  const val=parseFloat(inp.value);
-  if(isNaN(val))return;
-  const ico=document.getElementById('ei-ico-'+fila);
-  ico.className='fas fa-circle-notch fa-spin';
-  api.actualizarFijo(fila,val).then(r=>{
-    ico.className='fas fa-check';
-    if(r.ok){
-      const {txt,cls}=fmtMoneda(val);
-      const em=document.getElementById('em-'+fila);
-      if(em){em.textContent=txt;em.className='ente-monto '+cls;}
-      togEnteEdit(fila);
-      Promise.all([api.getFijos(),api.getApartados(),api.getPatrimonio()]).then(([fijos,apData,pat])=>{
-        if(apData&&typeof renderApartados==='function')renderApartados(apData);
-        if(typeof renderEntes==='function')renderEntes(fijos);
-        if(pat&&typeof renderPatrimonio==='function'){window._patrimonioData=pat;renderPatrimonio(pat);}
-        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
-      }).catch(()=>api.getFijos().then(f=>{if(typeof renderEntes==='function')renderEntes(f);}));
+  if(!ee && evt && evt.target){
+    // Si currentTarget no funcionó, subir desde target hasta encontrar .ente-row
+    var row = evt.target.closest && evt.target.closest('.ente-row');
+    if(row){
+      var sib = row.nextElementSibling;
+      if(sib && sib.classList.contains('ente-edit')) ee = sib;
     }
-  }).catch(()=>{ico.className='fas fa-check';});
+  }
+  // Fallback: getElementById (comportamiento original) — pero ahora solo si
+  // no hay event (p.ej. llamada desde teclado de un input específico).
+  if(!ee) ee = document.getElementById('ee-'+fila);
+  if(!ee) return;
+  var isOpen = ee.classList.contains('open');
+  // Cerrar TODOS los otros editores antes de abrir
+  document.querySelectorAll('.ente-edit.open').forEach(function(e){ e.classList.remove('open'); });
+  if(!isOpen){
+    ee.classList.add('open');
+    // Buscar el input dentro de ESTE ente-edit (no por ID global)
+    var inp = ee.querySelector('input[type="number"]');
+    if(inp) inp.focus();
+  }
 }
-window.guardarEnte = guardarEnte; // v5.131: garantizar acceso desde onclick=
+window.togEnteEdit = togEnteEdit;
+
+function guardarEnte(fila, evt){
+  // v5.132: mismo problema — buscar el input dentro del contenedor visible.
+  evt = evt || window.event;
+  var inp = null;
+  if(evt && evt.target){
+    var ee = evt.target.closest && evt.target.closest('.ente-edit');
+    if(ee) inp = ee.querySelector('input[type="number"]');
+  }
+  if(!inp) inp = document.getElementById('ei-'+fila);
+  if(!inp) return;
+  var val = parseFloat(inp.value);
+  if(isNaN(val)) return;
+  // Buscar el ícono dentro del mismo ente-edit visible
+  var ico = null;
+  if(evt && evt.target){
+    var ee2 = evt.target.closest && evt.target.closest('.ente-edit');
+    if(ee2) ico = ee2.querySelector('.btn-check i');
+  }
+  if(!ico) ico = document.getElementById('ei-ico-'+fila);
+  if(ico) ico.className = 'fas fa-circle-notch fa-spin';
+  api.actualizarFijo(fila,val).then(function(r){
+    if(ico) ico.className = 'fas fa-check';
+    if(r.ok){
+      // Actualizar TODOS los em-FILA visibles (puede haber duplicados)
+      document.querySelectorAll('[id="em-'+fila+'"]').forEach(function(em){
+        var fm = fmtMoneda(val);
+        em.textContent = fm.txt;
+        em.className = 'ente-monto ' + fm.cls;
+      });
+      // Cerrar TODOS los ente-edit abiertos
+      document.querySelectorAll('.ente-edit.open').forEach(function(e){ e.classList.remove('open'); });
+      Promise.all([api.getFijos(),api.getApartados(),api.getPatrimonio()]).then(function(arr){
+        var fijos=arr[0], apData=arr[1], pat=arr[2];
+        if(apData && typeof renderApartados==='function') renderApartados(apData);
+        if(typeof renderEntes==='function') renderEntes(fijos);
+        if(pat && typeof renderPatrimonio==='function'){ window._patrimonioData=pat; renderPatrimonio(pat); }
+        if(typeof window._refrescarEspejos==='function') window._refrescarEspejos();
+      }).catch(function(){
+        api.getFijos().then(function(f){ if(typeof renderEntes==='function') renderEntes(f); });
+      });
+    }
+  }).catch(function(){ if(ico) ico.className = 'fas fa-check'; });
+}
+window.guardarEnte = guardarEnte;
 
 // ══════════════════════════════════════════
 //  SOS
