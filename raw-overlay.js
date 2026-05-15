@@ -1,39 +1,56 @@
-/* RAW Entry — Overlay v.5.129
-   FIX clicks no funcionan en +Nueva + logger de diagnóstico.
+/* RAW Entry — Overlay v.5.134
+   FIX clicks rotos en +Nueva — causa raíz definitiva.
 
-   ── Hipótesis del bug ──
-   En +Nueva, el _dialOverlay se destruye y se recrea con z-index:9000.
-   Los paneles flotantes en document.body tienen z-index:9001 declarado
-   inline en _mkFloatPanel cuando se crearon. Pero la limpieza quirúrgica
-   de v5.127 limpiaba muchas propiedades inline. Aunque no tocaba z-index
-   directamente, otros mecanismos (resize, _resetDuroLayout) pueden haber
-   limpiado el z-index inline, dejando los paneles sin él. Sin z-index
-   inline, el browser usa el default "auto", y aunque visualmente quedan
-   encima por orden DOM, el stacking context del _dialOverlay recreado
-   puede capturar los clicks primero (porque tiene z-index:9000 explícito).
+   ── Bug ──
+   En +Nueva, toggleEntradaDropdown destruye el _dialOverlay y
+   _crearDialOverlay lo recrea con document.body.appendChild. Eso lo
+   inserta AL FINAL del body — DESPUÉS de los paneles flotantes en
+   orden DOM (los paneles se crearon en la primera carga y persisten).
 
-   ── Fix v5.129 ──
-   En toggleEntradaDropdown (+Nueva), después de la limpieza quirúrgica,
-   FORZAR en cada panel:
-     · pointer-events: auto  (en lugar de '')
-     · z-index: 9001         (explícito, garantiza estar encima)
-   Esto asegura que los paneles capturan los clicks antes que el overlay.
+   Combinación letal:
+     · _dialOverlay tiene backdrop-filter:blur(28px) saturate(160%)
+       brightness(0.68) → crea stacking context independiente
+     · _dialOverlay z-index:9000, paneles z-index:9001
+     · Overlay aparece DESPUÉS en orden DOM
+     · Resultado: aunque z-index del panel es mayor, el stacking context
+       creado por backdrop-filter combinado con orden DOM hace que
+       document.elementFromPoint() retorne dial-overlay sobre los paneles
+     · Clicks llegan al overlay (que tiene pointer-events:auto para el
+       "click fuera para cerrar"), no a los paneles
+     · Solo Sim banda (megatabs) seguía funcionando porque... no sé,
+       quizás su posición coincide con un área del overlay donde el
+       stacking diverge.
 
-   ── Logger de diagnóstico ──
-   Si después de v5.129 los clicks siguen muertos, activar en consola:
-       window._dbgClicks = true
-   y luego hacer click sobre cualquier panel. La consola mostrará:
-     · target element y sus styles computados
-     · panel padre y su visibility/pointerEvents/opacity/zIndex
-     · qué elemento captura el click via document.elementFromPoint
-     · path del DOM hasta body
-   Con esa info se puede identificar exactamente qué bloquea los clicks.
+   ── Fix ──
+   En _crearDialOverlay, en lugar de document.body.appendChild(_dialOverlay),
+   usar document.body.insertBefore(_dialOverlay, primerPanel). Esto pone
+   el overlay ANTES de los paneles en orden DOM. Ahora los paneles ganan
+   por z-index (9001>9000) Y por orden DOM (vienen después).
 
-   ── Heredado v5.128 ──
-   Fix de SyntaxError por asterisco-slash en comentarios.
+   ── Heredado v5.129 ──
+   Forzar z-index:9001 y pointer-events:auto en paneles tras reset.
 
    ── Heredado v5.127 ──
-   Limpieza quirúrgica en toggleEntradaDropdown sin borrar styling visual.
+   Limpieza quirúrgica en toggleEntradaDropdown.
+   "resetear" los paneles antes de abrirDial. Pero eso eliminaba TODO el
+   styling visual original (background, border, box-shadow, animation,
+   font-family, CSS variables --pc-dim/--pc-mid/--pc-glow). Yo
+   reaplicaba solo unos pocos (position, opacity, visibility, etc.).
+   
+   Resultado: los paneles perdían su aspecto visual y POSIBLEMENTE su
+   capacidad de capturar clicks (algunos hovers CSS dependen del border
+   y de las variables que se borraron).
+
+   ── Fix v5.127 ──
+   Limpieza QUIRÚRGICA en lugar de cssText=''. Solo limpiar las
+   propiedades que abrirDial/reposicionarHUD necesitan recalcular:
+     · left/top/right/bottom
+     · width/height/min-max
+     · overflowY/transform/clipPath
+     · opacity/visibility/transition (para que abrirDial los maneje)
+     · pointer-events (vacío = hereda default auto)
+   NO se tocan: background, border, box-shadow, backdrop-filter,
+   animation, font-family, CSS variables --pc-X.
 
    El listener del CARRUSEL (megatabs) y los listeners de los botones
    de EXPANSIÓN están registrados en los paneles, que NO se destruyen.
@@ -2236,7 +2253,27 @@ function _crearDialOverlay(){
   window._reposicionarHUD = _reposicionarHUD;
 
   _dialOverlay.appendChild(_dialCanvas);
-  document.body.appendChild(_dialOverlay);
+  // v5.134: insertar el _dialOverlay ANTES del primer panel flotante en
+  // document.body, NO al final. Razón: cuando +Nueva destruye y recrea
+  // el overlay, hacer appendChild lo deja DESPUÉS de los paneles en
+  // orden DOM. Aunque z-index del overlay (9000) es menor que el de los
+  // paneles (9001), backdrop-filter del overlay crea un stacking context
+  // independiente que combinado con el orden DOM termina capturando
+  // los clicks que deberían llegar a los paneles. Resultado: clicks en
+  // las cards no funcionan. Insertando ANTES, los paneles quedan después
+  // en orden DOM y ganan tanto por z-index como por orden DOM.
+  var primerPanel = null;
+  for(var pi = 0; pi < _hudPanels.length; pi++){
+    if(_hudPanels[pi] && _hudPanels[pi].el && _hudPanels[pi].el.parentNode === document.body){
+      primerPanel = _hudPanels[pi].el;
+      break;
+    }
+  }
+  if(primerPanel){
+    document.body.insertBefore(_dialOverlay, primerPanel);
+  } else {
+    document.body.appendChild(_dialOverlay);
+  }
 
   window._hudPanels = _hudPanels;
 
@@ -4400,14 +4437,8 @@ function toggleEntradaDropdown(){
       hp.el.style.opacity    = '0';
       hp.el.style.visibility = 'hidden';
       hp.el.style.transition = 'opacity 500ms ease-out';
-      // v5.129: GARANTIZAR pointer-events:auto y z-index alto.
-      // En +Nueva, el _dialOverlay recreado tiene z-index:9000. Los paneles
-      // deben quedar por encima (z-index:9001+) para capturar clicks. Si por
-      // algún motivo perdieron z-index inline (heredado del CSS de
-      // _mkFloatPanel), los clicks pasan al overlay debajo en lugar de
-      // llegar a los paneles → carrusel/expand/dial parecen "muertos".
-      hp.el.style.pointerEvents = 'auto';
-      hp.el.style.zIndex        = '9001';
+      // pointer-events vacío permite que herede default (auto)
+      hp.el.style.pointerEvents = '';
       hp.el.classList.remove('hud-breathing','hud-scan','hud-scan-2');
       var inner = hp.el.querySelector(':scope > [id$="-inner"]');
       if(inner){
@@ -4790,32 +4821,6 @@ function cerrarDial(){
 window.abrirDial = abrirDial;
 window.cerrarDial = cerrarDial;
 window.toggleEntradaDropdown = toggleEntradaDropdown;
-
-// v5.129 DEBUG: logger de clicks para diagnosticar bug "+Nueva sin clicks".
-// Activar con window._dbgClicks=true antes de hacer click.
-// Loggea: el elemento clickeado, su padre _hudPanel si existe, y el path completo.
-document.addEventListener('click', function(e){
-  if(!window._dbgClicks) return;
-  var target = e.target;
-  var panel = target.closest && target.closest('.hud-pnl');
-  var path = [];
-  var n = target;
-  while(n && n !== document.body){
-    var desc = n.tagName + (n.id?'#'+n.id:'') + (n.className?'.'+String(n.className).split(' ').slice(0,2).join('.'):'');
-    path.push(desc);
-    n = n.parentNode;
-  }
-  console.log('🖱️ CLICK', {
-    target: target.tagName + (target.id?'#'+target.id:'') + (target.className?'.'+String(target.className).slice(0,40):''),
-    panel: panel ? panel.id : 'NO PANEL',
-    panelVisibility: panel ? getComputedStyle(panel).visibility : '?',
-    panelPointerEvents: panel ? getComputedStyle(panel).pointerEvents : '?',
-    panelOpacity: panel ? getComputedStyle(panel).opacity : '?',
-    panelZIndex: panel ? getComputedStyle(panel).zIndex : '?',
-    elementAtPoint: document.elementFromPoint(e.clientX, e.clientY),
-    path: path.slice(0, 8).join(' > ')
-  });
-}, true); // capture phase para correr antes que cualquier otro listener
 
 function abrirFormulario(modo){
   var dd=document.getElementById('entrada-dropdown');
