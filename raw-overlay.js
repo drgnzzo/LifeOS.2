@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.138
+/* RAW Entry — Overlay v.5.139
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -2367,41 +2367,35 @@ function _crearDialOverlay(){
         '</svg>';
     }
 
-    // ── DISTRIBUCIÓN: barras horizontales reflejando el % real ──
+    // ── DISTRIBUCIÓN: barras horizontales proporcionales al % real ──
     if(listaEl){
-      // v5.138: antes era una "pirámide" SVG cuyo ancho dependía de la
-      // POSICIÓN del nivel (i/length), NO del porcentaje real. Ahora son
-      // barras horizontales donde el ancho refleja el pct real de cada
-      // necesidad. Orden: de mayor a menor para que el más usado quede
-      // visualmente prominente arriba.
-      var ordenadosPyr = NIVELES_CFG.slice().sort(function(a,b){
-        return Math.abs(_dataDe(b.key).total||0) - Math.abs(_dataDe(a.key).total||0);
-      });
+      // v5.139: orden ORIGINAL de NIVELES_CFG (Fisio→Autorrealización),
+      // sin reordenar. Ancho de cada barra = pct exacto sobre 100% del
+      // contenedor. Si pct=30 → barra ocupa 30%. Si pct=0 → 0%.
       var pyrHTML =
         '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px;text-align:center">DISTRIBUCIÓN</div>'+
-        '<div style="display:flex;flex-direction:column;gap:6px;max-width:340px;margin:0 auto">';
-      ordenadosPyr.forEach(function(c){
+        '<div style="display:flex;flex-direction:column;gap:6px;width:100%;margin:0 auto">';
+      NIVELES_CFG.forEach(function(c){
         var d = _dataDe(c.key);
         var abs = Math.abs(d.total || 0);
-        var pct = totalAll > 0 ? Math.round((abs/totalAll)*100) : 0;
-        // Barra: el contenedor es el 100%. La parte coloreada es pct%.
-        // Mínimo 2% visible cuando hay datos (>0) para que se note el color.
-        var visualW = abs > 0 ? Math.max(2, pct) : 0;
-        var op = abs > 0 ? 1 : 0.25;
+        var pct = totalAll > 0 ? (abs/totalAll)*100 : 0;
+        var pctRound = Math.round(pct);
+        var op = abs > 0 ? 1 : 0.35;
         pyrHTML +=
-          '<div style="position:relative;height:32px;border-radius:6px;background:rgba(255,255,255,0.04);border:1px solid '+c.color+'40;overflow:hidden;opacity:'+op+'">'+
-            // Barra coloreada interior (ancho = pct%)
-            '<div style="position:absolute;left:0;top:0;bottom:0;width:'+visualW+'%;'+
-              'background:linear-gradient(90deg,'+c.color+'dd,'+c.color+');'+
-              'box-shadow:0 0 8px '+c.color+'66;border-radius:5px 0 0 5px"></div>'+
-            // Texto superpuesto: label + monto + %
-            '<div style="position:relative;display:flex;align-items:center;justify-content:space-between;height:100%;padding:0 12px;z-index:1">'+
-              '<span style="font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85)">'+c.label+'</span>'+
-              '<span style="display:flex;align-items:center;gap:10px;font-family:JetBrains Mono,monospace">'+
-                '<span style="font-size:10px;color:rgba(255,255,255,0.95);font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.85)">$ '+abs.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>'+
-                '<span style="font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85);min-width:36px;text-align:right">'+pct+'%</span>'+
-              '</span>'+
+          // Fila: label fijo a la izquierda, track de barra a la derecha
+          '<div style="display:flex;align-items:center;gap:10px;opacity:'+op+'">'+
+            // Label
+            '<div style="flex:0 0 130px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.label+'</div>'+
+            // Track (100% del espacio restante)
+            '<div style="flex:1;position:relative;height:22px;background:rgba(255,255,255,0.04);border:1px solid '+c.color+'30;border-radius:4px;overflow:hidden">'+
+              // Fill (ancho = pct exacto sobre el track)
+              '<div style="position:absolute;left:0;top:0;bottom:0;width:'+pct.toFixed(2)+'%;'+
+                'background:linear-gradient(90deg,'+c.color+'dd,'+c.color+');'+
+                'box-shadow:0 0 6px '+c.color+'66"></div>'+
             '</div>'+
+            // % y monto
+            '<div style="flex:0 0 50px;font-size:11px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;text-align:right">'+pctRound+'%</div>'+
+            '<div style="flex:0 0 90px;font-size:11px;font-weight:700;color:'+c.color+';font-family:JetBrains Mono,monospace;text-align:right;white-space:nowrap">$ '+abs.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>'+
           '</div>';
       });
       pyrHTML += '</div>';
