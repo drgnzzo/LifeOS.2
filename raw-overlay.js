@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.139
+/* RAW Entry — Overlay v.5.140
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -2369,12 +2369,12 @@ function _crearDialOverlay(){
 
     // ── DISTRIBUCIÓN: barras horizontales proporcionales al % real ──
     if(listaEl){
-      // v5.139: orden ORIGINAL de NIVELES_CFG (Fisio→Autorrealización),
-      // sin reordenar. Ancho de cada barra = pct exacto sobre 100% del
-      // contenedor. Si pct=30 → barra ocupa 30%. Si pct=0 → 0%.
+      // v5.140: reemplazo la pirámide SVG por barras horizontales donde
+      // el ANCHO de cada barra refleja el porcentaje real sobre 100%.
+      // Orden original de NIVELES_CFG (Fisiológicas → Autorrealización).
       var pyrHTML =
         '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px;text-align:center">DISTRIBUCIÓN</div>'+
-        '<div style="display:flex;flex-direction:column;gap:6px;width:100%;margin:0 auto">';
+        '<div style="display:flex;flex-direction:column;gap:6px;width:100%">';
       NIVELES_CFG.forEach(function(c){
         var d = _dataDe(c.key);
         var abs = Math.abs(d.total || 0);
@@ -2382,20 +2382,14 @@ function _crearDialOverlay(){
         var pctRound = Math.round(pct);
         var op = abs > 0 ? 1 : 0.35;
         pyrHTML +=
-          // Fila: label fijo a la izquierda, track de barra a la derecha
-          '<div style="display:flex;align-items:center;gap:10px;opacity:'+op+'">'+
-            // Label
-            '<div style="flex:0 0 130px;font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.label+'</div>'+
-            // Track (100% del espacio restante)
-            '<div style="flex:1;position:relative;height:22px;background:rgba(255,255,255,0.04);border:1px solid '+c.color+'30;border-radius:4px;overflow:hidden">'+
-              // Fill (ancho = pct exacto sobre el track)
+          '<div style="display:flex;align-items:center;gap:8px;opacity:'+op+'">'+
+            '<div style="flex:0 0 105px;font-size:10px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.label+'</div>'+
+            '<div style="flex:1;position:relative;height:20px;background:rgba(255,255,255,0.04);border:1px solid '+c.color+'30;border-radius:4px;overflow:hidden;min-width:0">'+
               '<div style="position:absolute;left:0;top:0;bottom:0;width:'+pct.toFixed(2)+'%;'+
                 'background:linear-gradient(90deg,'+c.color+'dd,'+c.color+');'+
                 'box-shadow:0 0 6px '+c.color+'66"></div>'+
             '</div>'+
-            // % y monto
-            '<div style="flex:0 0 50px;font-size:11px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;text-align:right">'+pctRound+'%</div>'+
-            '<div style="flex:0 0 90px;font-size:11px;font-weight:700;color:'+c.color+';font-family:JetBrains Mono,monospace;text-align:right;white-space:nowrap">$ '+abs.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>'+
+            '<div style="flex:0 0 38px;font-size:10px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;text-align:right">'+pctRound+'%</div>'+
           '</div>';
       });
       pyrHTML += '</div>';
