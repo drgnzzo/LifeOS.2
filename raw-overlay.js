@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.142
+/* RAW Entry — Overlay v.5.143
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -2324,12 +2324,23 @@ function _crearDialOverlay(){
     // ── RADAR (lado izquierdo) ──
     if(radarEl){
       var W = 300, H = 280, CX = W/2, CY = H/2 + 10, R = 96;
+      // v5.143: normalizar por el VALOR MÁXIMO entre niveles, no por el
+      // total. Así el nivel más grande llega al borde del radar y los
+      // demás se escalan proporcionalmente. Igual que renderNecesidadesInline
+      // en HOME. Antes con totalAll, si los niveles eran similares (~33%
+      // cada uno), el polígono quedaba chiquito.
+      var maxVal = 0;
+      NIVELES_CFG.forEach(function(c){
+        var v = Math.abs(_dataDe(c.key).total || 0);
+        if(v > maxVal) maxVal = v;
+      });
       var pts = NIVELES_CFG.map(function(c, i){
         var d = _dataDe(c.key);
         var abs = Math.abs(d.total || 0);
-        var pct = totalAll > 0 ? Math.min(1, abs/totalAll) : 0;
-        // Pequeño boost visual: si pct<1 que el polígono se note un poquito (min 0.04 = 4%)
-        var pctVisual = abs > 0 ? Math.max(0.06, pct) : 0;
+        var pctNorm = maxVal > 0 ? abs/maxVal : 0; // 0..1 relativo al máximo
+        var pctTotal = totalAll > 0 ? abs/totalAll : 0; // % real del total (para tooltip/etiqueta)
+        // Pequeño boost visual cuando hay datos pero el valor es muy bajo respecto al máximo
+        var pctVisual = abs > 0 ? Math.max(0.06, pctNorm) : 0;
         var ang = -Math.PI/2 + (Math.PI*2*i)/NIVELES_CFG.length;
         return {
           x: CX + Math.cos(ang) * R * pctVisual,
@@ -2338,7 +2349,7 @@ function _crearDialOverlay(){
           ay: CY + Math.sin(ang) * R,
           label: c.label,
           color: c.color,
-          pct: Math.round(pct*100),
+          pct: Math.round(pctTotal*100),
         };
       });
       var grid = '';
