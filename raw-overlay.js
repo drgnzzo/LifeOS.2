@@ -1,33 +1,37 @@
-/* RAW Entry — Overlay v.5.137
-   Fix bundle: expand buttons en +Nueva, drag handles, scroll Necesidades.
+/* RAW Entry — Overlay v.5.138
+   FIX clicks rotos en +Nueva — causa raíz definitiva.
 
-   ── 3 fixes en este commit ──
+   ── Bug ──
+   En +Nueva, toggleEntradaDropdown destruye el _dialOverlay y
+   _crearDialOverlay lo recrea con document.body.appendChild. Eso lo
+   inserta AL FINAL del body — DESPUÉS de los paneles flotantes en
+   orden DOM (los paneles se crearon en la primera carga y persisten).
 
-   1) BOTONES EXPAND no funcionaban en +Nueva
-      El listener delegado en document seguía vivo pero por alguna razón
-      no atrapaba clicks en +Nueva (probablemente el click no llegaba a
-      document por interferencia del overlay recreado). Fix: agregar
-      onclick inline al botón expand y al cta. No depende del listener
-      delegado.
+   Combinación letal:
+     · _dialOverlay tiene backdrop-filter:blur(28px) saturate(160%)
+       brightness(0.68) → crea stacking context independiente
+     · _dialOverlay z-index:9000, paneles z-index:9001
+     · Overlay aparece DESPUÉS en orden DOM
+     · Resultado: aunque z-index del panel es mayor, el stacking context
+       creado por backdrop-filter combinado con orden DOM hace que
+       document.elementFromPoint() retorne dial-overlay sobre los paneles
+     · Clicks llegan al overlay (que tiene pointer-events:auto para el
+       "click fuera para cerrar"), no a los paneles
+     · Solo Sim banda (megatabs) seguía funcionando porque... no sé,
+       quizás su posición coincide con un área del overlay donde el
+       stacking diverge.
 
-   2) DRAG HANDLES no se creaban
-      Diagnóstico via consola: window._hudPanels[0].el.querySelector
-      ('.hud-dnd-handle') retornaba null. makeDraggable solo se llamaba
-      en init() una vez. Fix: en el hook abrirDial, re-aplicar
-      makeDraggable a todos los paneles cada vez que se abre el dial.
-      makeDraggable es idempotente (chequea si el handle ya existe).
+   ── Fix ──
+   En _crearDialOverlay, en lugar de document.body.appendChild(_dialOverlay),
+   usar document.body.insertBefore(_dialOverlay, primerPanel). Esto pone
+   el overlay ANTES de los paneles en orden DOM. Ahora los paneles ganan
+   por z-index (9001>9000) Y por orden DOM (vienen después).
 
-   3) NECESIDADES expandida con scroll innecesario
-      CSS de .hud-expanded-content tenía overflow:auto que mostraba
-      scrollbar siempre, aunque el contenido cabiera. Cambio a
-      overflow-y:auto + flex:1 1 auto + overflow-x:hidden para que
-      el scrollbar solo aparezca cuando el contenido excede.
+   ── Heredado v5.129 ──
+   Forzar z-index:9001 y pointer-events:auto en paneles tras reset.
 
-   ── Heredado v5.136 ──
-   _dialOverlay con pointer-events:none para que paneles reciban clicks.
-
-   ── Heredado v5.132 ──
-   togEnteEdit/guardarEnte usan event.target en lugar de getElementById.
+   ── Heredado v5.127 ──
+   Limpieza quirúrgica en toggleEntradaDropdown.
    "resetear" los paneles antes de abrirDial. Pero eso eliminaba TODO el
    styling visual original (background, border, box-shadow, animation,
    font-family, CSS variables --pc-dim/--pc-mid/--pc-glow). Yo
@@ -849,11 +853,7 @@ function _crearDialOverlay(){
       '.hud-pnl.hud-expanded{transition:left .42s cubic-bezier(.4,1.4,.5,1),top .42s cubic-bezier(.4,1.4,.5,1),width .42s cubic-bezier(.4,1.4,.5,1),height .42s cubic-bezier(.4,1.4,.5,1)!important;z-index:9050!important;display:flex;flex-direction:column}',
       '.hud-pnl.hud-expanded > [id$="-inner"]{display:flex;flex-direction:column;flex:1;min-height:0}',
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
-      // v5.137: cambio overflow:auto a overflow-y:auto + min-height:0
-      // para que el scrollbar solo aparezca si el contenido realmente
-      // excede la altura disponible. Antes aparecía siempre incluso
-      // cuando el contenido cabía.
-      '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 18px}',
+      '.hud-expanded-content{display:none;flex:1;min-height:0;overflow:auto;padding:14px 18px}',
       '.hud-expanded .hud-expanded-content{display:flex;flex-direction:column;gap:14px;justify-content:center}',
       '.hud-expanded .hud-collapsed-content{display:none}',
       // Tablas dentro del panel expandido: scroll horizontal mantenido
@@ -1075,7 +1075,6 @@ function _crearDialOverlay(){
         '<circle cx="'+lastPt[0]+'" cy="'+lastPt[1]+'" r="1.6" fill="'+color+'" style="filter:drop-shadow(0 0 3px '+color+')"/>'+
       '</svg>'+
       '<button class="hud-h-expand" data-color="'+color+'" title="Expandir" '+
-        'onclick="event.stopPropagation();var p=this.closest(\'.hud-pnl\');if(p&&typeof window._hudExpand===\'function\')window._hudExpand(p);return false;" '+
         'style="color:'+color+';text-shadow:0 0 6px '+_rgba(color,0.40)+'">'+
         '<i class="fas fa-up-right-and-down-left-from-center"></i>'+
       '</button>'+
@@ -1088,9 +1087,7 @@ function _crearDialOverlay(){
   // El parámetro `fn` se ignora ahora — antes navegaba a un panel externo
   // (irAPatrimonio, etc). Mantenemos el parámetro por compat con llamadas existentes.
   function _pCTA(label, color, fn){
-    return '<div class="hud-cta hud-cta-expand" '+
-      'onclick="event.stopPropagation();var p=this.closest(\'.hud-pnl\');if(p&&typeof window._hudExpand===\'function\')window._hudExpand(p);return false;" '+
-      'style="'+
+    return '<div class="hud-cta hud-cta-expand" style="'+
       '--ac-15:'+_rgba(color,0.12)+';'+
       '--ac-08:'+_rgba(color,0.08)+';'+
       'cursor:pointer">'+
@@ -2370,40 +2367,44 @@ function _crearDialOverlay(){
         '</svg>';
     }
 
-    // ── DISTRIBUCIÓN: pirámide + lista detallada ──
+    // ── DISTRIBUCIÓN: barras horizontales reflejando el % real ──
     if(listaEl){
-      // Pirámide en el orden REVERSO (Autorrealización arriba, Fisiológicas abajo)
-      // Tipo image 2: cada nivel con su tamaño según el % invertido.
-      var pisos = NIVELES_CFG.slice().reverse(); // [5,4,3,2,1]
-      var pyrSVG = '';
-      var pyrW = 280, pyrH = 230, rowH = 40, gapY = 6;
-      pisos.forEach(function(c, i){
-        var d = _dataDe(c.key);
-        var abs = Math.abs(d.total || 0);
-        var pct = totalAll > 0 ? Math.round((abs/totalAll)*100) : 0;
-        // Anchura crece desde arriba hacia abajo: i=0 (más arriba) ancho min, i=4 (Fisio) más ancho
-        var minW = 110, maxW = pyrW - 10;
-        var w = minW + (i/(pisos.length-1)) * (maxW - minW);
-        var x = (pyrW - w) / 2;
-        var y = i * (rowH + gapY);
-        var op = abs > 0 ? 0.85 : 0.18;
-        pyrSVG +=
-          '<g>'+
-            '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+rowH+'" rx="6" '+
-              'fill="'+c.color+'" opacity="'+op+'" style="filter:drop-shadow(0 0 4px '+c.color+'66)"/>'+
-            '<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w.toFixed(1)+'" height="'+rowH+'" rx="6" '+
-              'fill="none" stroke="'+c.color+'" stroke-width="1" opacity="0.85"/>'+
-            '<text x="'+(pyrW/2)+'" y="'+(y+rowH/2-3).toFixed(1)+'" text-anchor="middle" font-size="11" '+
-              'fill="#fff" font-weight="800" style="filter:drop-shadow(0 1px 1px rgba(0,0,0,.8))">'+c.label+'</text>'+
-            '<text x="'+(pyrW/2)+'" y="'+(y+rowH/2+10).toFixed(1)+'" text-anchor="middle" font-size="9" '+
-              'fill="rgba(255,255,255,0.85)" font-weight="700">'+pct+'%</text>'+
-          '</g>';
+      // v5.138: antes era una "pirámide" SVG cuyo ancho dependía de la
+      // POSICIÓN del nivel (i/length), NO del porcentaje real. Ahora son
+      // barras horizontales donde el ancho refleja el pct real de cada
+      // necesidad. Orden: de mayor a menor para que el más usado quede
+      // visualmente prominente arriba.
+      var ordenadosPyr = NIVELES_CFG.slice().sort(function(a,b){
+        return Math.abs(_dataDe(b.key).total||0) - Math.abs(_dataDe(a.key).total||0);
       });
       var pyrHTML =
         '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px;text-align:center">DISTRIBUCIÓN</div>'+
-        '<svg viewBox="0 0 '+pyrW+' '+(pisos.length*(rowH+gapY))+'" style="width:100%;max-width:320px;display:block;margin:0 auto">'+
-          pyrSVG +
-        '</svg>';
+        '<div style="display:flex;flex-direction:column;gap:6px;max-width:340px;margin:0 auto">';
+      ordenadosPyr.forEach(function(c){
+        var d = _dataDe(c.key);
+        var abs = Math.abs(d.total || 0);
+        var pct = totalAll > 0 ? Math.round((abs/totalAll)*100) : 0;
+        // Barra: el contenedor es el 100%. La parte coloreada es pct%.
+        // Mínimo 2% visible cuando hay datos (>0) para que se note el color.
+        var visualW = abs > 0 ? Math.max(2, pct) : 0;
+        var op = abs > 0 ? 1 : 0.25;
+        pyrHTML +=
+          '<div style="position:relative;height:32px;border-radius:6px;background:rgba(255,255,255,0.04);border:1px solid '+c.color+'40;overflow:hidden;opacity:'+op+'">'+
+            // Barra coloreada interior (ancho = pct%)
+            '<div style="position:absolute;left:0;top:0;bottom:0;width:'+visualW+'%;'+
+              'background:linear-gradient(90deg,'+c.color+'dd,'+c.color+');'+
+              'box-shadow:0 0 8px '+c.color+'66;border-radius:5px 0 0 5px"></div>'+
+            // Texto superpuesto: label + monto + %
+            '<div style="position:relative;display:flex;align-items:center;justify-content:space-between;height:100%;padding:0 12px;z-index:1">'+
+              '<span style="font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85)">'+c.label+'</span>'+
+              '<span style="display:flex;align-items:center;gap:10px;font-family:JetBrains Mono,monospace">'+
+                '<span style="font-size:10px;color:rgba(255,255,255,0.95);font-weight:700;text-shadow:0 1px 2px rgba(0,0,0,.85)">$ '+abs.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</span>'+
+                '<span style="font-size:11px;font-weight:800;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.85);min-width:36px;text-align:right">'+pct+'%</span>'+
+              '</span>'+
+            '</div>'+
+          '</div>';
+      });
+      pyrHTML += '</div>';
 
       // Lista detallada (ordenada por monto desc, igual que image 2)
       var ordenados = NIVELES_CFG.slice().sort(function(a,b){
@@ -4537,19 +4538,7 @@ function abrirDial(){
 
   _dialOverlay.style.opacity = '0';
   _dialOverlay.style.display = 'flex';
-  // v5.136: _dialOverlay con pointer-events:none. El backdrop-filter del
-  // overlay crea un stacking context que capturaba TODOS los clicks sobre
-  // el área del overlay aunque los paneles tuvieran z-index mayor. Eso
-  // hacía que clicks en cards laterales, drag-handles, expand buttons, y
-  // dial-canvas mismo (cuando coincidía con zona del overlay) no llegaran
-  // a sus listeners.
-  // Con pointer-events:none:
-  //   · overlay deja de capturar clicks → paneles flotantes los reciben (auto)
-  //   · canvas del dial tiene pointer-events:auto explícito → sigue clickeable
-  //   · drag handles (dentro de paneles con auto) siguen funcionando
-  // Lo que se PIERDE: "click en zona vacía del overlay = cerrar el dial".
-  // Quedan alternativas: ESC, botón close del dial.
-  _dialOverlay.style.pointerEvents = 'none';
+  _dialOverlay.style.pointerEvents = 'auto';
   _dialVisible = true;
 
   // ═══ FASE 0 — Estado inicial: TODO oculto ═══
