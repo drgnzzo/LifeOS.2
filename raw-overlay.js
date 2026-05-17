@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.143
+/* RAW Entry — Overlay v.5.144
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -3093,7 +3093,7 @@ function _crearDialOverlay(){
     'hud-necesidades': {
       html: function(){
         return ''+
-          '<div style="display:flex;flex-direction:column;gap:14px;height:100%;min-height:0">'+
+          '<div style="display:flex;flex-direction:column;gap:14px;min-height:0">'+
             // Header con título + filtros
             '<div style="display:flex;align-items:center;justify-content:space-between">'+
               '<div style="display:flex;align-items:center;gap:10px">'+
@@ -3113,8 +3113,11 @@ function _crearDialOverlay(){
               '<div id="nec-inline-radar-wrap-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:10px;background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
               '<div id="nec-inline-piramide-overlay" style="flex:1;min-width:0;padding:12px;border:1px solid rgba(168,85,247,0.18);border-radius:10px;background:rgba(168,85,247,0.03);display:flex;flex-direction:column;justify-content:center"></div>'+
             '</div>'+
-            // Lista detallada abajo
-            '<div id="nec-inline-container-overlay" style="flex:1;min-height:0;overflow:auto;padding:4px"></div>'+
+            // v5.144: contenedor inferior SIN scroll interno — el modo
+            // expansión ya hace que el panel crezca para mostrar todo el
+            // contenido. Antes tenía overflow:auto + flex:1 + min-height:0
+            // que forzaba scroll vertical aunque el contenido cabiera.
+            '<div id="nec-inline-container-overlay" style="flex:0 0 auto;overflow:visible;padding:4px"></div>'+
           '</div>';
       },
       hydrate: function(){
@@ -4997,15 +5000,31 @@ window.addEventListener('DOMContentLoaded',()=>{
   //   t=4800   cleanup + vida
   abrirDial();
 
-  // Limpiar el splash de fondo (#splash-dial) y el render-block tan pronto el
-  // overlay esté visible. Hacerlo antes de empezar la animación para que el
-  // backdrop fade-in del dial se vea bien.
-  requestAnimationFrame(function(){
-    var rb = document.getElementById('render-block');
+  // v5.144: hacer fade-out del splash SINCRONIZADO con el fade-in del
+  // overlay para evitar el "flash gris" entre que se quita el splash y
+  // aparece el morado del overlay. El splash tiene el color de fondo del
+  // overlay (azul-violeta oscuro) y se desvanece progresivamente sobre
+  // el primer 800ms, justo cuando el overlay alcanza visibilidad clara.
+  var splash = document.getElementById('splash-dial');
+  var rb = document.getElementById('render-block');
+  if(splash){
+    // Cambiar el color del splash al tono del overlay para que la
+    // transición sea sin cambio de color, solo de opacidad.
+    splash.style.transition = 'opacity 700ms ease-out';
+    splash.style.background = 'rgba(10,7,22,1)'; // mismo color base del overlay
+    // Quitar el render-block sin demora (los paneles internos ya están
+    // ocultos por opacity:0, no aparecerán hasta que su animación los muestre)
     if(rb && rb.parentNode) rb.parentNode.removeChild(rb);
-    var splash = document.getElementById('splash-dial');
-    if(splash && splash.parentNode) splash.parentNode.removeChild(splash);
-  });
+    // Esperar a que el overlay tenga opacidad antes de empezar fade-out
+    setTimeout(function(){
+      splash.style.opacity = '0';
+      setTimeout(function(){
+        if(splash.parentNode) splash.parentNode.removeChild(splash);
+      }, 750);
+    }, 200);
+  } else {
+    if(rb && rb.parentNode) rb.parentNode.removeChild(rb);
+  }
 
   _dialOverlay.addEventListener('click', function(e){
     if(e.target === _dialOverlay) cerrarDial();
