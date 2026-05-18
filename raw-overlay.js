@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.149
+/* RAW Entry — Overlay v.5.150
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -689,19 +689,22 @@ function _crearDialOverlay(){
     '-webkit-backdrop-filter:blur(28px) saturate(160%) brightness(0.68)',
   ].join(';');
 
-  // ── Glow ambiental ──
+  // ── Glow ambiental — v5.150: más intenso para que el dial se sienta como núcleo neuronal ──
   var _glowEl = document.createElement('div');
   _glowEl.id = 'dial-ambient';
   _glowEl.style.cssText = [
     'position:absolute','inset:0','pointer-events:none','z-index:0',
-    'background:radial-gradient(ellipse 600px 600px at 50% 50%, rgba(120,80,200,0.06) 0%, transparent 70%)',
+    // Doble radial: uno violeta interior intenso, otro azul muy difuso exterior
+    'background:radial-gradient(circle 480px at 50% 50%, rgba(140,90,220,0.16) 0%, rgba(120,80,200,0.08) 35%, transparent 70%), '+
+                'radial-gradient(circle 760px at 50% 50%, rgba(34,211,238,0.05) 0%, transparent 80%)',
     'animation:dialBreath 4s ease-in-out infinite',
   ].join(';');
   if(!document.getElementById('dial-keyframes')){
     var ks = document.createElement('style');
     ks.id = 'dial-keyframes';
     ks.textContent = [
-      '@keyframes dialBreath{0%,100%{opacity:.6;transform:scale(1);}50%{opacity:1;transform:scale(1.08);}}',
+      // v5.150: respiración más amplia para el glow ambiental
+      '@keyframes dialBreath{0%,100%{opacity:.75;transform:scale(1);}50%{opacity:1;transform:scale(1.10);}}',
       '@keyframes dialGlowPulse{0%,100%{box-shadow:0 0 0 1px rgba(120,80,200,0.08),0 4px 32px rgba(0,0,0,0.5);}50%{box-shadow:0 0 0 1px rgba(140,100,220,0.20),0 4px 48px rgba(80,40,140,0.3),0 0 60px rgba(120,80,200,0.08);}}',
       '.hud-panel-glow{animation:dialGlowPulse 4s ease-in-out infinite;}',
     ].join('');
@@ -710,24 +713,32 @@ function _crearDialOverlay(){
   _dialOverlay.appendChild(_glowEl);
 
   // ══════════════════════════════════════════════════════════════════
-  //  v5.149: ANIMACIÓN DE PARTÍCULAS / CIRCUIT-BOARD
-  //  Canvas detrás del dial y las cards. Nodos pulsantes + trazos
-  //  de circuito que recorren caminos. Estilo motherboard cibernético.
+  //  v5.150: ANIMACIÓN DE RED NEURONAL ORGÁNICA
+  //  Reemplaza el circuit-board angular por una red orgánica con:
+  //  • Clusters de nodos (no grid uniforme) — distribución orgánica
+  //  • Hubs centrales en cada cluster con conexiones cercanas
+  //  • Curvas Bézier (no líneas rectas Manhattan) entre nodos
+  //  • Pulsos sinápticos que viajan por las curvas
+  //  • "Raíces" desde el dial central hacia nodos cercanos —
+  //    el dial es el cerebro del que emanan las señales
   // ══════════════════════════════════════════════════════════════════
   var _particlesCanvas = document.createElement('canvas');
   _particlesCanvas.id = 'dial-particles';
-  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.45';
+  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.55';
   _dialOverlay.appendChild(_particlesCanvas);
 
-  // Inicializar la lógica de partículas
-  (function initParticles(){
-    var pctx, nodes, traces, lastT = 0, animId = null;
-    var W = 0, H = 0;
+  (function initNeural(){
+    var pctx, nodes, hubs, edges, pulses, dialRoots, lastT = 0, animId = null;
+    var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0;
+    var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
       W = window.innerWidth;
       H = window.innerHeight;
+      CX = W / 2; CY = H / 2;
+      // Radio aproximado de exclusión alrededor del dial
+      DIAL_R = Math.min(W, H) * 0.22;
       _particlesCanvas.width = W * dpr;
       _particlesCanvas.height = H * dpr;
       _particlesCanvas.style.width = W + 'px';
@@ -736,112 +747,201 @@ function _crearDialOverlay(){
       pctx.scale(dpr, dpr);
     }
 
+    // Distribuir nodos en CLUSTERS orgánicos en lugar de grid uniforme.
+    // Cada cluster: un hub central + 3-7 nodos satélite alrededor.
     function buildNetwork(){
-      // Distribuir nodos en una grid suave con jitter, simulando pcb
       nodes = [];
-      var cols = Math.floor(W / 95);
-      var rows = Math.floor(H / 95);
-      var stepX = W / (cols + 1);
-      var stepY = H / (rows + 1);
-      var palette = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9'];
-      for(var r = 0; r < rows + 1; r++){
-        for(var c = 0; c < cols + 1; c++){
-          // Excluir nodos demasiado cerca del centro (zona del dial)
-          var cx = stepX * (c + 1) + (Math.random() - 0.5) * 35;
-          var cy = stepY * (r + 1) + (Math.random() - 0.5) * 35;
-          var distFromCenter = Math.hypot(cx - W/2, cy - H/2);
-          if(distFromCenter < Math.min(W, H) * 0.22) continue;
-          nodes.push({
-            x: cx,
-            y: cy,
-            color: palette[Math.floor(Math.random() * palette.length)],
+      hubs = [];
+      edges = [];
+      pulses = [];
+      dialRoots = [];
+
+      // Número de clusters según tamaño de viewport
+      var area = W * H;
+      var nClusters = Math.max(6, Math.min(14, Math.round(area / 180000)));
+
+      // Sembrar clusters fuera de la zona del dial, distribuidos por las 4 esquinas/lados
+      for(var cl = 0; cl < nClusters; cl++){
+        var hx, hy, tries = 0, ok = false;
+        // Buscar posición válida (lejos del centro, lejos de otros hubs)
+        while(!ok && tries < 30){
+          hx = 80 + Math.random() * (W - 160);
+          hy = 80 + Math.random() * (H - 160);
+          if(Math.hypot(hx - CX, hy - CY) < DIAL_R + 40){ tries++; continue; }
+          var tooClose = hubs.some(function(h){ return Math.hypot(h.x - hx, h.y - hy) < 180; });
+          if(!tooClose) ok = true;
+          tries++;
+        }
+        if(!ok) continue;
+        var hubColor = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+        var hub = {
+          x: hx, y: hy,
+          color: hubColor,
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.5 + Math.random() * 0.6,
+          baseR: 1.8 + Math.random() * 1.2,
+          isHub: true,
+          satellites: [],
+        };
+        hubs.push(hub);
+        nodes.push(hub);
+
+        // Satélites alrededor del hub (en arco con jitter, distancia variable)
+        var nSats = 3 + Math.floor(Math.random() * 5);
+        for(var s = 0; s < nSats; s++){
+          var angle = (s / nSats) * Math.PI * 2 + Math.random() * 0.6;
+          var dist  = 55 + Math.random() * 75;
+          var sx = hx + Math.cos(angle) * dist;
+          var sy = hy + Math.sin(angle) * dist;
+          // Excluir si cae dentro del dial
+          if(Math.hypot(sx - CX, sy - CY) < DIAL_R + 20) continue;
+          // Mantener dentro del viewport
+          sx = Math.max(20, Math.min(W - 20, sx));
+          sy = Math.max(20, Math.min(H - 20, sy));
+          var sat = {
+            x: sx, y: sy,
+            color: hubColor, // mismo color del cluster
             phase: Math.random() * Math.PI * 2,
-            speed: 0.4 + Math.random() * 0.8,
-            baseR: 0.8 + Math.random() * 1.3,
-          });
+            speed: 0.7 + Math.random() * 0.8,
+            baseR: 0.7 + Math.random() * 0.9,
+            isHub: false,
+          };
+          hub.satellites.push(sat);
+          nodes.push(sat);
+          // Edge curvo del hub al satélite
+          edges.push(makeCurvedEdge(hub, sat));
         }
       }
-      traces = [];
-    }
 
-    function spawnTrace(){
-      if(!nodes || nodes.length < 2) return;
-      // Tomar un nodo aleatorio y crear un trazo de circuito con 2-4 segmentos manhattan
-      var n1 = nodes[Math.floor(Math.random() * nodes.length)];
-      var n2 = nodes[Math.floor(Math.random() * nodes.length)];
-      if(n1 === n2) return;
-      // Manhattan path: ir primero horizontal, luego vertical (o vice versa)
-      var horizFirst = Math.random() < 0.5;
-      var pts;
-      if(horizFirst){
-        pts = [{x:n1.x, y:n1.y}, {x:n2.x, y:n1.y}, {x:n2.x, y:n2.y}];
-      } else {
-        pts = [{x:n1.x, y:n1.y}, {x:n1.x, y:n2.y}, {x:n2.x, y:n2.y}];
+      // Conexiones entre hubs cercanos (estructura de red entre clusters)
+      for(var i = 0; i < hubs.length; i++){
+        for(var j = i + 1; j < hubs.length; j++){
+          var d = Math.hypot(hubs[i].x - hubs[j].x, hubs[i].y - hubs[j].y);
+          if(d < 320 && Math.random() < 0.6){
+            edges.push(makeCurvedEdge(hubs[i], hubs[j], 0.4));
+          }
+        }
       }
-      // Calcular longitud total
-      var lens = [];
-      var total = 0;
-      for(var i = 1; i < pts.length; i++){
-        var d = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
-        lens.push(d);
-        total += d;
-      }
-      traces.push({
-        pts: pts,
-        lens: lens,
-        total: total,
-        progress: 0,
-        speed: 180 + Math.random() * 220, // px/s
-        color: n1.color,
-        life: 1,
-        tailLen: 80 + Math.random() * 70,
+
+      // "Raíces" del DIAL hacia los hubs más cercanos.
+      // Emanan del borde del dial central, no del centro exacto.
+      hubs.forEach(function(h){
+        var dx = h.x - CX, dy = h.y - CY;
+        var dist = Math.hypot(dx, dy);
+        if(dist <= 0) return;
+        // Punto de origen en el borde del dial
+        var ox = CX + (dx / dist) * DIAL_R;
+        var oy = CY + (dy / dist) * DIAL_R;
+        var virtualOrigin = { x: ox, y: oy, color: h.color, isVirtual: true };
+        var rootEdge = makeCurvedEdge(virtualOrigin, h, 0.7);
+        rootEdge.isRoot = true;
+        dialRoots.push(rootEdge);
       });
     }
 
-    function getPointAt(trace, dist){
-      // Recorrer segmentos hasta encontrar la posición
-      var rem = dist;
-      for(var i = 0; i < trace.lens.length; i++){
-        if(rem <= trace.lens[i]){
-          var t = rem / trace.lens[i];
-          var p1 = trace.pts[i];
-          var p2 = trace.pts[i+1];
-          return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
-        }
-        rem -= trace.lens[i];
-      }
-      return trace.pts[trace.pts.length - 1];
+    // Crear edge con curva Bézier cuadrática y un control point desplazado
+    // perpendicular a la línea recta entre los dos nodos.
+    function makeCurvedEdge(a, b, curvature){
+      var curv = curvature !== undefined ? curvature : 0.5;
+      var mx = (a.x + b.x) / 2;
+      var my = (a.y + b.y) / 2;
+      var dx = b.x - a.x, dy = b.y - a.y;
+      var len = Math.hypot(dx, dy) || 1;
+      // Perpendicular normalizado
+      var nx = -dy / len, ny = dx / len;
+      // Offset aleatorio +/- para que la curva sea orgánica
+      var sign = Math.random() < 0.5 ? -1 : 1;
+      var off = len * curv * 0.4 * sign;
+      var cpx = mx + nx * off;
+      var cpy = my + ny * off;
+      return {
+        a: a, b: b,
+        cp: { x: cpx, y: cpy },
+        len: approxBezierLen(a, {x:cpx,y:cpy}, b),
+        color: a.color || b.color,
+        baseAlpha: 0.10 + Math.random() * 0.10,
+      };
     }
 
-    function drawTrace(trace){
-      // Dibujar línea fade desde (progress - tailLen) hasta progress
-      var headDist = trace.progress;
-      var tailDist = Math.max(0, headDist - trace.tailLen);
-      // Trazar puntos cada 4px de la cola a la cabeza
+    // Longitud aprox. de una bezier cuadrática (sampling)
+    function approxBezierLen(a, cp, b){
+      var prev = a, total = 0;
+      for(var t = 0.1; t <= 1.001; t += 0.1){
+        var p = bezierPoint(a, cp, b, t);
+        total += Math.hypot(p.x - prev.x, p.y - prev.y);
+        prev = p;
+      }
+      return total;
+    }
+
+    function bezierPoint(a, cp, b, t){
+      var u = 1 - t;
+      return {
+        x: u*u*a.x + 2*u*t*cp.x + t*t*b.x,
+        y: u*u*a.y + 2*u*t*cp.y + t*t*b.y,
+      };
+    }
+
+    // Spawn de pulso sináptico — viaja por una edge desde a hacia b
+    function spawnPulse(){
+      var pool = edges.concat(dialRoots);
+      if(!pool.length) return;
+      var edge = pool[Math.floor(Math.random() * pool.length)];
+      // Si es root, mayor probabilidad de dirección saliente (del dial hacia hub)
+      var forward = edge.isRoot ? (Math.random() < 0.75) : (Math.random() < 0.5);
+      pulses.push({
+        edge: edge,
+        t: 0,
+        speed: 0.35 + Math.random() * 0.45, // unidad/seg
+        forward: forward,
+        life: 1,
+        color: edge.color,
+        tailT: 0.18 + Math.random() * 0.12,
+        isRoot: !!edge.isRoot,
+      });
+    }
+
+    function drawEdge(e, isRoot){
+      // Línea base (muy tenue) — más visible para roots
+      pctx.strokeStyle = e.color + (isRoot ? '55' : '22');
+      pctx.lineWidth = isRoot ? 1.2 : 0.8;
+      pctx.beginPath();
+      pctx.moveTo(e.a.x, e.a.y);
+      pctx.quadraticCurveTo(e.cp.x, e.cp.y, e.b.x, e.b.y);
+      pctx.stroke();
+    }
+
+    function drawPulse(p){
+      var e = p.edge;
+      var t = p.forward ? p.t : (1 - p.t);
+      // Cola: serie de samples del tail al head
       var samples = [];
-      for(var d = tailDist; d <= headDist; d += 4){
-        samples.push({ pt: getPointAt(trace, d), alpha: (d - tailDist) / (headDist - tailDist || 1) });
+      var steps = 12;
+      for(var i = 0; i <= steps; i++){
+        var tt = t - (p.forward ? 1 : -1) * (i / steps) * p.tailT;
+        if(tt < 0 || tt > 1) continue;
+        var pt = bezierPoint(e.a, e.cp, e.b, tt);
+        samples.push({ pt: pt, alpha: 1 - (i / steps) });
       }
       if(samples.length < 2) return;
-      // Dibujar segmentos con gradiente de alpha
       pctx.lineCap = 'round';
       pctx.lineJoin = 'round';
       for(var s = 1; s < samples.length; s++){
-        var a = samples[s].alpha * trace.life;
-        pctx.strokeStyle = trace.color + Math.floor(a * 220).toString(16).padStart(2, '0');
-        pctx.lineWidth = 1.6 * samples[s].alpha;
+        var a = samples[s].alpha * p.life * 0.95;
+        pctx.strokeStyle = p.color + Math.floor(a * 220).toString(16).padStart(2, '0');
+        pctx.lineWidth = p.isRoot ? 2.2 * samples[s].alpha : 1.8 * samples[s].alpha;
         pctx.beginPath();
         pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
         pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
         pctx.stroke();
       }
       // Cabeza brillante
-      var head = getPointAt(trace, headDist);
-      pctx.fillStyle = trace.color;
-      pctx.shadowColor = trace.color;
-      pctx.shadowBlur = 12;
+      var head = bezierPoint(e.a, e.cp, e.b, t);
+      pctx.fillStyle = p.color;
+      pctx.shadowColor = p.color;
+      pctx.shadowBlur = p.isRoot ? 16 : 11;
       pctx.beginPath();
-      pctx.arc(head.x, head.y, 2.2, 0, Math.PI * 2);
+      pctx.arc(head.x, head.y, p.isRoot ? 2.6 : 2.2, 0, Math.PI * 2);
       pctx.fill();
       pctx.shadowBlur = 0;
     }
@@ -849,42 +949,47 @@ function _crearDialOverlay(){
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       lastT = t;
-      if(!pctx) { animId = requestAnimationFrame(frame); return; }
+      if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
 
-      // Dibujar nodos (puntos pulsantes estilo servidor)
-      for(var i = 0; i < nodes.length; i++){
-        var n = nodes[i];
+      // 1) Dibujar edges base (curvas tenues)
+      for(var ei = 0; ei < edges.length; ei++) drawEdge(edges[ei], false);
+      // Roots del dial: más visibles
+      for(var ri = 0; ri < dialRoots.length; ri++) drawEdge(dialRoots[ri], true);
+
+      // 2) Nodos pulsantes
+      for(var ni = 0; ni < nodes.length; ni++){
+        var n = nodes[ni];
         n.phase += n.speed * dt;
-        var pulse = (Math.sin(n.phase) + 1) / 2; // 0..1
-        var r = n.baseR + pulse * 1.4;
-        var alpha = 0.30 + pulse * 0.55;
-        pctx.fillStyle = n.color + Math.floor(alpha * 200).toString(16).padStart(2, '0');
+        var pulse = (Math.sin(n.phase) + 1) / 2;
+        var r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
+        var alpha = 0.35 + pulse * 0.55;
+        pctx.fillStyle = n.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = n.color;
-        pctx.shadowBlur = 5 + pulse * 8;
+        pctx.shadowBlur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
         pctx.beginPath();
         pctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         pctx.fill();
       }
       pctx.shadowBlur = 0;
 
-      // Avanzar trazos
-      for(var ti = traces.length - 1; ti >= 0; ti--){
-        var tr = traces[ti];
-        tr.progress += tr.speed * dt;
-        if(tr.progress > tr.total + tr.tailLen){
-          traces.splice(ti, 1);
+      // 3) Avanzar pulsos sinápticos
+      for(var pi = pulses.length - 1; pi >= 0; pi--){
+        var p = pulses[pi];
+        p.t += p.speed * dt;
+        if(p.t > 1 + p.tailT){
+          pulses.splice(pi, 1);
           continue;
         }
-        if(tr.progress > tr.total){
-          tr.life = Math.max(0, 1 - (tr.progress - tr.total) / tr.tailLen);
+        if(p.t > 1){
+          p.life = Math.max(0, 1 - (p.t - 1) / p.tailT);
         }
-        drawTrace(tr);
+        drawPulse(p);
       }
 
-      // Spawn ocasional (densidad razonable)
-      if(traces.length < 8 && Math.random() < 0.05){
-        spawnTrace();
+      // 4) Spawn ocasional — más frecuente en roots
+      if(pulses.length < 14 && Math.random() < 0.08){
+        spawnPulse();
       }
 
       animId = requestAnimationFrame(frame);
@@ -893,8 +998,19 @@ function _crearDialOverlay(){
     function start(){
       resize();
       buildNetwork();
-      // Spawn inicial
-      for(var i = 0; i < 3; i++) spawnTrace();
+      // Spawn inicial: priorizar roots para que se vea la emanación del dial
+      for(var i = 0; i < 4; i++){
+        if(dialRoots.length && Math.random() < 0.7){
+          pulses.push({
+            edge: dialRoots[Math.floor(Math.random() * dialRoots.length)],
+            t: Math.random() * 0.6, speed: 0.4, forward: true, life: 1,
+            color: PALETTE[Math.floor(Math.random()*PALETTE.length)],
+            tailT: 0.22, isRoot: true,
+          });
+        } else {
+          spawnPulse();
+        }
+      }
       lastT = 0;
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
@@ -907,9 +1023,8 @@ function _crearDialOverlay(){
     window._particlesStart = start;
     window._particlesStop  = stop;
 
-    // Resize handler
     window.addEventListener('resize', function(){
-      if(_particlesCanvas.offsetParent !== null){ // si visible
+      if(_particlesCanvas.offsetParent !== null){
         resize();
         buildNetwork();
       }
@@ -927,15 +1042,18 @@ function _crearDialOverlay(){
   ].join(';');
   _ringEl.innerHTML =
     '<svg viewBox="0 0 600 600" style="width:min(580px,40vw);height:min(580px,40vw);overflow:visible">'+
-      // Aro principal
-      '<circle cx="300" cy="300" r="280" fill="none" stroke="rgba(167,139,250,0.55)" stroke-width="1.5" '+
-        'style="filter:drop-shadow(0 0 12px rgba(167,139,250,0.55));animation:dialRingPulse 3s ease-in-out infinite"/>'+
-      // Aro secundario interior más tenue
-      '<circle cx="300" cy="300" r="252" fill="none" stroke="rgba(167,139,250,0.20)" stroke-width="1" '+
-        'style="animation:dialRingPulse 3s ease-in-out infinite;animation-delay:.6s"/>'+
-      // Punto central pulsante
-      '<circle cx="300" cy="300" r="6" fill="rgba(167,139,250,0.9)" '+
-        'style="filter:drop-shadow(0 0 8px rgba(167,139,250,0.9));animation:dialDotPulse 1.6s ease-in-out infinite"/>'+
+      // v5.150: Halo orgánico exterior — círculo grande muy difuso (cerebro)
+      '<circle cx="300" cy="300" r="320" fill="none" stroke="rgba(167,139,250,0.18)" stroke-width="0.8" '+
+        'style="filter:drop-shadow(0 0 28px rgba(167,139,250,0.45));animation:dialHaloBreath 5s ease-in-out infinite"/>'+
+      // Aro principal — más intenso
+      '<circle cx="300" cy="300" r="280" fill="none" stroke="rgba(167,139,250,0.75)" stroke-width="1.8" '+
+        'style="filter:drop-shadow(0 0 18px rgba(167,139,250,0.80));animation:dialRingPulse 3s ease-in-out infinite"/>'+
+      // Aro secundario interior con cyan (gradiente neuronal)
+      '<circle cx="300" cy="300" r="252" fill="none" stroke="rgba(34,211,238,0.35)" stroke-width="1.2" '+
+        'style="filter:drop-shadow(0 0 10px rgba(34,211,238,0.45));animation:dialRingPulse 3s ease-in-out infinite;animation-delay:.6s"/>'+
+      // Punto central pulsante — más brillante (núcleo del cerebro)
+      '<circle cx="300" cy="300" r="7" fill="rgba(167,139,250,1)" '+
+        'style="filter:drop-shadow(0 0 14px rgba(167,139,250,1)) drop-shadow(0 0 24px rgba(167,139,250,0.6));animation:dialDotPulse 1.6s ease-in-out infinite"/>'+
     '</svg>';
   _dialOverlay.appendChild(_ringEl);
   // Keyframes del aro
@@ -943,8 +1061,10 @@ function _crearDialOverlay(){
     var rkf = document.createElement('style');
     rkf.id = 'dial-ring-kf';
     rkf.textContent =
-      '@keyframes dialRingPulse{0%,100%{stroke-opacity:.35;transform:scale(0.96);transform-origin:50% 50%}50%{stroke-opacity:.85;transform:scale(1.02);transform-origin:50% 50%}}'+
-      '@keyframes dialDotPulse{0%,100%{opacity:.6;r:5}50%{opacity:1;r:8}}';
+      '@keyframes dialRingPulse{0%,100%{stroke-opacity:.45;transform:scale(0.96);transform-origin:50% 50%}50%{stroke-opacity:.95;transform:scale(1.025);transform-origin:50% 50%}}'+
+      // v5.150: Halo orgánico exterior — pulso lento y amplio
+      '@keyframes dialHaloBreath{0%,100%{stroke-opacity:.10;transform:scale(0.93);transform-origin:50% 50%}50%{stroke-opacity:.35;transform:scale(1.06);transform-origin:50% 50%}}'+
+      '@keyframes dialDotPulse{0%,100%{opacity:.7;r:5}50%{opacity:1;r:9}}';
     document.head.appendChild(rkf);
   }
 
