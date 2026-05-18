@@ -2231,6 +2231,8 @@ document.addEventListener('DOMContentLoaded', function(){
           var cat  = CAT[tipo];
           var ahora = new Date();
           var fechaStr = String(ahora.getDate()).padStart(2,'0')+'/'+String(ahora.getMonth()+1).padStart(2,'0');
+          // v5.148: fecha completa con hora para mostrar en la card
+          var fechaCardStr = fechaStr+' '+String(ahora.getHours()).padStart(2,'0')+':'+String(ahora.getMinutes()).padStart(2,'0');
           // Guardar fecha en localStorage
           try {
             var lsKey = 'actItemDate:'+tipo+':'+fila;
@@ -2252,16 +2254,45 @@ document.addEventListener('DOMContentLoaded', function(){
           var row = it.parentElement;
           var sp  = row&&row.querySelector('span');
           if(sp) sp.style.color = nowDone?'#4A5266':'#C8D0E0';
+
+          // v5.148: actualizar la fecha visual DENTRO de la card del concepto.
+          // El template original tenía un <span> con fechaStr dentro del flex
+          // de info (línea 1929). Cuando se marca/desmarca, actualizar ese
+          // span o crearlo si no existe.
+          if(row){
+            var infoFlex = row.querySelector(':scope > div'); // contenedor de info
+            if(infoFlex){
+              // Buscar el segundo span (fecha) — el primero es el nombre
+              var spans = infoFlex.querySelectorAll(':scope > span');
+              var fechaSpan = spans[1];
+              if(nowDone){
+                if(!fechaSpan){
+                  // No existe, crearlo
+                  fechaSpan = document.createElement('span');
+                  fechaSpan.style.cssText = 'font-size:9px;font-weight:700;letter-spacing:.06em;color:rgba(167,139,250,0.65);font-family:JetBrains Mono,monospace';
+                  infoFlex.appendChild(fechaSpan);
+                }
+                fechaSpan.textContent = fechaCardStr;
+                fechaSpan.style.display = '';
+              } else if(fechaSpan){
+                fechaSpan.style.display = 'none';
+              }
+            }
+          }
+
           if(row&&row.parentElement){
             if(nowDone) row.parentElement.appendChild(row);
             else        row.parentElement.insertBefore(row, row.parentElement.firstChild);
           }
-          // Sincronizar dato local
+          // Sincronizar dato local — incluir fechaCompletado para próximo render
           var d2 = window._actData;
           if(d2){
             var arr2 = tipo==='libro'?d2.libros:tipo==='movie'?d2.movies:d2.noRutinarias;
             var item2 = (arr2||[]).find(function(x){ return x.fila===fila; });
-            if(item2) item2.completado = nowDone;
+            if(item2){
+              item2.completado = nowDone;
+              item2.fechaCompletado = nowDone ? ahora.toISOString() : null;
+            }
           }
           if(typeof api!=='undefined') api.marcarActivityItem(tipo, fila, nowDone);
         }

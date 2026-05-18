@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.147
+/* RAW Entry — Overlay v.5.148
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -2539,39 +2539,24 @@ function _crearDialOverlay(){
       html: function(){
         return ''+
         '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
-          // ── HEADER ──
-          '<div style="display:flex;align-items:center;justify-content:space-between">'+
-            '<div style="display:flex;align-items:center;gap:10px">'+
-              '<div style="width:34px;height:34px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.40);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(34,197,94,0.20)">'+
-                '<i class="fas fa-landmark" style="color:#22C55E;font-size:15px"></i>'+
-              '</div>'+
-              '<div style="font-size:15px;font-weight:800;letter-spacing:.10em;color:#fff;text-shadow:0 0 8px rgba(34,197,94,0.30)">CENTRO PATRIMONIAL</div>'+
-              '<div style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.30);font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#4ADE80">'+
-                '<span style="width:6px;height:6px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;animation:hudDotPulse 2.5s ease-in-out infinite"></span>Sistema estable'+
-              '</div>'+
+          // ── HEADER (sin tabs ni chip decorativo) ──
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<div style="width:34px;height:34px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.40);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(34,197,94,0.20)">'+
+              '<i class="fas fa-landmark" style="color:#22C55E;font-size:15px"></i>'+
             '</div>'+
-            '<div style="display:flex;align-items:center;gap:6px">'+
-              '<div id="pat-tab-resumen" class="pat-tab pat-tab-active" data-tab="resumen" style="padding:5px 12px;border:1px solid rgba(34,197,94,0.50);border-radius:7px;background:rgba(34,197,94,0.10);font-size:10px;font-weight:800;color:#22C55E;cursor:pointer;letter-spacing:.04em">Resumen</div>'+
-              '<div id="pat-tab-saldos" class="pat-tab" data-tab="saldos" style="padding:5px 12px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);cursor:pointer;letter-spacing:.04em">Saldos</div>'+
-              '<div id="pat-tab-distribucion" class="pat-tab" data-tab="distribucion" style="padding:5px 12px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);cursor:pointer;letter-spacing:.04em">Distribución</div>'+
-              '<div id="pat-tab-movimientos" class="pat-tab" data-tab="movimientos" style="padding:5px 12px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.55);cursor:pointer;letter-spacing:.04em">Movimientos</div>'+
-              '<div style="padding:5px 10px;border:1px solid rgba(255,255,255,0.10);border-radius:7px;background:rgba(255,255,255,0.03);font-size:10px;font-weight:700;color:rgba(220,224,235,0.65);display:flex;align-items:center;gap:6px;font-family:JetBrains Mono,monospace"><i class="fas fa-calendar" style="font-size:9px"></i>Hoy</div>'+
-            '</div>'+
+            '<div style="font-size:15px;font-weight:800;letter-spacing:.10em;color:#fff;text-shadow:0 0 8px rgba(34,197,94,0.30)">CENTRO PATRIMONIAL</div>'+
           '</div>'+
           // ── 5 cards top con sparkline + delta ──
           '<div id="pat-cards-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.1fr;gap:10px"></div>'+
           // ── Banda Bruto = Disponible + Apartados ──
           '<div id="pat-banda" style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:12px;align-items:center;padding:14px 16px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
           // ── Saldos y Cuentas + Distribución de Fondos ──
-          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px;min-height:200px">'+
-            '<div id="pat-saldos" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);overflow:auto"></div>'+
+          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">'+
+            '<div id="pat-saldos" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
             '<div id="pat-distribucion" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);display:flex;flex-direction:column"></div>'+
           '</div>'+
-          // ── Apartados y Objetivos + Flujo y Liquidez ──
-          '<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px;min-height:180px">'+
-            '<div id="pat-apartados" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03);overflow:auto"></div>'+
-            '<div id="pat-flujo" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;background:rgba(34,211,238,0.03);display:flex;flex-direction:column"></div>'+
-          '</div>'+
+          // ── Apartados (full width, todos los apartados activos) ──
+          '<div id="pat-apartados" style="padding:12px;border:1px solid rgba(34,197,94,0.18);border-radius:10px;background:rgba(34,197,94,0.03)"></div>'+
         '</div>';
       },
       hydrate: function(){
@@ -2719,8 +2704,7 @@ function _crearDialOverlay(){
                 '<text x="80" y="106" text-anchor="middle" fill="rgba(220,224,235,0.45)" font-size="8">100%</text>'+
               '</svg>'+
               '<div style="flex:1;min-width:0">'+leyenda+'</div>'+
-            '</div>'+
-            '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer;text-align:right">Ver análisis completo ›</div>';
+            '</div>';
         })();
 
         // Apartados y Objetivos: TODOS los apartados activos (v5.147)
@@ -2756,32 +2740,9 @@ function _crearDialOverlay(){
             '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">'+(cards || '')+nuevo+'</div>';
         })();
 
-        // Flujo y Liquidez
-        (function(){
-          var fin = window._finData || {};
-          var mes = fin.mes || {};
-          var ingresos = mes.ingresos || 0, egresos = mes.egresos || 0;
-          var neto = ingresos + egresos;
-          // Sparkline placeholder 7 días
-          var W = 100, H = 50, pts = [];
-          for(var i=0;i<7;i++){ pts.push((i/6)*W+','+(H/2 - Math.sin(i*0.9)*15).toFixed(1)); }
-          document.getElementById('pat-flujo').innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'+
-              '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22D3EE">Flujo y Liquidez</div>'+
-              '<div style="padding:3px 8px;border:1px solid rgba(34,211,238,0.30);border-radius:6px;font-size:9px;font-weight:700;color:#22D3EE;display:flex;align-items:center;gap:4px"><i class="fas fa-caret-down" style="font-size:8px"></i>7 días</div>'+
-            '</div>'+
-            '<div style="display:flex;gap:12px;flex:1;min-height:0">'+
-              '<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="flex:1;min-width:0">'+
-                '<polyline points="'+pts.join(' ')+'" fill="none" stroke="#22D3EE" stroke-width="1.4" style="filter:drop-shadow(0 0 4px #22D3EE80)"/>'+
-              '</svg>'+
-              '<div style="flex:0 0 160px;display:flex;flex-direction:column;gap:6px;justify-content:center">'+
-                '<div><div style="font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)">Ingresos</div><div style="font-size:12px;font-weight:800;color:#22C55E;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(ingresos)+' <span style="color:#4ADE80;font-size:9px">+12.3%</span></div></div>'+
-                '<div><div style="font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)">Egresos</div><div style="font-size:12px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(egresos)+' <span style="color:#EF4444;font-size:9px">-5.1%</span></div></div>'+
-                '<div><div style="font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)">Balance Neto</div><div style="font-size:14px;font-weight:800;color:'+(neto>=0?'#22C55E':'#EF4444')+';font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt2(neto)+' <span style="font-size:9px">'+(neto>=0?'+':'')+'22.1%</span></div></div>'+
-              '</div>'+
-            '</div>'+
-            '<div style="margin-top:6px;font-size:10px;color:#22D3EE;cursor:pointer">Ver movimientos detallados ›</div>';
-        })();
+        // v5.148: sección "Flujo y Liquidez" eliminada — usaba datos
+        // sintéticos (sparkline Math.sin, deltas +12.3%/-5.1%/+22.1%
+        // hardcoded). Para análisis de flujo real, ver card Financiero.
       },
     },
     // ── FINANCIERO ──
@@ -2797,28 +2758,21 @@ function _crearDialOverlay(){
               '</div>'+
               '<div>'+
                 '<div style="font-size:14px;font-weight:800;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.4)">FINANCIERO</div>'+
-                '<div style="font-size:9px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45);margin-top:2px">Sistema financiero operativo</div>'+
+                '<div style="font-size:9px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45);margin-top:2px">Resumen del mes</div>'+
               '</div>'+
-            '</div>'+
-            '<div id="fin-status-chip" style="display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.30);font-size:9px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#4ADE80">'+
-              '<span style="width:6px;height:6px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80"></span>Sistema estable'+
             '</div>'+
           '</div>'+
           // 5 cards top
           '<div id="fin-cards-row" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px"></div>'+
-          // Mid: Visión General + Gasto promedio + Proyección
-          '<div style="display:grid;grid-template-columns:1.0fr 1.1fr 1.4fr;gap:10px">'+
+          // Mid: Visión General + Gasto promedio (proyección eliminada — datos sintéticos)
+          '<div style="display:grid;grid-template-columns:1fr 1.4fr;gap:10px">'+
             '<div id="fin-vision" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
             '<div id="fin-gasto" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
-            '<div id="fin-proyeccion" style="padding:12px;border:1px solid rgba(34,211,238,0.20);border-radius:10px;background:rgba(34,211,238,0.03)"></div>'+
           '</div>'+
-          // Protección bar
-          '<div id="fin-proteccion" style="padding:12px;border:1px solid rgba(255,255,255,0.06);border-radius:10px"></div>'+
-          // Bottom: Análisis mensual + Tendencia + Desglose
-          '<div style="display:grid;grid-template-columns:1.2fr 1.1fr 0.9fr;gap:10px">'+
-            '<div id="fin-analisis" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;overflow:auto"></div>'+
-            '<div id="fin-tendencia" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;display:flex;flex-direction:column;min-height:200px"></div>'+
-            '<div id="fin-desglose" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
+          // Bottom: Análisis mensual + Tendencia
+          '<div style="display:grid;grid-template-columns:1.4fr 1fr;gap:10px">'+
+            '<div id="fin-analisis" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
+            '<div id="fin-tendencia" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;display:flex;flex-direction:column"></div>'+
           '</div>'+
         '</div>';
       },
@@ -2833,28 +2787,23 @@ function _crearDialOverlay(){
         var fmt = function(n){ return '$ '+Math.round(Math.abs(n||0)).toLocaleString('es-MX'); };
         var fmtSign = function(n){ var s = n>=0?'+ ':'− '; return s+fmt(n); };
 
-        // ── 5 cards top ──
-        function _spark(color, n){
-          var pts=[]; for(var i=0;i<n;i++){ pts.push((i*8)+','+(20-((Math.sin(i*0.8+color.charCodeAt(1))+1)/2*16))); }
-          return '<svg viewBox="0 0 64 22" preserveAspectRatio="none" style="width:100%;height:32px;margin-top:8px"><polyline points="'+pts.join(' ')+'" fill="none" stroke="'+color+'" stroke-width="1.5" stroke-linecap="round" style="filter:drop-shadow(0 0 3px '+color+'80)"/></svg>';
-        }
-        function _card(label, value, color, sub, useSpark){
+        // ── 5 cards top (sin sparklines sintéticas) ──
+        function _card(label, value, color, sub){
           return '<div style="padding:11px 13px;border:1px solid '+color+'40;border-radius:10px;background:'+color+'08;position:relative;overflow:hidden">'+
             '<div style="position:absolute;top:0;left:0;right:0;height:2px;background:'+color+';box-shadow:0 0 8px '+color+';opacity:.7"></div>'+
             '<div style="font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:'+color+';margin-bottom:6px;opacity:.85">'+label+'</div>'+
             '<div style="font-size:18px;font-weight:800;color:'+color+';font-family:JetBrains Mono,monospace;line-height:1;text-shadow:0 0 10px '+color+'40;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+value+'</div>'+
             (sub ? '<div style="font-size:9px;color:rgba(220,224,235,0.45);margin-top:4px">'+sub+'</div>' : '')+
-            (useSpark ? _spark(color, 8) : '')+
           '</div>';
         }
         var ahorro = m.porcentajeAhorro || 0;
         var runway = m.runwayDias===null||m.runwayDias===undefined?'∞':m.runwayDias+' días';
         document.getElementById('fin-cards-row').innerHTML =
-          _card('Ingresos',  fmt(mes.ingresos),  '#22C55E', null, true)+
-          _card('Egresos',   fmt(mes.egresos),   '#EF4444', null, true)+
-          _card('Excedente', fmtSign(mes.excedente), '#22D3EE', null, true)+
-          _card('Ahorro %',  ahorro.toFixed(1)+'%', '#FACC15', 'Objetivo: 50%', false)+
-          _card('Runway',    runway, '#A78BFA', 'Operatividad estimada', false);
+          _card('Ingresos',  fmt(mes.ingresos),  '#22C55E', null)+
+          _card('Egresos',   fmt(mes.egresos),   '#EF4444', null)+
+          _card('Excedente', fmtSign(mes.excedente), '#22D3EE', null)+
+          _card('Ahorro %',  ahorro.toFixed(1)+'%', '#FACC15', 'Objetivo: 50%')+
+          _card('Runway',    runway, '#A78BFA', 'Operatividad estimada');
 
         // ── Visión general (donut + lista) ──
         (function(){
@@ -2902,41 +2851,10 @@ function _crearDialOverlay(){
             '<div style="display:flex;align-items:flex-end;gap:6px;height:64px">'+bars+'</div>';
         })();
 
-        // ── Proyección financiera ──
-        (function(){
-          var exc = mes.excedente||0;
-          var proy = mes.proyeccion || {};
-          var mejor = proy.mejorEscenario || exc * 1.25;
-          var peor  = proy.peorEscenario  || exc * 0.65;
-          // Línea horizontal con 3 puntos
-          var html = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:6px;display:flex;justify-content:space-between"><span>Proyección Financiera</span><span style="color:rgba(220,224,235,0.45);font-weight:600;letter-spacing:0;text-transform:none">Basado en tendencia</span></div>'+
-            '<div style="display:flex;flex-direction:column;gap:8px">'+
-              '<div style="font-size:8px;font-weight:800;letter-spacing:.10em;color:rgba(220,224,235,0.55)">LIQUIDEZ PROYECTADA</div>'+
-              '<div style="font-size:18px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(exc)+'</div>'+
-              '<div style="display:flex;justify-content:space-between;padding:8px;border:1px solid rgba(74,222,128,0.30);border-radius:8px;background:rgba(74,222,128,0.05)"><span style="font-size:9px;font-weight:700;color:#4ADE80">MEJOR ESCENARIO</span><span style="font-size:11px;font-weight:800;color:#4ADE80;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(mejor)+'</span></div>'+
-              '<div style="display:flex;justify-content:space-between;padding:8px;border:1px solid rgba(34,211,238,0.30);border-radius:8px;background:rgba(34,211,238,0.05)"><span style="font-size:9px;font-weight:700;color:#22D3EE">ESCENARIO BASE</span><span style="font-size:11px;font-weight:800;color:#22D3EE;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(exc)+'</span></div>'+
-              '<div style="display:flex;justify-content:space-between;padding:8px;border:1px solid rgba(239,68,68,0.30);border-radius:8px;background:rgba(239,68,68,0.05)"><span style="font-size:9px;font-weight:700;color:#EF4444">PEOR ESCENARIO</span><span style="font-size:11px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmtSign(peor)+'</span></div>'+
-            '</div>';
-          document.getElementById('fin-proyeccion').innerHTML = html;
-        })();
-
-        // ── Protección fin de mes (bar inversor/consumidor) ──
-        (function(){
-          var ahorroPct = m.porcentajeAhorro || 0;
-          var inv = Math.max(0, Math.min(100, ahorroPct));
-          var con = 100 - inv;
-          var hoy = new Date();
-          var diasRest = new Date(hoy.getFullYear(),hoy.getMonth()+1,0).getDate() - hoy.getDate();
-          document.getElementById('fin-proteccion').innerHTML =
-            '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'+
-              '<div><span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.65)">Protección fin de mes · </span><span style="font-size:10px;font-weight:700;color:#22D3EE">'+diasRest+' días restantes</span></div>'+
-              '<div style="font-size:9px;color:rgba(220,224,235,0.55)">Al ritmo actual de '+fmt(m.gastoPorDiaPromedio)+'/día</div>'+
-            '</div>'+
-            '<div style="height:14px;border-radius:7px;overflow:hidden;display:flex;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08)">'+
-              '<div style="width:'+inv+'%;background:linear-gradient(90deg,#22C55E,#4ADE80);box-shadow:0 0 8px rgba(74,222,128,0.5);display:flex;align-items:center;justify-content:flex-start;padding-left:10px;font-size:9px;font-weight:800;color:#fff">'+inv.toFixed(0)+'% Inversionista</div>'+
-              '<div style="width:'+con+'%;background:linear-gradient(90deg,#F87171,#EF4444);box-shadow:0 0 8px rgba(239,68,68,0.5);display:flex;align-items:center;justify-content:flex-end;padding-right:10px;font-size:9px;font-weight:800;color:#fff">'+con.toFixed(0)+'% Consumidor</div>'+
-            '</div>';
-        })();
+        // v5.148: secciones "Proyección financiera" y "Protección fin de mes"
+        // eliminadas porque usaban datos sintéticos (exc*1.25, exc*0.65,
+        // deltas hardcoded). Para análisis predictivo real se necesita
+        // modelo en el backend.
 
         // ── Análisis mensual (tabla) ──
         (function(){
@@ -2980,32 +2898,8 @@ function _crearDialOverlay(){
             '</div>';
         })();
 
-        // ── Desglose táctico (top entes egresos del mes) ──
-        (function(){
-          var desglose = [];
-          if(datosM && datosM.meses){
-            var mesActual = datosM.meses[datosM.meses.length-1];
-            var entesMes = (datosM.grupos||{})[mesActual] || [];
-            desglose = entesMes.filter(function(e){ return e.monto<0; })
-              .map(function(e){ return {ente:e.ente, monto:Math.abs(e.monto)}; })
-              .sort(function(a,b){ return b.monto-a.monto; }).slice(0,6);
-          }
-          var totalEgr = desglose.reduce(function(s,d){ return s+d.monto; }, 0) || 1;
-          var rows = desglose.map(function(d){
-            var pct = Math.round((d.monto/totalEgr)*100);
-            return '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'+
-              '<span style="font-size:11px;color:rgba(220,224,235,0.85);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px">'+d.ente+'</span>'+
-              '<span style="font-size:9px;color:rgba(220,224,235,0.55);font-family:JetBrains Mono,monospace">'+pct+'%</span>'+
-              '<span style="font-size:11px;font-weight:700;color:#EF4444;font-family:JetBrains Mono,monospace;white-space:nowrap">'+fmt(d.monto)+'</span>'+
-            '</div>';
-          }).join('');
-          var totalStr = fmt(totalEgr);
-          document.getElementById('fin-desglose').innerHTML =
-            '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#22D3EE;margin-bottom:4px">Desglose Táctico</div>'+
-            '<div style="font-size:9px;color:rgba(220,224,235,0.45);margin-bottom:10px">Top categorías de egreso</div>'+
-            (desglose.length ? rows : '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:14px;font-size:11px">Sin datos</div>')+
-            (desglose.length ? '<div style="display:flex;justify-content:space-between;padding:8px 0 0;margin-top:6px;border-top:1px solid rgba(255,255,255,0.10)"><span style="font-size:10px;font-weight:700;color:rgba(220,224,235,0.65)">Total</span><span style="font-size:11px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace">'+totalStr+'</span></div>' : '');
-        })();
+        // v5.148: sección "Desglose táctico" eliminada — su container
+        // fin-desglose ya no existe en el DOM (limpieza de cards expandidas).
 
         // Asegurar que tenemos flujo mensual, si no, fetch
         if(!meses.length && typeof api !== 'undefined' && api.getFlujoPorMes){
