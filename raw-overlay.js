@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.150
+/* RAW Entry — Overlay v.5.151
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -3157,10 +3157,10 @@ function _crearDialOverlay(){
               '<div style="font-size:16px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap;margin-bottom:6px">'+fmt2(ap.monto)+'</div>'+
               '<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-bottom:6px"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#F59E0B,#FBBF24);box-shadow:0 0 6px #F59E0B;border-radius:999px"></div></div>'+
               '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:rgba(220,224,235,0.55)">Meta '+fmt(ap.metaMonto||ap.monto)+'</span><span style="font-size:10px;font-weight:800;color:#FBBF24;font-family:JetBrains Mono,monospace">'+pct+'%</span></div>'+
-              '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+vencidoBadge+'<button style="padding:3px 10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);border-radius:6px;font-size:9px;font-weight:800;color:#4ADE80;cursor:pointer;letter-spacing:.04em">Usar</button></div>'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+vencidoBadge+'<button onclick="if(typeof _marcarApartadoUsado===\'function\')_marcarApartadoUsado('+ap.fila+')" style="padding:3px 10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);border-radius:6px;font-size:9px;font-weight:800;color:#4ADE80;cursor:pointer;letter-spacing:.04em">Usar ✓</button></div>'+
             '</div>';
           }).join('');
-          var nuevo = '<div style="display:flex;align-items:center;justify-content:center;border:1px dashed rgba(34,197,94,0.40);border-radius:9px;background:rgba(34,197,94,0.02);cursor:pointer;min-height:120px"><div style="text-align:center"><div style="width:32px;height:32px;border-radius:8px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);display:flex;align-items:center;justify-content:center;margin:0 auto 6px"><i class="fas fa-plus" style="color:#4ADE80;font-size:13px"></i></div><div style="font-size:10px;font-weight:800;color:#4ADE80;letter-spacing:.06em">Nuevo<br>apartado</div></div></div>';
+          var nuevo = ''; // v5.151: quitado botón decorativo "Nuevo apartado" — sin función
           // v5.147: grid auto-fill — cantas tarjetas quepan por fila según ancho
           document.getElementById('pat-apartados').innerHTML =
             '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Apartados y Objetivos <span style="color:rgba(220,224,235,0.40);font-weight:700">('+activos.length+')</span></div>'+
@@ -3427,6 +3427,15 @@ function _crearDialOverlay(){
             if(cfg && document.getElementById('fin-analisis')) cfg.hydrate();
           }).catch(function(){});
         }
+        // v5.151: si _revData no está cargado, pedirlo y re-hidratar Identidad/Insights
+        if((!window._revData || !window._revData.ok) && typeof api !== 'undefined' && api.getRevision){
+          var _h = new Date();
+          api.getRevision('mensual', _h.getFullYear(), _h.getMonth()+1, null).then(function(d){
+            window._revData = d;
+            var cfg = window._EXPAND_CONFIG && window._EXPAND_CONFIG['hud-financiero'];
+            if(cfg && document.getElementById('fin-identidad')) cfg.hydrate();
+          }).catch(function(){});
+        }
       },
     },
     // ── FIJOS ──
@@ -3578,7 +3587,7 @@ function _crearDialOverlay(){
               '<div style="display:flex;align-items:center;gap:8px">'+
                 '<div id="nec-overlay-anio-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85);font-family:JetBrains Mono,monospace">'+(new Date().getFullYear())+'</div>'+
                 '<div id="nec-overlay-mes-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85)">Hasta hoy</div>'+
-                '<button id="nec-overlay-hoy-btn" style="padding:5px 12px;border:1px solid rgba(168,85,247,0.55);border-radius:8px;background:rgba(168,85,247,0.10);font-size:10px;font-weight:800;color:#A855F7;cursor:pointer;letter-spacing:.04em">Hoy</button>'+
+                // v5.151: botón "Hoy" decorativo eliminado — sin listener real
               '</div>'+
             '</div>'+
             // Radar + Pirámide lado a lado
