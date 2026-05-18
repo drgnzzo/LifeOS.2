@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.148
+/* RAW Entry — Overlay v.5.149
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -708,6 +708,213 @@ function _crearDialOverlay(){
     document.head.appendChild(ks);
   }
   _dialOverlay.appendChild(_glowEl);
+
+  // ══════════════════════════════════════════════════════════════════
+  //  v5.149: ANIMACIÓN DE PARTÍCULAS / CIRCUIT-BOARD
+  //  Canvas detrás del dial y las cards. Nodos pulsantes + trazos
+  //  de circuito que recorren caminos. Estilo motherboard cibernético.
+  // ══════════════════════════════════════════════════════════════════
+  var _particlesCanvas = document.createElement('canvas');
+  _particlesCanvas.id = 'dial-particles';
+  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.45';
+  _dialOverlay.appendChild(_particlesCanvas);
+
+  // Inicializar la lógica de partículas
+  (function initParticles(){
+    var pctx, nodes, traces, lastT = 0, animId = null;
+    var W = 0, H = 0;
+
+    function resize(){
+      var dpr = window.devicePixelRatio || 1;
+      W = window.innerWidth;
+      H = window.innerHeight;
+      _particlesCanvas.width = W * dpr;
+      _particlesCanvas.height = H * dpr;
+      _particlesCanvas.style.width = W + 'px';
+      _particlesCanvas.style.height = H + 'px';
+      pctx = _particlesCanvas.getContext('2d');
+      pctx.scale(dpr, dpr);
+    }
+
+    function buildNetwork(){
+      // Distribuir nodos en una grid suave con jitter, simulando pcb
+      nodes = [];
+      var cols = Math.floor(W / 95);
+      var rows = Math.floor(H / 95);
+      var stepX = W / (cols + 1);
+      var stepY = H / (rows + 1);
+      var palette = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9'];
+      for(var r = 0; r < rows + 1; r++){
+        for(var c = 0; c < cols + 1; c++){
+          // Excluir nodos demasiado cerca del centro (zona del dial)
+          var cx = stepX * (c + 1) + (Math.random() - 0.5) * 35;
+          var cy = stepY * (r + 1) + (Math.random() - 0.5) * 35;
+          var distFromCenter = Math.hypot(cx - W/2, cy - H/2);
+          if(distFromCenter < Math.min(W, H) * 0.22) continue;
+          nodes.push({
+            x: cx,
+            y: cy,
+            color: palette[Math.floor(Math.random() * palette.length)],
+            phase: Math.random() * Math.PI * 2,
+            speed: 0.4 + Math.random() * 0.8,
+            baseR: 0.8 + Math.random() * 1.3,
+          });
+        }
+      }
+      traces = [];
+    }
+
+    function spawnTrace(){
+      if(!nodes || nodes.length < 2) return;
+      // Tomar un nodo aleatorio y crear un trazo de circuito con 2-4 segmentos manhattan
+      var n1 = nodes[Math.floor(Math.random() * nodes.length)];
+      var n2 = nodes[Math.floor(Math.random() * nodes.length)];
+      if(n1 === n2) return;
+      // Manhattan path: ir primero horizontal, luego vertical (o vice versa)
+      var horizFirst = Math.random() < 0.5;
+      var pts;
+      if(horizFirst){
+        pts = [{x:n1.x, y:n1.y}, {x:n2.x, y:n1.y}, {x:n2.x, y:n2.y}];
+      } else {
+        pts = [{x:n1.x, y:n1.y}, {x:n1.x, y:n2.y}, {x:n2.x, y:n2.y}];
+      }
+      // Calcular longitud total
+      var lens = [];
+      var total = 0;
+      for(var i = 1; i < pts.length; i++){
+        var d = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
+        lens.push(d);
+        total += d;
+      }
+      traces.push({
+        pts: pts,
+        lens: lens,
+        total: total,
+        progress: 0,
+        speed: 180 + Math.random() * 220, // px/s
+        color: n1.color,
+        life: 1,
+        tailLen: 80 + Math.random() * 70,
+      });
+    }
+
+    function getPointAt(trace, dist){
+      // Recorrer segmentos hasta encontrar la posición
+      var rem = dist;
+      for(var i = 0; i < trace.lens.length; i++){
+        if(rem <= trace.lens[i]){
+          var t = rem / trace.lens[i];
+          var p1 = trace.pts[i];
+          var p2 = trace.pts[i+1];
+          return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
+        }
+        rem -= trace.lens[i];
+      }
+      return trace.pts[trace.pts.length - 1];
+    }
+
+    function drawTrace(trace){
+      // Dibujar línea fade desde (progress - tailLen) hasta progress
+      var headDist = trace.progress;
+      var tailDist = Math.max(0, headDist - trace.tailLen);
+      // Trazar puntos cada 4px de la cola a la cabeza
+      var samples = [];
+      for(var d = tailDist; d <= headDist; d += 4){
+        samples.push({ pt: getPointAt(trace, d), alpha: (d - tailDist) / (headDist - tailDist || 1) });
+      }
+      if(samples.length < 2) return;
+      // Dibujar segmentos con gradiente de alpha
+      pctx.lineCap = 'round';
+      pctx.lineJoin = 'round';
+      for(var s = 1; s < samples.length; s++){
+        var a = samples[s].alpha * trace.life;
+        pctx.strokeStyle = trace.color + Math.floor(a * 220).toString(16).padStart(2, '0');
+        pctx.lineWidth = 1.6 * samples[s].alpha;
+        pctx.beginPath();
+        pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
+        pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
+        pctx.stroke();
+      }
+      // Cabeza brillante
+      var head = getPointAt(trace, headDist);
+      pctx.fillStyle = trace.color;
+      pctx.shadowColor = trace.color;
+      pctx.shadowBlur = 12;
+      pctx.beginPath();
+      pctx.arc(head.x, head.y, 2.2, 0, Math.PI * 2);
+      pctx.fill();
+      pctx.shadowBlur = 0;
+    }
+
+    function frame(t){
+      var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+      lastT = t;
+      if(!pctx) { animId = requestAnimationFrame(frame); return; }
+      pctx.clearRect(0, 0, W, H);
+
+      // Dibujar nodos (puntos pulsantes estilo servidor)
+      for(var i = 0; i < nodes.length; i++){
+        var n = nodes[i];
+        n.phase += n.speed * dt;
+        var pulse = (Math.sin(n.phase) + 1) / 2; // 0..1
+        var r = n.baseR + pulse * 1.4;
+        var alpha = 0.30 + pulse * 0.55;
+        pctx.fillStyle = n.color + Math.floor(alpha * 200).toString(16).padStart(2, '0');
+        pctx.shadowColor = n.color;
+        pctx.shadowBlur = 5 + pulse * 8;
+        pctx.beginPath();
+        pctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+        pctx.fill();
+      }
+      pctx.shadowBlur = 0;
+
+      // Avanzar trazos
+      for(var ti = traces.length - 1; ti >= 0; ti--){
+        var tr = traces[ti];
+        tr.progress += tr.speed * dt;
+        if(tr.progress > tr.total + tr.tailLen){
+          traces.splice(ti, 1);
+          continue;
+        }
+        if(tr.progress > tr.total){
+          tr.life = Math.max(0, 1 - (tr.progress - tr.total) / tr.tailLen);
+        }
+        drawTrace(tr);
+      }
+
+      // Spawn ocasional (densidad razonable)
+      if(traces.length < 8 && Math.random() < 0.05){
+        spawnTrace();
+      }
+
+      animId = requestAnimationFrame(frame);
+    }
+
+    function start(){
+      resize();
+      buildNetwork();
+      // Spawn inicial
+      for(var i = 0; i < 3; i++) spawnTrace();
+      lastT = 0;
+      if(animId) cancelAnimationFrame(animId);
+      animId = requestAnimationFrame(frame);
+    }
+
+    function stop(){
+      if(animId){ cancelAnimationFrame(animId); animId = null; }
+    }
+
+    window._particlesStart = start;
+    window._particlesStop  = stop;
+
+    // Resize handler
+    window.addEventListener('resize', function(){
+      if(_particlesCanvas.offsetParent !== null){ // si visible
+        resize();
+        buildNetwork();
+      }
+    });
+  })();
 
   // ── Aro pulsante "breathing" (P-1b): círculo delineado SVG centrado en el dial.
   // Se muestra ANTES de que aparezcan los paneles y antes que el dial canvas.
@@ -2496,7 +2703,7 @@ function _crearDialOverlay(){
           estado = 'alto'; estadoColor = '#EF4444'; estadoBg = 'rgba(239,68,68,0.12)'; estadoIcon = 'fa-triangle-exclamation';
         }
         listaHTML +=
-          '<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid '+c.color+'40;border-radius:9px;background:'+c.color+'08">'+
+          '<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid '+c.color+'40;border-radius:9px;background:'+c.color+'08;flex-wrap:wrap">'+
             // Icon block
             '<div style="width:28px;height:28px;border-radius:7px;background:'+c.color+'1a;border:1px solid '+c.color+'55;display:flex;align-items:center;justify-content:center;flex-shrink:0">'+
               '<i class="fas fa-square" style="color:'+c.color+';font-size:9px"></i>'+
@@ -2516,6 +2723,11 @@ function _crearDialOverlay(){
             '<div style="font-size:11px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;flex:0 0 36px;text-align:right;white-space:nowrap">'+pct+'%</div>'+
             // Monto
             '<div style="font-size:12px;font-weight:800;color:'+c.color+';font-family:JetBrains Mono,monospace;flex:0 0 88px;text-align:right;white-space:nowrap">$ '+abs.toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>'+
+            // v5.149: Conceptos del nivel (vienen del backend como d.conceptos)
+            (d.conceptos && d.conceptos.length ? '<div style="flex:1 1 100%;margin-top:6px;padding-top:6px;border-top:1px dashed '+c.color+'40;display:flex;flex-wrap:wrap;gap:4px">'+
+              '<span style="font-size:8px;font-weight:700;color:rgba(220,224,235,0.45);letter-spacing:.08em;text-transform:uppercase;margin-right:4px;align-self:center">Conceptos:</span>'+
+              d.conceptos.map(function(cn){ return '<span style="font-size:9px;padding:2px 7px;border-radius:999px;background:'+c.color+'14;border:1px solid '+c.color+'33;color:'+c.color+';font-weight:600">'+cn+'</span>'; }).join('')+
+            '</div>' : '')+
           '</div>';
       });
       listaHTML += '</div>';
@@ -2634,77 +2846,172 @@ function _crearDialOverlay(){
             '<div style="width:30px;height:30px;border-radius:7px;background:rgba(245,158,11,0.14);border:1px solid rgba(245,158,11,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-lock" style="color:#F59E0B;font-size:13px"></i></div>'+
           '</div>';
 
-        // Saldos y Cuentas: lista de banco + fisico + inversion items
+        // ── Saldos y Cuentas: TODOS los fijos reales, con apartados por banco ──
+        // v5.149: usa la misma lógica que renderPatrimonio de HOME.
+        // Cada banco muestra: saldo bruto, apartados de ese banco, disponible neto.
         (function(){
-          var rows = '';
-          var allItems = [];
-          (banco.items||[]).forEach(function(it){ allItems.push({nombre:it.nombre,categoria:'Banco',monto:it.monto,color:'#4ADE80'}); });
-          (fisico.items||[]).forEach(function(it){ allItems.push({nombre:it.nombre,categoria:'Cuenta digital',monto:it.monto,color:'#FBBF24'}); });
-          (inv.items||[]).forEach(function(it){ allItems.push({nombre:it.nombre,categoria:'Cartera',monto:it.monto,color:'#C4B5FD'}); });
-          rows = allItems.slice(0,5).map(function(it){
-            var color = it.color;
+          var fijosReales = window._fijosData || [];
+          var fijosVisibles = fijosReales.filter(function(fi){ return fi.nombre !== 'P'; });
+          var pFila = fijosReales.find(function(fi){ return fi.nombre === 'P'; });
+
+          // Apartados por banco (igual que HOME)
+          var apartadosArr = window._apartadosData || [];
+          var apPorBanco = {};
+          var totalApActivos = 0;
+          apartadosArr.forEach(function(ap){
+            if(ap.estado && ap.estado.toLowerCase()==='usado') return;
+            var b = (ap.banco||'').trim().toUpperCase();
+            apPorBanco[b] = (apPorBanco[b]||0) + (ap.monto||0);
+            totalApActivos += (ap.monto||0);
+          });
+
+          var rows = fijosVisibles.map(function(fi){
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            var dispBanco = (fi.monto||0) - apBanco;
+            var col = (fi.monto||0) >= 0 ? '#4ADE80' : '#EF4444';
             return '<tr style="border-bottom:1px solid rgba(255,255,255,0.04)">'+
               '<td style="padding:8px 6px">'+
-                '<div style="display:flex;align-items:center;gap:8px"><div style="width:26px;height:26px;border-radius:6px;background:'+color+'1a;border:1px solid '+color+'55;display:flex;align-items:center;justify-content:center"><span style="font-size:10px;font-weight:800;color:'+color+'">'+(it.nombre||'').slice(0,3).toUpperCase()+'</span></div>'+
-                '<div><div style="font-size:11px;font-weight:800;color:#fff">'+it.nombre+'</div><div style="font-size:9px;color:rgba(220,224,235,0.45)">'+it.categoria+'</div></div></div>'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<div style="width:26px;height:26px;border-radius:6px;background:'+col+'1a;border:1px solid '+col+'55;display:flex;align-items:center;justify-content:center"><i class="fas fa-building-columns" style="color:'+col+';font-size:10px"></i></div>'+
+                  '<div><div style="font-size:11px;font-weight:800;color:#fff">'+fi.nombre+'</div></div>'+
+                '</div>'+
               '</td>'+
-              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:'+(it.monto>=0?color:'#EF4444')+';white-space:nowrap">'+(it.monto>=0?'':'− ')+fmt2(it.monto)+'</td>'+
-              '<td style="padding:8px 6px;text-align:right"><div style="font-size:10px;color:'+(it.monto>=0?'#4ADE80':'#EF4444')+';font-family:JetBrains Mono,monospace;font-weight:700">'+(it.monto>=0?'+ $0.00':'-$ 0.00')+'</div><div style="font-size:9px;color:rgba(220,224,235,0.45)">0.00%</div></td>'+
-              '<td style="padding:8px 6px;text-align:right">'+_spark(color, color.charCodeAt(1))+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:'+col+';white-space:nowrap">'+fmt2(fi.monto)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:'+(apBanco>0?'#F59E0B':'rgba(220,224,235,0.35)')+';white-space:nowrap">'+(apBanco>0?'-':'')+fmt(apBanco)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:12px;font-weight:800;color:#4ADE80;white-space:nowrap">'+fmt2(dispBanco)+'</td>'+
             '</tr>';
           }).join('');
+
+          // Fila P* (excluida del total, pero visible como indicador)
+          if(pFila){
+            rows += '<tr style="border-top:1px dashed rgba(239,68,68,0.30)">'+
+              '<td style="padding:8px 6px">'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<div style="width:26px;height:26px;border-radius:6px;background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.40);display:flex;align-items:center;justify-content:center"><i class="fas fa-circle-exclamation" style="color:#EF4444;font-size:10px"></i></div>'+
+                  '<div><div style="font-size:11px;font-weight:800;color:#fff">P <span style="color:#EF4444">*</span></div><div style="font-size:9px;color:rgba(220,224,235,0.45)">Indicador, excluido del total</div></div>'+
+                '</div>'+
+              '</td>'+
+              '<td style="padding:8px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:11px;font-weight:700;color:#EF4444;white-space:nowrap">'+fmt2(pFila.monto)+'</td>'+
+              '<td style="padding:8px 6px;text-align:right;color:rgba(220,224,235,0.30)">—</td>'+
+              '<td style="padding:8px 6px;text-align:right;color:rgba(220,224,235,0.30)">—</td>'+
+            '</tr>';
+          }
+
+          // Total
+          var sumDisp = fijosVisibles.reduce(function(s,fi){
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            return s + ((fi.monto||0) - apBanco);
+          }, 0);
+          var sumBruto = fijosVisibles.reduce(function(s,fi){ return s + (fi.monto||0); }, 0);
+
           document.getElementById('pat-saldos').innerHTML =
-            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Saldos y Cuentas</div>'+
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">'+
+              '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E">Saldos por banco</div>'+
+              '<div style="font-size:11px;color:rgba(220,224,235,0.55)">'+fijosVisibles.length+' cuentas'+(pFila?' + P*':'')+'</div>'+
+            '</div>'+
             '<table style="width:100%;border-collapse:collapse">'+
-              '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08)"><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:left">Cuenta</th><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Saldo actual</th><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Δ Hoy</th><th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Tendencia 7D</th></tr></thead>'+
-              '<tbody>'+(rows || '<tr><td colspan="4" style="padding:18px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin cuentas registradas</td></tr>')+'</tbody>'+
-            '</table>'+
-            '<div style="margin-top:8px;font-size:10px;color:#22C55E;cursor:pointer">Ver todas las cuentas ('+allItems.length+') ›</div>';
+              '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.08)">'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:left">Cuenta</th>'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Saldo bruto</th>'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Apartados</th>'+
+                '<th style="padding:6px 6px;font-size:8px;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);text-align:right">Disponible</th>'+
+              '</tr></thead>'+
+              '<tbody>'+(rows || '<tr><td colspan="4" style="padding:18px;text-align:center;color:rgba(220,224,235,0.40);font-size:11px">Sin cuentas</td></tr>')+'</tbody>'+
+              '<tfoot><tr style="border-top:2px solid rgba(34,197,94,0.30)">'+
+                '<td style="padding:10px 6px;font-size:11px;font-weight:800;color:#fff">TOTAL</td>'+
+                '<td style="padding:10px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:13px;font-weight:800;color:#fff">'+fmt2(sumBruto)+'</td>'+
+                '<td style="padding:10px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:13px;font-weight:800;color:#F59E0B">-'+fmt(totalApActivos)+'</td>'+
+                '<td style="padding:10px 6px;text-align:right;font-family:JetBrains Mono,monospace;font-size:14px;font-weight:800;color:#4ADE80">'+fmt2(sumDisp)+'</td>'+
+              '</tr></tfoot>'+
+            '</table>';
         })();
 
-        // Distribución de Fondos: donut
+        // ── Distribución de Fondos REAL (v5.149) ──
+        // Misma lógica de HOME: cada banco con su disponible + apartados.
+        // P* mostrado como indicador SEPARADO (no se mezcla con distribución).
         (function(){
-          var bancoT = banco.saldo||0, fisicoT = fisico.saldo||0, invT = inv.saldo||0, deudaT = 0;
-          // Detectar deuda como ente con monto < 0 (ej. P)
-          var hayP = (window._fijosData||[]).filter(function(fi){ return fi.monto<0; })
-                       .reduce(function(s,fi){ return s + Math.abs(fi.monto||0); }, 0);
-          deudaT = hayP;
-          var totalNoDeuda = bancoT + fisicoT + invT + totalAp;
-          if(totalNoDeuda <= 0){ document.getElementById('pat-distribucion').innerHTML = '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:24px">Sin datos</div>'; return; }
-          var partes = [
-            { label:'Banco', valor:bancoT, color:'#4ADE80' },
-            { label:'Apartados', valor:totalAp, color:'#FBBF24' },
-            { label:'Efectivo', valor:fisicoT, color:'#22D3EE' },
-            { label:'Deudas (P.)', valor:-deudaT, color:'#EF4444' },
-          ];
-          var sumPos = partes.filter(function(p){return p.valor>0;}).reduce(function(s,p){return s+p.valor;},0) || 1;
-          var R = 50, C = 2*Math.PI*R, off = 0;
-          var arcs = partes.filter(function(p){return p.valor>0;}).map(function(p){
-            var d = (p.valor/sumPos)*C;
-            var arc = '<circle cx="80" cy="80" r="'+R+'" fill="none" stroke="'+p.color+'" stroke-width="16" stroke-dasharray="'+d+' '+C+'" stroke-dashoffset="'+(-off)+'" transform="rotate(-90 80 80)" style="filter:drop-shadow(0 0 4px '+p.color+'80)"/>';
-            off += d;
-            return arc;
-          }).join('');
-          var leyenda = partes.map(function(p){
-            var pct = sumPos>0 ? Math.round((Math.abs(p.valor)/sumPos)*100) : 0;
-            var c = p.valor < 0 ? '#EF4444' : p.color;
+          var fijosReales = window._fijosData || [];
+          var fijosVisibles = fijosReales.filter(function(fi){ return fi.nombre !== 'P'; });
+          var pFila = fijosReales.find(function(fi){ return fi.nombre === 'P'; });
+
+          var apartadosArr = window._apartadosData || [];
+          var apPorBanco = {};
+          var totalApActivos = 0;
+          apartadosArr.forEach(function(ap){
+            if(ap.estado && ap.estado.toLowerCase()==='usado') return;
+            var b = (ap.banco||'').trim().toUpperCase();
+            apPorBanco[b] = (apPorBanco[b]||0) + (ap.monto||0);
+            totalApActivos += (ap.monto||0);
+          });
+
+          var sumBruto = fijosVisibles.reduce(function(s,fi){ return s + Math.max(0, fi.monto||0); }, 0);
+
+          if(sumBruto <= 0){
+            document.getElementById('pat-distribucion').innerHTML = '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:24px">Sin datos</div>';
+            return;
+          }
+
+          // Paletas por banco
+          var paleta = ['#4ADE80','#22D3EE','#A78BFA','#FBBF24','#F472B6','#86EFAC','#67E8F9'];
+
+          // Barra apilada: cada banco (parte disponible) + apartados de ese banco
+          var barraHTML = '<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);margin-bottom:10px">';
+          fijosVisibles.forEach(function(fi, i){
+            var color = paleta[i % paleta.length];
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            var dispBanco = Math.max(0, (fi.monto||0) - apBanco);
+            var pctDisp = (dispBanco/sumBruto)*100;
+            var pctAp = (apBanco/sumBruto)*100;
+            if(pctDisp > 0){
+              barraHTML += '<div title="'+fi.nombre+' disponible" style="width:'+pctDisp.toFixed(2)+'%;background:'+color+';box-shadow:0 0 4px '+color+'80 inset"></div>';
+            }
+            if(pctAp > 0){
+              barraHTML += '<div title="'+fi.nombre+' apartados" style="width:'+pctAp.toFixed(2)+'%;background:'+color+'66;border-left:1px dashed rgba(255,255,255,0.20)"></div>';
+            }
+          });
+          barraHTML += '</div>';
+
+          // Lista por banco
+          var listaHTML = fijosVisibles.map(function(fi, i){
+            var color = paleta[i % paleta.length];
+            var bancKey = (fi.nombre||'').trim().toUpperCase();
+            var apBanco = apPorBanco[bancKey] || 0;
+            var dispBanco = (fi.monto||0) - apBanco;
+            var pct = sumBruto > 0 ? Math.round(((fi.monto||0)/sumBruto)*100) : 0;
             return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,0.04)">'+
-              '<span style="display:flex;align-items:center;gap:6px;color:rgba(220,224,235,0.85)"><span style="width:7px;height:7px;border-radius:50%;background:'+c+';box-shadow:0 0 4px '+c+'"></span>'+p.label+'</span>'+
-              '<span style="display:flex;align-items:center;gap:10px"><span style="color:'+c+';font-weight:700;font-family:JetBrains Mono,monospace">'+(p.valor<0?'-':'')+pct+'%</span><span style="color:'+c+';font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap;min-width:80px;text-align:right">'+(p.valor<0?'-$ ':'$ ')+Math.abs(p.valor).toLocaleString('es-MX',{minimumFractionDigits:2})+'</span></span>'+
+              '<span style="display:flex;align-items:center;gap:6px;color:rgba(220,224,235,0.85);font-weight:700"><span style="width:9px;height:9px;border-radius:2px;background:'+color+';box-shadow:0 0 4px '+color+'"></span>'+fi.nombre+'</span>'+
+              '<span style="display:flex;align-items:center;gap:10px">'+
+                '<span style="color:rgba(220,224,235,0.55);font-family:JetBrains Mono,monospace">'+pct+'%</span>'+
+                '<span style="color:'+color+';font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap;min-width:90px;text-align:right">'+fmt2(fi.monto)+'</span>'+
+              '</span>'+
             '</div>';
           }).join('');
-          document.getElementById('pat-distribucion').innerHTML =
-            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Distribución de Fondos</div>'+
-            '<div style="display:flex;align-items:center;gap:14px">'+
-              '<svg viewBox="0 0 160 160" style="width:140px;height:140px;flex-shrink:0">'+
-                '<circle cx="80" cy="80" r="'+R+'" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="16"/>'+
-                arcs +
-                '<text x="80" y="74" text-anchor="middle" fill="rgba(220,224,235,0.55)" font-size="8" font-weight="700">TOTAL</text>'+
-                '<text x="80" y="92" text-anchor="middle" fill="#fff" font-size="13" font-weight="800" font-family="JetBrains Mono,monospace">$ '+Math.round(sumPos).toLocaleString('es-MX')+'</text>'+
-                '<text x="80" y="106" text-anchor="middle" fill="rgba(220,224,235,0.45)" font-size="8">100%</text>'+
-              '</svg>'+
-              '<div style="flex:1;min-width:0">'+leyenda+'</div>'+
+
+          // P* como indicador SEPARADO (no se mezcla en distribución)
+          var pHTML = '';
+          if(pFila){
+            pHTML = '<div style="margin-top:10px;padding:10px 12px;border:1px dashed rgba(239,68,68,0.40);border-radius:8px;background:rgba(239,68,68,0.04)">'+
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'+
+                '<div style="display:flex;align-items:center;gap:8px">'+
+                  '<i class="fas fa-circle-exclamation" style="color:#EF4444;font-size:11px"></i>'+
+                  '<div>'+
+                    '<div style="font-size:11px;font-weight:800;color:#fff">P <span style="color:#EF4444">*</span></div>'+
+                    '<div style="font-size:9px;color:rgba(220,224,235,0.45)">Indicador, NO afecta el total</div>'+
+                  '</div>'+
+                '</div>'+
+                '<span style="font-size:13px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace">'+fmt2(pFila.monto)+'</span>'+
+              '</div>'+
             '</div>';
+          }
+
+          document.getElementById('pat-distribucion').innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Distribución por cuenta</div>'+
+            barraHTML +
+            '<div style="display:flex;flex-direction:column">'+listaHTML+'</div>'+
+            pHTML;
         })();
 
         // Apartados y Objetivos: TODOS los apartados activos (v5.147)
@@ -2774,6 +3081,12 @@ function _crearDialOverlay(){
             '<div id="fin-analisis" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
             '<div id="fin-tendencia" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px;display:flex;flex-direction:column"></div>'+
           '</div>'+
+          // v5.149: Proyección REAL (de mes.proyeccion del backend, no sintética)
+          '<div id="fin-proyeccion-real" style="padding:12px;border:1px solid rgba(34,211,238,0.18);border-radius:10px"></div>'+
+          // v5.149: Identidad (scoreInversionista/scoreConsumidor) — viene de _revData del backend
+          '<div id="fin-identidad" style="padding:12px;border:1px solid rgba(196,181,253,0.18);border-radius:10px;background:rgba(196,181,253,0.03)"></div>'+
+          // v5.149: Insights del backend
+          '<div id="fin-insights" style="padding:12px;border:1px solid rgba(255,255,255,0.06);border-radius:10px"></div>'+
         '</div>';
       },
       hydrate: function(){
@@ -2901,6 +3214,90 @@ function _crearDialOverlay(){
         // v5.148: sección "Desglose táctico" eliminada — su container
         // fin-desglose ya no existe en el DOM (limpieza de cards expandidas).
 
+        // v5.149: Proyección REAL del backend (mes.proyeccion)
+        (function(){
+          var proy = mes.proyeccion || {};
+          var diasRest = proy.diasRestantes || 0;
+          var excProy = proy.excedente;
+          var el = document.getElementById('fin-proyeccion-real');
+          if(!el) return;
+          if(diasRest <= 0 || excProy === undefined || excProy === null){
+            el.innerHTML = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:6px">Proyección Fin de Mes</div>'+
+              '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:16px;font-size:11px">Sin proyección disponible</div>';
+            return;
+          }
+          var pos = excProy >= 0;
+          el.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between">'+
+              '<div>'+
+                '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:4px">Proyección fin de mes · '+diasRest+' días restantes</div>'+
+                '<div style="font-size:11px;color:rgba(220,224,235,0.55)">Al ritmo actual de '+fmt(m.gastoPorDiaPromedio||0)+'/día</div>'+
+              '</div>'+
+              '<div style="text-align:right">'+
+                '<div style="font-size:9px;font-weight:700;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:4px">Excedente proyectado</div>'+
+                '<div style="font-size:24px;font-weight:800;color:'+(pos?'#4ADE80':'#EF4444')+';font-family:JetBrains Mono,monospace;white-space:nowrap">'+(pos?'+':'')+fmt(excProy)+'</div>'+
+              '</div>'+
+            '</div>';
+        })();
+
+        // v5.149: Identidad (scoreInversionista / scoreConsumidor) — desde _revData
+        (function(){
+          var rev = window._revData || {};
+          var id = rev.identidad || {};
+          var scoreInv = id.scoreInversionista || 0;
+          var scoreCons = id.scoreConsumidor || 0;
+          var tiene = rev.ok && scoreInv > 0;
+          var el = document.getElementById('fin-identidad');
+          if(!el) return;
+          if(!tiene){
+            el.innerHTML = '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(196,181,253,0.85);margin-bottom:6px">Identidad financiera</div>'+
+              '<div style="color:rgba(220,224,235,0.40);text-align:center;padding:16px;font-size:11px">Esperando análisis del período…</div>';
+            return;
+          }
+          el.innerHTML =
+            '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+              '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#C4B5FD">Identidad'+(rev.periodo?' · '+rev.periodo.inicio+' – '+rev.periodo.fin:'')+'</div>'+
+              '<div style="font-size:9px;color:#C4B5FD;font-weight:700;text-transform:uppercase;letter-spacing:.06em">'+(rev.tipo||'').toUpperCase()+'</div>'+
+            '</div>'+
+            '<div style="height:10px;border-radius:5px;overflow:hidden;display:flex;background:rgba(255,255,255,0.04)">'+
+              '<div style="height:100%;width:'+scoreInv+'%;background:linear-gradient(90deg,#22C55E,#4ADE80);transition:width .6s ease;box-shadow:0 0 8px rgba(74,222,128,0.4)"></div>'+
+              '<div style="height:100%;flex:1;background:linear-gradient(90deg,#EF4444,#DC2626)"></div>'+
+            '</div>'+
+            '<div style="display:flex;justify-content:space-between;margin-top:6px">'+
+              '<div style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:#4ADE80"></span><span style="font-size:11px;font-weight:800;color:#4ADE80">'+scoreInv+'% Inversionista</span></div>'+
+              '<div style="display:flex;align-items:center;gap:5px"><span style="font-size:11px;font-weight:800;color:#EF4444">'+scoreCons+'% Consumidor</span><span style="width:8px;height:8px;border-radius:50%;background:#EF4444"></span></div>'+
+            '</div>';
+        })();
+
+        // v5.149: Insights del backend (_revData.insights)
+        (function(){
+          var rev = window._revData || {};
+          var ins = (rev.insights || []).filter(function(i){
+            return i && i.msg && !i.msg.includes('Buen ritmo de ahorro');
+          });
+          var el = document.getElementById('fin-insights');
+          if(!el) return;
+          if(!ins.length){
+            el.style.display = 'none';
+            return;
+          }
+          el.style.display = '';
+          el.innerHTML =
+            '<div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.55);margin-bottom:8px">💡 Insights</div>'+
+            '<div style="display:flex;flex-direction:column;gap:6px">'+
+              ins.map(function(i){
+                var bg = i.tipo==='alerta'?'rgba(239,68,68,0.06)':i.tipo==='positivo'?'rgba(74,222,128,0.06)':'rgba(255,255,255,0.03)';
+                var bd = i.tipo==='alerta'?'rgba(239,68,68,0.20)':i.tipo==='positivo'?'rgba(74,222,128,0.20)':'rgba(255,255,255,0.08)';
+                var dotC = i.tipo==='alerta'?'#EF4444':i.tipo==='positivo'?'#4ADE80':i.tipo==='identidad'?'#C4B5FD':'rgba(220,224,235,0.55)';
+                var txtC = i.tipo==='alerta'?'#FCA5A5':i.tipo==='positivo'?'#86EFAC':i.tipo==='identidad'?'#C4B5FD':'rgba(220,224,235,0.85)';
+                return '<div style="display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-radius:6px;background:'+bg+';border:1px solid '+bd+'">'+
+                  '<div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:6px;background:'+dotC+';box-shadow:0 0 4px '+dotC+'"></div>'+
+                  '<span style="font-size:12px;line-height:1.5;color:'+txtC+'">'+i.msg+'</span>'+
+                '</div>';
+              }).join('')+
+            '</div>';
+        })();
+
         // Asegurar que tenemos flujo mensual, si no, fetch
         if(!meses.length && typeof api !== 'undefined' && api.getFlujoPorMes){
           api.getFlujoPorMes().then(function(d){
@@ -2916,11 +3313,12 @@ function _crearDialOverlay(){
     'hud-fijos': {
       html: function(){
         return ''+
-          '<div style="display:flex;gap:14px;flex:1;min-height:0;align-items:stretch">'+
-            '<div id="hud-fijos-tabla" style="flex:1.1;min-width:0;overflow:auto;display:flex;align-items:center"></div>'+
-            '<div id="hud-fijos-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:0;justify-content:center">'+
+          // v5.149: sin overflow:auto en tabla — la card crece dinámica
+          '<div style="display:flex;gap:14px;align-items:stretch;min-height:400px">'+
+            '<div id="hud-fijos-tabla" style="flex:1.1;min-width:0;display:flex;align-items:flex-start"></div>'+
+            '<div id="hud-fijos-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:300px;justify-content:flex-start">'+
               '<div id="graf-fijos-loading-hud-fijos-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
-              '<canvas id="graf-fijos-canvas-hud-fijos-tabla" style="display:none;flex:1;min-height:200px;max-height:100%"></canvas>'+
+              '<canvas id="graf-fijos-canvas-hud-fijos-tabla" style="display:none;min-height:280px"></canvas>'+
               '<div id="graf-fijos-leyenda-hud-fijos-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
             '</div>'+
           '</div>';
@@ -3525,6 +3923,7 @@ function _crearDialOverlay(){
     // ── Saldos por banco (todos, no solo BBVA/BEATS) ──
     // Mostrar cada fijo con: nombre, saldo bruto, apartados de ese banco, disponible neto
     var fijosVisibles = fijos.filter(function(fi){ return fi.nombre!=='P'; });
+    var pFila = fijos.find(function(fi){ return fi.nombre === 'P'; });
     if(fijosVisibles.length){
       html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px"><span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:rgba(220,224,235,0.55)">Saldos</span><span style="font-size:13px;font-weight:800;color:#4ADE80;font-family:JetBrains Mono,monospace">'+fmt2(totalDisp)+'</span></div>';
 
@@ -3545,6 +3944,20 @@ function _crearDialOverlay(){
           '</div>'+
         '</div>';
       });
+    }
+
+    // ── P* indicador (excluido del total — v5.149) ──
+    if(pFila){
+      html += '<div style="padding:6px 8px;border:1px dashed rgba(239,68,68,0.30);border-radius:6px;background:rgba(239,68,68,0.04);display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px">'+
+        '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:6px">'+
+          '<i class="fas fa-circle-exclamation" style="color:#EF4444;font-size:10px"></i>'+
+          '<div>'+
+            '<div style="font-size:10px;font-weight:700;color:#fff">P <span style="color:#EF4444">*</span></div>'+
+            '<div style="font-size:8px;color:rgba(220,224,235,0.45)">Indicador, excluido del total</div>'+
+          '</div>'+
+        '</div>'+
+        '<span style="font-size:11px;font-weight:800;color:#EF4444;font-family:JetBrains Mono,monospace">'+fmt2(pFila.monto)+'</span>'+
+      '</div>';
     }
 
     // ── Apartados (solo conteo + total, no desglose — v5.147) ──
@@ -4587,6 +5000,11 @@ function abrirDial(){
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = true;
 
+  // v5.149: iniciar animación de partículas/circuit-board
+  if(typeof window._particlesStart === 'function'){
+    setTimeout(function(){ window._particlesStart(); }, 200);
+  }
+
   // ═══ FASE 0 — Estado inicial: TODO oculto ═══
 
   // Dial canvas oculto
@@ -4818,6 +5236,10 @@ function cerrarDial(){
   _dialOverlay.style.pointerEvents = 'none';
   _dialVisible = false; _dialActiveSub=-1; _dialCentroHov=false; _detenerPulsoCentro();
   window._hudCascadaEnCurso = false;
+  // v5.149: detener animación de partículas
+  if(typeof window._particlesStop === 'function'){
+    setTimeout(function(){ window._particlesStop(); }, 320);
+  }
   if(_dialBreathRAF){ cancelAnimationFrame(_dialBreathRAF); _dialBreathRAF=null; _dialBreathT=0; }
   var btn=document.getElementById('btn-nueva-entrada');
   if(btn) btn.classList.remove('active');
