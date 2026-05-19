@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.149
+/* RAW Entry — Overlay v.5.154
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -689,19 +689,22 @@ function _crearDialOverlay(){
     '-webkit-backdrop-filter:blur(28px) saturate(160%) brightness(0.68)',
   ].join(';');
 
-  // ── Glow ambiental ──
+  // ── Glow ambiental — v5.150: más intenso para que el dial se sienta como núcleo neuronal ──
   var _glowEl = document.createElement('div');
   _glowEl.id = 'dial-ambient';
   _glowEl.style.cssText = [
     'position:absolute','inset:0','pointer-events:none','z-index:0',
-    'background:radial-gradient(ellipse 600px 600px at 50% 50%, rgba(120,80,200,0.06) 0%, transparent 70%)',
+    // Doble radial: uno violeta interior intenso, otro azul muy difuso exterior
+    'background:radial-gradient(circle 480px at 50% 50%, rgba(140,90,220,0.16) 0%, rgba(120,80,200,0.08) 35%, transparent 70%), '+
+                'radial-gradient(circle 760px at 50% 50%, rgba(34,211,238,0.05) 0%, transparent 80%)',
     'animation:dialBreath 4s ease-in-out infinite',
   ].join(';');
   if(!document.getElementById('dial-keyframes')){
     var ks = document.createElement('style');
     ks.id = 'dial-keyframes';
     ks.textContent = [
-      '@keyframes dialBreath{0%,100%{opacity:.6;transform:scale(1);}50%{opacity:1;transform:scale(1.08);}}',
+      // v5.150: respiración más amplia para el glow ambiental
+      '@keyframes dialBreath{0%,100%{opacity:.75;transform:scale(1);}50%{opacity:1;transform:scale(1.10);}}',
       '@keyframes dialGlowPulse{0%,100%{box-shadow:0 0 0 1px rgba(120,80,200,0.08),0 4px 32px rgba(0,0,0,0.5);}50%{box-shadow:0 0 0 1px rgba(140,100,220,0.20),0 4px 48px rgba(80,40,140,0.3),0 0 60px rgba(120,80,200,0.08);}}',
       '.hud-panel-glow{animation:dialGlowPulse 4s ease-in-out infinite;}',
     ].join('');
@@ -710,24 +713,42 @@ function _crearDialOverlay(){
   _dialOverlay.appendChild(_glowEl);
 
   // ══════════════════════════════════════════════════════════════════
-  //  v5.149: ANIMACIÓN DE PARTÍCULAS / CIRCUIT-BOARD
-  //  Canvas detrás del dial y las cards. Nodos pulsantes + trazos
-  //  de circuito que recorren caminos. Estilo motherboard cibernético.
+  //  v5.152: ESTRUCTURA TIPO ANILLOS DE DYSON / GALAXIA CIBERNÉTICA
+  //  Reemplaza los clusters dispersos que dejaban zonas vacías.
+  //  Ahora 4 anillos concéntricos alrededor del dial que cubren todo
+  //  el viewport. Nodos distribuidos angularmente con jitter mínimo.
+  //  Conexiones tangenciales (arcos orbitales) + radiales (entre
+  //  anillos) + raíces del dial. Rotación orbital lenta (anillos
+  //  pares e impares en sentido opuesto). Biomimético: orgánico en
+  //  forma pero geométrico en estructura como anillos planetarios.
   // ══════════════════════════════════════════════════════════════════
   var _particlesCanvas = document.createElement('canvas');
   _particlesCanvas.id = 'dial-particles';
-  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.45';
+  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.55';
   _dialOverlay.appendChild(_particlesCanvas);
 
-  // Inicializar la lógica de partículas
-  (function initParticles(){
-    var pctx, nodes, traces, lastT = 0, animId = null;
-    var W = 0, H = 0;
+  (function initNeural(){
+    var pctx, nodes, edges, pulses, lastT = 0, animId = null;
+    var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0;
+    var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
+
+    // ── v5.154: Capas matemáticas ──────────────────────────────────
+    // Geometría Euclidiana: hexágonos áureos rotando lento detrás del dial
+    // Vorticial: campo de velocidad rotacional que afecta nodos sutilmente
+    // Caos: atractor de Clifford genera trazos lentos en el fondo
+    var _euclideanRot = 0;           // fase de rotación de geometría sagrada
+    var _vortexT = 0;                // tiempo del campo vortex
+    var _chaosPath = [];             // historial de puntos del atractor
+    var _chaosX = 0.1, _chaosY = 0;  // estado del atractor de Clifford
+    var CLIFFORD = { a: -1.4, b: 1.6, c: 1.0, d: 0.7 }; // parámetros estables
+    var PHI = (1 + Math.sqrt(5)) / 2; // razón áurea
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
       W = window.innerWidth;
       H = window.innerHeight;
+      CX = W / 2; CY = H / 2;
+      DIAL_R = Math.min(W, H) * 0.22;
       _particlesCanvas.width = W * dpr;
       _particlesCanvas.height = H * dpr;
       _particlesCanvas.style.width = W + 'px';
@@ -736,112 +757,418 @@ function _crearDialOverlay(){
       pctx.scale(dpr, dpr);
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  ESTRUCTURA TIPO ANILLO DE DYSON / GALAXIA CIBERNÉTICA
+    //  4 anillos concéntricos alrededor del dial. Cada anillo tiene nodos
+    //  distribuidos angularmente con jitter mínimo (cubre TODA el área).
+    //  Conexiones radiales (dial → afuera) + tangenciales (entre nodos
+    //  vecinos del mismo anillo, en arco curvo).
+    // ══════════════════════════════════════════════════════════════════
     function buildNetwork(){
-      // Distribuir nodos en una grid suave con jitter, simulando pcb
       nodes = [];
-      var cols = Math.floor(W / 95);
-      var rows = Math.floor(H / 95);
-      var stepX = W / (cols + 1);
-      var stepY = H / (rows + 1);
-      var palette = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9'];
-      for(var r = 0; r < rows + 1; r++){
-        for(var c = 0; c < cols + 1; c++){
-          // Excluir nodos demasiado cerca del centro (zona del dial)
-          var cx = stepX * (c + 1) + (Math.random() - 0.5) * 35;
-          var cy = stepY * (r + 1) + (Math.random() - 0.5) * 35;
-          var distFromCenter = Math.hypot(cx - W/2, cy - H/2);
-          if(distFromCenter < Math.min(W, H) * 0.22) continue;
-          nodes.push({
-            x: cx,
-            y: cy,
-            color: palette[Math.floor(Math.random() * palette.length)],
+      edges = [];
+      pulses = [];
+
+      // Radio máximo: la diagonal del viewport menos un margen
+      var maxR = Math.hypot(W/2, H/2) - 30;
+      var minR = DIAL_R + 50;
+
+      // 4 anillos a distancias graduadas
+      var nRings = 4;
+      var ringDefs = [];
+      for(var ri = 0; ri < nRings; ri++){
+        var t = (ri + 1) / nRings;
+        var r = minR + (maxR - minR) * t;
+        // Cada anillo tiene más nodos cuanto más grande
+        var circumference = 2 * Math.PI * r;
+        var nNodes = Math.max(6, Math.floor(circumference / 140));
+        // Color base por anillo (gradiente violeta→cyan→verde→cyan claro)
+        var baseColor = PALETTE[ri % PALETTE.length];
+        ringDefs.push({ r: r, n: nNodes, color: baseColor, ringIdx: ri });
+      }
+
+      // Crear nodos de cada anillo, distribuidos angularmente con jitter pequeño
+      ringDefs.forEach(function(rd){
+        // Offset angular aleatorio para que los anillos no estén alineados
+        var angleOffset = Math.random() * Math.PI * 2;
+        // Inverso: anillos pares giran en sentido opuesto
+        var direction = rd.ringIdx % 2 === 0 ? 1 : -1;
+        rd.nodes = [];
+        for(var k = 0; k < rd.n; k++){
+          var baseAngle = angleOffset + direction * (k / rd.n) * Math.PI * 2;
+          // Jitter angular y radial muy pequeño (mantener forma del anillo)
+          var jitterAngle = (Math.random() - 0.5) * (Math.PI * 2 / rd.n) * 0.3;
+          var jitterR = (Math.random() - 0.5) * 25;
+          var angle = baseAngle + jitterAngle;
+          var r = rd.r + jitterR;
+          var x = CX + Math.cos(angle) * r;
+          var y = CY + Math.sin(angle) * r;
+          // Si el nodo cae fuera del viewport con margen, descartar
+          if(x < -20 || x > W + 20 || y < -20 || y > H + 20) continue;
+          var node = {
+            x: x, y: y,
+            angle: angle,
+            ringR: rd.r,
+            ringIdx: rd.ringIdx,
+            color: rd.color,
             phase: Math.random() * Math.PI * 2,
-            speed: 0.4 + Math.random() * 0.8,
-            baseR: 0.8 + Math.random() * 1.3,
+            speed: 0.5 + Math.random() * 0.7,
+            baseR: 0.9 + Math.random() * 1.0,
+            // Algunos nodos son "hubs": más grandes y brillantes
+            isHub: Math.random() < 0.18,
+          };
+          if(node.isHub){
+            node.baseR = 1.7 + Math.random() * 1.0;
+          }
+          rd.nodes.push(node);
+          nodes.push(node);
+        }
+      });
+
+      // ── CONEXIONES TANGENCIALES (entre nodos vecinos del mismo anillo) ──
+      // v5.153: solo dibujar segmentos alternos para no saturar (arcos discontinuos)
+      ringDefs.forEach(function(rd){
+        for(var i = 0; i < rd.nodes.length; i++){
+          // Saltar nodos alternos: solo dibujar conexión en índices pares
+          if(i % 2 !== 0) continue;
+          var a = rd.nodes[i];
+          var b = rd.nodes[(i + 1) % rd.nodes.length];
+          // Punto de control: en el punto medio angular pero al radio del anillo
+          // (esto curva la línea siguiendo la circunferencia)
+          var midAngle = (a.angle + b.angle) / 2;
+          // Si los ángulos se cruzan, ajustar
+          var diff = b.angle - a.angle;
+          if(Math.abs(diff) > Math.PI){
+            midAngle = midAngle + Math.PI;
+          }
+          // El control point queda un poco más afuera del radio (curva orgánica hacia afuera)
+          var cpR = rd.r + 8;
+          var cpx = CX + Math.cos(midAngle) * cpR;
+          var cpy = CY + Math.sin(midAngle) * cpR;
+          edges.push({
+            a: a, b: b,
+            cp: { x: cpx, y: cpy },
+            color: rd.color,
+            type: 'tangential',
+            ringIdx: rd.ringIdx,
           });
         }
+      });
+
+      // ── CONEXIONES RADIALES (del dial hacia cada nodo del primer anillo,
+      //    y entre anillos adyacentes) ──
+      // Del dial a cada nodo del anillo 0
+      ringDefs[0].nodes.forEach(function(n){
+        // Origen en el borde del dial (en la dirección del nodo)
+        var dx = n.x - CX, dy = n.y - CY;
+        var dist = Math.hypot(dx, dy) || 1;
+        var ox = CX + (dx / dist) * DIAL_R;
+        var oy = CY + (dy / dist) * DIAL_R;
+        var virtualOrigin = { x: ox, y: oy, color: n.color, isVirtual: true };
+        // Control point: ligeramente desviado perpendicularmente para curva orgánica
+        var mx = (ox + n.x) / 2, my = (oy + n.y) / 2;
+        var perpX = -dy / dist, perpY = dx / dist;
+        var off = (Math.random() - 0.5) * 25;
+        edges.push({
+          a: virtualOrigin, b: n,
+          cp: { x: mx + perpX * off, y: my + perpY * off },
+          color: n.color,
+          type: 'root',
+          ringIdx: 0,
+        });
+      });
+
+      // Entre anillos adyacentes: cada nodo de anillo i conecta con el más cercano del anillo i+1
+      for(var rIdx = 0; rIdx < ringDefs.length - 1; rIdx++){
+        var inner = ringDefs[rIdx];
+        var outer = ringDefs[rIdx + 1];
+        // Solo conectar algunos (no todos) para no saturar
+        inner.nodes.forEach(function(n1){
+          if(Math.random() > 0.25) return; // v5.153: ~25% (antes 55%) — menos saturación
+          // Nodo más cercano por ángulo en el anillo externo
+          var nearest = null, minDA = Infinity;
+          outer.nodes.forEach(function(n2){
+            var dA = Math.abs(n2.angle - n1.angle);
+            if(dA > Math.PI) dA = Math.PI * 2 - dA;
+            if(dA < minDA){ minDA = dA; nearest = n2; }
+          });
+          if(!nearest) return;
+          // Curva radial entre los dos
+          var mx = (n1.x + nearest.x) / 2;
+          var my = (n1.y + nearest.y) / 2;
+          var dx = nearest.x - n1.x, dy = nearest.y - n1.y;
+          var len = Math.hypot(dx, dy) || 1;
+          var perpX = -dy / len, perpY = dx / len;
+          var off = (Math.random() - 0.5) * 30;
+          edges.push({
+            a: n1, b: nearest,
+            cp: { x: mx + perpX * off, y: my + perpY * off },
+            color: n1.color,
+            type: 'radial',
+            ringIdx: rIdx,
+          });
+        });
       }
-      traces = [];
     }
 
-    function spawnTrace(){
-      if(!nodes || nodes.length < 2) return;
-      // Tomar un nodo aleatorio y crear un trazo de circuito con 2-4 segmentos manhattan
-      var n1 = nodes[Math.floor(Math.random() * nodes.length)];
-      var n2 = nodes[Math.floor(Math.random() * nodes.length)];
-      if(n1 === n2) return;
-      // Manhattan path: ir primero horizontal, luego vertical (o vice versa)
-      var horizFirst = Math.random() < 0.5;
-      var pts;
-      if(horizFirst){
-        pts = [{x:n1.x, y:n1.y}, {x:n2.x, y:n1.y}, {x:n2.x, y:n2.y}];
-      } else {
-        pts = [{x:n1.x, y:n1.y}, {x:n1.x, y:n2.y}, {x:n2.x, y:n2.y}];
+    // ══════════════════════════════════════════════════════════════════
+    //  ECUACIONES Y CAOS — v5.154
+    //  • Espirales logarítmicas (golden ratio φ) superpuestas al campo
+    //  • Atractor de Lorenz discretizado → trayectorias caóticas
+    //  • Vórtices locales: nodos cerca de hubs reciben deflexión rotacional
+    //  • Perturbación fractal (Koch-like) sutil en algunas tangenciales
+    // ══════════════════════════════════════════════════════════════════
+    var PHI = (1 + Math.sqrt(5)) / 2;          // golden ratio
+    var spirals = [];                           // espirales logarítmicas
+    var chaosTrajectories = [];                 // partículas Lorenz
+    var vortices = [];                          // centros de vórtice
+
+    function initEquations(){
+      spirals = [];
+      chaosTrajectories = [];
+      vortices = [];
+
+      // 2 espirales áureas: una horaria, otra antihoraria, fase desplazada
+      for(var s = 0; s < 2; s++){
+        spirals.push({
+          direction: s === 0 ? 1 : -1,
+          phaseOffset: s * Math.PI,
+          turns: 3.2,                            // 3+ vueltas completas
+          // r = a · e^(b·θ) con b derivado de φ: cot(α) donde α=ángulo áureo
+          a: DIAL_R + 18,
+          b: 0.306 * (s === 0 ? 1 : 0.85),       // ≈ ln(φ)/(π/2) ajustado
+          color: s === 0 ? '#A78BFA' : '#22D3EE',
+          rotation: Math.random() * Math.PI * 2, // ángulo inicial
+          rotSpeed: (s === 0 ? 0.015 : -0.012),  // rotación lenta
+        });
       }
-      // Calcular longitud total
-      var lens = [];
-      var total = 0;
-      for(var i = 1; i < pts.length; i++){
-        var d = Math.hypot(pts[i].x - pts[i-1].x, pts[i].y - pts[i-1].y);
-        lens.push(d);
-        total += d;
+
+      // Vórtices: ubicar en 2-3 hubs aleatorios
+      var hubsArr = nodes.filter(function(n){ return n.isHub; });
+      for(var v = 0; v < Math.min(3, hubsArr.length); v++){
+        var h = hubsArr[Math.floor(Math.random() * hubsArr.length)];
+        if(vortices.some(function(vx){ return vx.hub === h; })) continue;
+        vortices.push({
+          hub: h,
+          strength: 0.4 + Math.random() * 0.5,
+          radius: 90 + Math.random() * 40,
+          phase: Math.random() * Math.PI * 2,
+        });
       }
-      traces.push({
-        pts: pts,
-        lens: lens,
-        total: total,
-        progress: 0,
-        speed: 180 + Math.random() * 220, // px/s
-        color: n1.color,
-        life: 1,
-        tailLen: 80 + Math.random() * 70,
+
+      // 2 trayectorias caóticas (Lorenz attractor proyectado a 2D)
+      for(var c = 0; c < 2; c++){
+        chaosTrajectories.push({
+          x: (Math.random() - 0.5) * 4,
+          y: (Math.random() - 0.5) * 4,
+          z: 5 + Math.random() * 10,
+          history: [],
+          color: c === 0 ? '#4ADE80' : '#C4B5FD',
+          scale: 12 + Math.random() * 6,
+          centerX: CX + (Math.random() - 0.5) * (W * 0.3),
+          centerY: CY + (Math.random() - 0.5) * (H * 0.3),
+          // Parámetros del sistema de Lorenz (clásicos)
+          sigma: 10, rho: 28, beta: 8/3,
+        });
+      }
+    }
+
+    function stepLorenz(traj, dt){
+      // Sistema clásico de Lorenz:
+      // dx/dt = σ(y − x)
+      // dy/dt = x(ρ − z) − y
+      // dz/dt = xy − βz
+      var step = dt * 0.4; // factor de tiempo (más bajo = más lento/suave)
+      var dx = traj.sigma * (traj.y - traj.x);
+      var dy = traj.x * (traj.rho - traj.z) - traj.y;
+      var dz = traj.x * traj.y - traj.beta * traj.z;
+      traj.x += dx * step;
+      traj.y += dy * step;
+      traj.z += dz * step;
+      // Proyección a 2D: usar (x, z) como coords, escalar y centrar
+      var px = traj.centerX + traj.x * traj.scale * 0.5;
+      var py = traj.centerY + (traj.z - traj.rho) * traj.scale * 0.5;
+      // Mantener dentro del viewport (loop suave)
+      if(px < 0 || px > W || py < 0 || py > H){
+        // Reset si se salió
+        traj.x = (Math.random() - 0.5) * 4;
+        traj.y = (Math.random() - 0.5) * 4;
+        traj.z = 5 + Math.random() * 10;
+        traj.history = [];
+        traj.centerX = CX + (Math.random() - 0.5) * (W * 0.3);
+        traj.centerY = CY + (Math.random() - 0.5) * (H * 0.3);
+        return;
+      }
+      traj.history.push({ x: px, y: py });
+      if(traj.history.length > 80) traj.history.shift();
+    }
+
+    function drawChaosTrajectories(){
+      chaosTrajectories.forEach(function(traj){
+        if(traj.history.length < 2) return;
+        pctx.lineCap = 'round';
+        pctx.lineJoin = 'round';
+        // Trazo con gradiente de alpha (cola desvanecida)
+        for(var i = 1; i < traj.history.length; i++){
+          var a = (i / traj.history.length) * 0.55;
+          pctx.strokeStyle = traj.color + Math.floor(a * 200).toString(16).padStart(2, '0');
+          pctx.lineWidth = 0.9 * (i / traj.history.length) + 0.3;
+          pctx.beginPath();
+          pctx.moveTo(traj.history[i-1].x, traj.history[i-1].y);
+          pctx.lineTo(traj.history[i].x, traj.history[i].y);
+          pctx.stroke();
+        }
+        // Cabeza brillante
+        var head = traj.history[traj.history.length - 1];
+        pctx.fillStyle = traj.color;
+        pctx.shadowColor = traj.color;
+        pctx.shadowBlur = 8;
+        pctx.beginPath();
+        pctx.arc(head.x, head.y, 1.5, 0, Math.PI * 2);
+        pctx.fill();
+        pctx.shadowBlur = 0;
       });
     }
 
-    function getPointAt(trace, dist){
-      // Recorrer segmentos hasta encontrar la posición
-      var rem = dist;
-      for(var i = 0; i < trace.lens.length; i++){
-        if(rem <= trace.lens[i]){
-          var t = rem / trace.lens[i];
-          var p1 = trace.pts[i];
-          var p2 = trace.pts[i+1];
-          return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t };
+    function drawSpirals(t){
+      spirals.forEach(function(sp){
+        sp.rotation += sp.rotSpeed * 0.016; // suave avance
+        pctx.beginPath();
+        var maxR = Math.hypot(W/2, H/2);
+        var prev = null;
+        // r = a·e^(b·θ), θ desde 0 hasta turns·2π
+        var steps = 220;
+        var thetaMax = sp.turns * Math.PI * 2;
+        for(var i = 0; i <= steps; i++){
+          var theta = (i / steps) * thetaMax;
+          var r = sp.a * Math.exp(sp.b * theta);
+          if(r > maxR) break;
+          var ang = sp.direction * theta + sp.rotation + sp.phaseOffset;
+          var x = CX + Math.cos(ang) * r;
+          var y = CY + Math.sin(ang) * r;
+          if(!prev) pctx.moveTo(x, y);
+          else pctx.lineTo(x, y);
+          prev = { x: x, y: y };
         }
-        rem -= trace.lens[i];
-      }
-      return trace.pts[trace.pts.length - 1];
+        // Stroke con alpha bajo (espiral siempre presente, sutil)
+        pctx.strokeStyle = sp.color + '24';
+        pctx.lineWidth = 0.8;
+        pctx.stroke();
+      });
     }
 
-    function drawTrace(trace){
-      // Dibujar línea fade desde (progress - tailLen) hasta progress
-      var headDist = trace.progress;
-      var tailDist = Math.max(0, headDist - trace.tailLen);
-      // Trazar puntos cada 4px de la cola a la cabeza
+    function applyVortexDeflection(){
+      // Los nodos cercanos a un vórtice reciben una rotación local extra.
+      // (No reescribimos posiciones permanentemente; aplicamos offset visual)
+      // Por simplicidad: agregar a n.angle un delta proporcional a 1/dist
+      vortices.forEach(function(vx){
+        vx.phase += 0.015;
+        nodes.forEach(function(n){
+          if(n === vx.hub) return;
+          var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
+          var d = Math.hypot(dx, dy);
+          if(d > vx.radius || d < 5) return;
+          // Influencia inversa a la distancia
+          var influence = (1 - d / vx.radius) * vx.strength * 0.0015;
+          n.angle += influence;
+          // Recalcular posición con el ángulo actualizado
+          n.x = CX + Math.cos(n.angle) * n.ringR;
+          n.y = CY + Math.sin(n.angle) * n.ringR;
+        });
+      });
+    }
+
+    function drawVortexHints(){
+      // Hint visual: aro tenue rotando alrededor del centro del vórtice
+      vortices.forEach(function(vx){
+        for(var i = 0; i < 3; i++){
+          var ringR = (i + 1) * 18;
+          if(ringR > vx.radius) break;
+          var ang = vx.phase + i * 0.8;
+          pctx.beginPath();
+          pctx.arc(vx.hub.x, vx.hub.y, ringR, ang, ang + Math.PI * 1.3);
+          pctx.strokeStyle = vx.hub.color + '20';
+          pctx.lineWidth = 0.5;
+          pctx.stroke();
+        }
+      });
+    }
+
+    function bezierPoint(a, cp, b, t){
+      var u = 1 - t;
+      return {
+        x: u*u*a.x + 2*u*t*cp.x + t*t*b.x,
+        y: u*u*a.y + 2*u*t*cp.y + t*t*b.y,
+      };
+    }
+
+    // Spawn pulso por una edge (preferencia: roots y tangenciales)
+    function spawnPulse(){
+      if(!edges.length) return;
+      // Sesgo: 40% roots, 35% tangenciales, 25% radiales
+      var pool = [];
+      var r = Math.random();
+      if(r < 0.40) pool = edges.filter(function(e){ return e.type === 'root'; });
+      else if(r < 0.75) pool = edges.filter(function(e){ return e.type === 'tangential'; });
+      else pool = edges.filter(function(e){ return e.type === 'radial'; });
+      if(!pool.length) pool = edges;
+      var edge = pool[Math.floor(Math.random() * pool.length)];
+      // Dirección: roots siempre forward (del dial hacia afuera)
+      var forward = edge.type === 'root' ? (Math.random() < 0.85) : (Math.random() < 0.5);
+      pulses.push({
+        edge: edge,
+        t: 0,
+        speed: 0.35 + Math.random() * 0.40,
+        forward: forward,
+        life: 1,
+        color: edge.color,
+        tailT: 0.18 + Math.random() * 0.12,
+        isRoot: edge.type === 'root',
+      });
+    }
+
+    function drawEdge(e){
+      var alphaHex = '22';
+      var lw = 0.7;
+      if(e.type === 'root'){ alphaHex = '45'; lw = 1.1; }
+      else if(e.type === 'tangential'){ alphaHex = '2a'; lw = 0.9; }
+      pctx.strokeStyle = e.color + alphaHex;
+      pctx.lineWidth = lw;
+      pctx.beginPath();
+      pctx.moveTo(e.a.x, e.a.y);
+      pctx.quadraticCurveTo(e.cp.x, e.cp.y, e.b.x, e.b.y);
+      pctx.stroke();
+    }
+
+    function drawPulse(p){
+      var e = p.edge;
+      var t = p.forward ? p.t : (1 - p.t);
       var samples = [];
-      for(var d = tailDist; d <= headDist; d += 4){
-        samples.push({ pt: getPointAt(trace, d), alpha: (d - tailDist) / (headDist - tailDist || 1) });
+      var steps = 12;
+      for(var i = 0; i <= steps; i++){
+        var tt = t - (p.forward ? 1 : -1) * (i / steps) * p.tailT;
+        if(tt < 0 || tt > 1) continue;
+        var pt = bezierPoint(e.a, e.cp, e.b, tt);
+        samples.push({ pt: pt, alpha: 1 - (i / steps) });
       }
       if(samples.length < 2) return;
-      // Dibujar segmentos con gradiente de alpha
       pctx.lineCap = 'round';
       pctx.lineJoin = 'round';
       for(var s = 1; s < samples.length; s++){
-        var a = samples[s].alpha * trace.life;
-        pctx.strokeStyle = trace.color + Math.floor(a * 220).toString(16).padStart(2, '0');
-        pctx.lineWidth = 1.6 * samples[s].alpha;
+        var a = samples[s].alpha * p.life * 0.95;
+        pctx.strokeStyle = p.color + Math.floor(a * 220).toString(16).padStart(2, '0');
+        pctx.lineWidth = (p.isRoot ? 2.2 : 1.7) * samples[s].alpha;
         pctx.beginPath();
         pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
         pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
         pctx.stroke();
       }
-      // Cabeza brillante
-      var head = getPointAt(trace, headDist);
-      pctx.fillStyle = trace.color;
-      pctx.shadowColor = trace.color;
-      pctx.shadowBlur = 12;
+      var head = bezierPoint(e.a, e.cp, e.b, t);
+      pctx.fillStyle = p.color;
+      pctx.shadowColor = p.color;
+      pctx.shadowBlur = p.isRoot ? 16 : 10;
       pctx.beginPath();
-      pctx.arc(head.x, head.y, 2.2, 0, Math.PI * 2);
+      pctx.arc(head.x, head.y, p.isRoot ? 2.6 : 2.1, 0, Math.PI * 2);
       pctx.fill();
       pctx.shadowBlur = 0;
     }
@@ -849,43 +1176,70 @@ function _crearDialOverlay(){
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       lastT = t;
-      if(!pctx) { animId = requestAnimationFrame(frame); return; }
+      if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
 
-      // Dibujar nodos (puntos pulsantes estilo servidor)
-      for(var i = 0; i < nodes.length; i++){
-        var n = nodes[i];
+      // 0a) Espirales áureas de fondo (debajo de todo)
+      drawSpirals(t);
+
+      // 0b) Hints visuales de vórtices
+      drawVortexHints();
+
+      // 1) Dibujar edges (curvas tenues — el tejido de fondo)
+      for(var ei = 0; ei < edges.length; ei++) drawEdge(edges[ei]);
+
+      // 1b) Vórtices: deflexión angular sobre nodos cercanos
+      applyVortexDeflection();
+
+      // 2) Lentísima rotación orbital de los nodos sobre su anillo
+      //    (galaxia que rota muy despacio)
+      for(var ni = 0; ni < nodes.length; ni++){
+        var n = nodes[ni];
+        // Dirección: anillos pares en sentido horario, impares antihorario
+        var dir = n.ringIdx % 2 === 0 ? 1 : -1;
+        // Velocidad angular MUY lenta (anillos interiores más rápidos)
+        var angVel = dir * 0.02 / (1 + n.ringIdx * 0.4);
+        n.angle += angVel * dt;
+        n.x = CX + Math.cos(n.angle) * n.ringR;
+        n.y = CY + Math.sin(n.angle) * n.ringR;
+
+        // Pulso visual del nodo
         n.phase += n.speed * dt;
-        var pulse = (Math.sin(n.phase) + 1) / 2; // 0..1
-        var r = n.baseR + pulse * 1.4;
-        var alpha = 0.30 + pulse * 0.55;
-        pctx.fillStyle = n.color + Math.floor(alpha * 200).toString(16).padStart(2, '0');
+        var pulse = (Math.sin(n.phase) + 1) / 2;
+        var r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
+        var alpha = 0.4 + pulse * 0.5;
+        pctx.fillStyle = n.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = n.color;
-        pctx.shadowBlur = 5 + pulse * 8;
+        pctx.shadowBlur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
         pctx.beginPath();
         pctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         pctx.fill();
       }
       pctx.shadowBlur = 0;
 
-      // Avanzar trazos
-      for(var ti = traces.length - 1; ti >= 0; ti--){
-        var tr = traces[ti];
-        tr.progress += tr.speed * dt;
-        if(tr.progress > tr.total + tr.tailLen){
-          traces.splice(ti, 1);
-          continue;
-        }
-        if(tr.progress > tr.total){
-          tr.life = Math.max(0, 1 - (tr.progress - tr.total) / tr.tailLen);
-        }
-        drawTrace(tr);
+      // Recalcular las curvas de edges porque los nodos se movieron
+      // (solo recalcular control points de tangenciales y radiales si los nodos rotan)
+      // Para eficiencia: aceptamos un pequeño desfase. Las curvas siguen viéndose bien.
+
+      // 3) Avanzar pulsos
+      for(var pi = pulses.length - 1; pi >= 0; pi--){
+        var p = pulses[pi];
+        p.t += p.speed * dt;
+        if(p.t > 1 + p.tailT){ pulses.splice(pi, 1); continue; }
+        if(p.t > 1){ p.life = Math.max(0, 1 - (p.t - 1) / p.tailT); }
+        drawPulse(p);
       }
 
-      // Spawn ocasional (densidad razonable)
-      if(traces.length < 8 && Math.random() < 0.05){
-        spawnTrace();
+      // 4) Spawn — v5.153: densidad reducida para no saturar
+      if(pulses.length < 10 && Math.random() < 0.06){
+        spawnPulse();
       }
+
+      // 5) Lorenz attractor: avanzar y dibujar trayectorias caóticas
+      chaosTrajectories.forEach(function(traj){
+        stepLorenz(traj, dt);
+      });
+      drawChaosTrajectories();
 
       animId = requestAnimationFrame(frame);
     }
@@ -893,8 +1247,22 @@ function _crearDialOverlay(){
     function start(){
       resize();
       buildNetwork();
-      // Spawn inicial
-      for(var i = 0; i < 3; i++) spawnTrace();
+      initEquations(); // v5.154: espirales áureas, vórtices, Lorenz
+      // Pre-spawn: poblar el campo desde el principio
+      for(var i = 0; i < 4; i++){
+        var e = edges[Math.floor(Math.random() * edges.length)];
+        if(!e) continue;
+        pulses.push({
+          edge: e,
+          t: Math.random(),
+          speed: 0.35 + Math.random() * 0.4,
+          forward: e.type === 'root' ? true : (Math.random() < 0.5),
+          life: 1,
+          color: e.color,
+          tailT: 0.20,
+          isRoot: e.type === 'root',
+        });
+      }
       lastT = 0;
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
@@ -907,11 +1275,11 @@ function _crearDialOverlay(){
     window._particlesStart = start;
     window._particlesStop  = stop;
 
-    // Resize handler
     window.addEventListener('resize', function(){
-      if(_particlesCanvas.offsetParent !== null){ // si visible
+      if(_particlesCanvas.offsetParent !== null){
         resize();
         buildNetwork();
+        initEquations();
       }
     });
   })();
@@ -927,15 +1295,18 @@ function _crearDialOverlay(){
   ].join(';');
   _ringEl.innerHTML =
     '<svg viewBox="0 0 600 600" style="width:min(580px,40vw);height:min(580px,40vw);overflow:visible">'+
-      // Aro principal
-      '<circle cx="300" cy="300" r="280" fill="none" stroke="rgba(167,139,250,0.55)" stroke-width="1.5" '+
-        'style="filter:drop-shadow(0 0 12px rgba(167,139,250,0.55));animation:dialRingPulse 3s ease-in-out infinite"/>'+
-      // Aro secundario interior más tenue
-      '<circle cx="300" cy="300" r="252" fill="none" stroke="rgba(167,139,250,0.20)" stroke-width="1" '+
-        'style="animation:dialRingPulse 3s ease-in-out infinite;animation-delay:.6s"/>'+
-      // Punto central pulsante
-      '<circle cx="300" cy="300" r="6" fill="rgba(167,139,250,0.9)" '+
-        'style="filter:drop-shadow(0 0 8px rgba(167,139,250,0.9));animation:dialDotPulse 1.6s ease-in-out infinite"/>'+
+      // v5.150: Halo orgánico exterior — círculo grande muy difuso (cerebro)
+      '<circle cx="300" cy="300" r="320" fill="none" stroke="rgba(167,139,250,0.18)" stroke-width="0.8" '+
+        'style="filter:drop-shadow(0 0 28px rgba(167,139,250,0.45));animation:dialHaloBreath 5s ease-in-out infinite"/>'+
+      // Aro principal — más intenso
+      '<circle cx="300" cy="300" r="280" fill="none" stroke="rgba(167,139,250,0.75)" stroke-width="1.8" '+
+        'style="filter:drop-shadow(0 0 18px rgba(167,139,250,0.80));animation:dialRingPulse 3s ease-in-out infinite"/>'+
+      // Aro secundario interior con cyan (gradiente neuronal)
+      '<circle cx="300" cy="300" r="252" fill="none" stroke="rgba(34,211,238,0.35)" stroke-width="1.2" '+
+        'style="filter:drop-shadow(0 0 10px rgba(34,211,238,0.45));animation:dialRingPulse 3s ease-in-out infinite;animation-delay:.6s"/>'+
+      // Punto central pulsante — más brillante (núcleo del cerebro)
+      '<circle cx="300" cy="300" r="7" fill="rgba(167,139,250,1)" '+
+        'style="filter:drop-shadow(0 0 14px rgba(167,139,250,1)) drop-shadow(0 0 24px rgba(167,139,250,0.6));animation:dialDotPulse 1.6s ease-in-out infinite"/>'+
     '</svg>';
   _dialOverlay.appendChild(_ringEl);
   // Keyframes del aro
@@ -943,8 +1314,10 @@ function _crearDialOverlay(){
     var rkf = document.createElement('style');
     rkf.id = 'dial-ring-kf';
     rkf.textContent =
-      '@keyframes dialRingPulse{0%,100%{stroke-opacity:.35;transform:scale(0.96);transform-origin:50% 50%}50%{stroke-opacity:.85;transform:scale(1.02);transform-origin:50% 50%}}'+
-      '@keyframes dialDotPulse{0%,100%{opacity:.6;r:5}50%{opacity:1;r:8}}';
+      '@keyframes dialRingPulse{0%,100%{stroke-opacity:.45;transform:scale(0.96);transform-origin:50% 50%}50%{stroke-opacity:.95;transform:scale(1.025);transform-origin:50% 50%}}'+
+      // v5.150: Halo orgánico exterior — pulso lento y amplio
+      '@keyframes dialHaloBreath{0%,100%{stroke-opacity:.10;transform:scale(0.93);transform-origin:50% 50%}50%{stroke-opacity:.35;transform:scale(1.06);transform-origin:50% 50%}}'+
+      '@keyframes dialDotPulse{0%,100%{opacity:.7;r:5}50%{opacity:1;r:9}}';
     document.head.appendChild(rkf);
   }
 
@@ -3037,10 +3410,10 @@ function _crearDialOverlay(){
               '<div style="font-size:16px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;white-space:nowrap;margin-bottom:6px">'+fmt2(ap.monto)+'</div>'+
               '<div style="height:5px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-bottom:6px"><div style="width:'+pct+'%;height:100%;background:linear-gradient(90deg,#F59E0B,#FBBF24);box-shadow:0 0 6px #F59E0B;border-radius:999px"></div></div>'+
               '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:9px;color:rgba(220,224,235,0.55)">Meta '+fmt(ap.metaMonto||ap.monto)+'</span><span style="font-size:10px;font-weight:800;color:#FBBF24;font-family:JetBrains Mono,monospace">'+pct+'%</span></div>'+
-              '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+vencidoBadge+'<button style="padding:3px 10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);border-radius:6px;font-size:9px;font-weight:800;color:#4ADE80;cursor:pointer;letter-spacing:.04em">Usar</button></div>'+
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+vencidoBadge+'<button onclick="if(typeof _marcarApartadoUsado===\'function\')_marcarApartadoUsado('+ap.fila+')" style="padding:3px 10px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);border-radius:6px;font-size:9px;font-weight:800;color:#4ADE80;cursor:pointer;letter-spacing:.04em">Usar ✓</button></div>'+
             '</div>';
           }).join('');
-          var nuevo = '<div style="display:flex;align-items:center;justify-content:center;border:1px dashed rgba(34,197,94,0.40);border-radius:9px;background:rgba(34,197,94,0.02);cursor:pointer;min-height:120px"><div style="text-align:center"><div style="width:32px;height:32px;border-radius:8px;background:rgba(74,222,128,0.10);border:1px solid rgba(74,222,128,0.40);display:flex;align-items:center;justify-content:center;margin:0 auto 6px"><i class="fas fa-plus" style="color:#4ADE80;font-size:13px"></i></div><div style="font-size:10px;font-weight:800;color:#4ADE80;letter-spacing:.06em">Nuevo<br>apartado</div></div></div>';
+          var nuevo = ''; // v5.151: quitado botón decorativo "Nuevo apartado" — sin función
           // v5.147: grid auto-fill — cantas tarjetas quepan por fila según ancho
           document.getElementById('pat-apartados').innerHTML =
             '<div style="font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:#22C55E;margin-bottom:10px">Apartados y Objetivos <span style="color:rgba(220,224,235,0.40);font-weight:700">('+activos.length+')</span></div>'+
@@ -3307,6 +3680,15 @@ function _crearDialOverlay(){
             if(cfg && document.getElementById('fin-analisis')) cfg.hydrate();
           }).catch(function(){});
         }
+        // v5.151: si _revData no está cargado, pedirlo y re-hidratar Identidad/Insights
+        if((!window._revData || !window._revData.ok) && typeof api !== 'undefined' && api.getRevision){
+          var _h = new Date();
+          api.getRevision('mensual', _h.getFullYear(), _h.getMonth()+1, null).then(function(d){
+            window._revData = d;
+            var cfg = window._EXPAND_CONFIG && window._EXPAND_CONFIG['hud-financiero'];
+            if(cfg && document.getElementById('fin-identidad')) cfg.hydrate();
+          }).catch(function(){});
+        }
       },
     },
     // ── FIJOS ──
@@ -3458,7 +3840,7 @@ function _crearDialOverlay(){
               '<div style="display:flex;align-items:center;gap:8px">'+
                 '<div id="nec-overlay-anio-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85);font-family:JetBrains Mono,monospace">'+(new Date().getFullYear())+'</div>'+
                 '<div id="nec-overlay-mes-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85)">Hasta hoy</div>'+
-                '<button id="nec-overlay-hoy-btn" style="padding:5px 12px;border:1px solid rgba(168,85,247,0.55);border-radius:8px;background:rgba(168,85,247,0.10);font-size:10px;font-weight:800;color:#A855F7;cursor:pointer;letter-spacing:.04em">Hoy</button>'+
+                // v5.151: botón "Hoy" decorativo eliminado — sin listener real
               '</div>'+
             '</div>'+
             // Radar + Pirámide lado a lado
