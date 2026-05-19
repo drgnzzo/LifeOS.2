@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.155
+/* RAW Entry — Overlay v.5.156
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -769,20 +769,24 @@ function _crearDialOverlay(){
       edges = [];
       pulses = [];
 
-      // Radio máximo: la diagonal del viewport menos un margen
-      var maxR = Math.hypot(W/2, H/2) - 30;
-      var minR = DIAL_R + 50;
+      // Radio máximo: la diagonal del viewport (los anillos exteriores
+      // pueden quedar parcialmente fuera, los nodos fuera se descartan)
+      // v5.156: estirar más hacia bordes — minR más lejos del dial,
+      // maxR ya casi tocando esquinas
+      var maxR = Math.hypot(W/2, H/2) + 60;
+      var minR = DIAL_R + 110;
 
-      // 4 anillos a distancias graduadas
+      // 4 anillos a distancias graduadas, con distribución NO lineal
+      // para concentrar menos al centro (más espaciado interior).
       var nRings = 4;
       var ringDefs = [];
       for(var ri = 0; ri < nRings; ri++){
         var t = (ri + 1) / nRings;
-        var r = minR + (maxR - minR) * t;
-        // Cada anillo tiene más nodos cuanto más grande
+        // Curva ease-out: mayor separación entre anillos exteriores
+        var tCurved = 1 - Math.pow(1 - t, 1.4);
+        var r = minR + (maxR - minR) * tCurved;
         var circumference = 2 * Math.PI * r;
         var nNodes = Math.max(6, Math.floor(circumference / 140));
-        // Color base por anillo (gradiente violeta→cyan→verde→cyan claro)
         var baseColor = PALETTE[ri % PALETTE.length];
         ringDefs.push({ r: r, n: nNodes, color: baseColor, ringIdx: ri });
       }
@@ -909,6 +913,69 @@ function _crearDialOverlay(){
           });
         });
       }
+
+      // ── v5.156: NODOS SATÉLITE EN BORDES ──
+      // Distribución estratégica en esquinas y midpoints para que los
+      // rincones del viewport no queden vacíos. Cada satélite se conecta
+      // al nodo del anillo más externo más cercano angularmente.
+      var outerRing = ringDefs[ringDefs.length - 1];
+      var edgeMargin = 60;
+      var satelliteSpots = [
+        { x: edgeMargin, y: edgeMargin },              // esquina TL
+        { x: W - edgeMargin, y: edgeMargin },          // esquina TR
+        { x: edgeMargin, y: H - edgeMargin },          // esquina BL
+        { x: W - edgeMargin, y: H - edgeMargin },      // esquina BR
+        { x: W / 2, y: edgeMargin },                   // mid top
+        { x: W / 2, y: H - edgeMargin },               // mid bottom
+        { x: edgeMargin, y: H / 2 },                   // mid left
+        { x: W - edgeMargin, y: H / 2 },               // mid right
+      ];
+      satelliteSpots.forEach(function(spot, sIdx){
+        var jx = spot.x + (Math.random() - 0.5) * 40;
+        var jy = spot.y + (Math.random() - 0.5) * 40;
+        jx = Math.max(20, Math.min(W - 20, jx));
+        jy = Math.max(20, Math.min(H - 20, jy));
+        if(Math.hypot(jx - CX, jy - CY) < DIAL_R + 20) return;
+        var sAngle = Math.atan2(jy - CY, jx - CX);
+        var sat = {
+          x: jx, y: jy,
+          angle: sAngle,
+          baseAngle: sAngle,
+          ringR: Math.hypot(jx - CX, jy - CY),
+          ringIdx: 99,                          // marcador: satélite de borde
+          color: PALETTE[sIdx % PALETTE.length],
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.4 + Math.random() * 0.5,
+          baseR: 1.0 + Math.random() * 0.8,
+          isHub: Math.random() < 0.4,           // satélites más probables de hub
+          isEdgeSat: true,
+        };
+        nodes.push(sat);
+
+        // Conectar al nodo del anillo externo más cercano angularmente
+        if(outerRing && outerRing.nodes && outerRing.nodes.length){
+          var nearest = null, minDA = Infinity;
+          outerRing.nodes.forEach(function(rn){
+            var dA = Math.abs(rn.angle - sAngle);
+            if(dA > Math.PI) dA = Math.PI * 2 - dA;
+            if(dA < minDA){ minDA = dA; nearest = rn; }
+          });
+          if(nearest){
+            var mx = (nearest.x + jx) / 2, my = (nearest.y + jy) / 2;
+            var dx = jx - nearest.x, dy = jy - nearest.y;
+            var len = Math.hypot(dx, dy) || 1;
+            var perpX = -dy / len, perpY = dx / len;
+            var off = (Math.random() - 0.5) * 50;
+            edges.push({
+              a: nearest, b: sat,
+              cp: { x: mx + perpX * off, y: my + perpY * off },
+              color: sat.color,
+              type: 'edge-sat',
+              ringIdx: 99,
+            });
+          }
+        }
+      });
     }
 
     // ══════════════════════════════════════════════════════════════════
@@ -1108,27 +1175,27 @@ function _crearDialOverlay(){
       });
       // Decay: cada nodo vuelve poco a poco a su baseAngle
       nodes.forEach(function(n){
+        if(n.isEdgeSat) return; // v5.156: satélites de borde son inmunes
         if(n.baseAngle === undefined) n.baseAngle = n.angle;
-        // Pull suave hacia baseAngle (más fuerte si está muy desviado)
         var deviation = n.angle - n.baseAngle;
-        // Normalizar a [-π, π]
         while(deviation > Math.PI) deviation -= Math.PI * 2;
         while(deviation < -Math.PI) deviation += Math.PI * 2;
-        n.angle -= deviation * 0.008; // pull lento
+        n.angle -= deviation * 0.008;
       });
       // Aplicar influencia activa de cada vórtice
       vortices.forEach(function(vx){
         nodes.forEach(function(n){
-          if(n === vx.hub) return;
+          if(n === vx.hub || n.isEdgeSat) return; // satélites no se afectan
           var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
           var d = Math.hypot(dx, dy);
           if(d > vx.radius || d < 5) return;
-          var influence = (1 - d / vx.radius) * vx.strength * 0.0008; // más sutil
+          var influence = (1 - d / vx.radius) * vx.strength * 0.0008;
           n.angle += influence;
         });
       });
       // Recalcular posiciones
       nodes.forEach(function(n){
+        if(n.isEdgeSat) return;
         n.x = CX + Math.cos(n.angle) * n.ringR;
         n.y = CY + Math.sin(n.angle) * n.ringR;
       });
@@ -1268,14 +1335,15 @@ function _crearDialOverlay(){
       //    (galaxia que rota muy despacio)
       for(var ni = 0; ni < nodes.length; ni++){
         var n = nodes[ni];
-        var dir = n.ringIdx % 2 === 0 ? 1 : -1;
-        var angVel = dir * 0.02 / (1 + n.ringIdx * 0.4);
-        // v5.155: rotar tanto angle como baseAngle para que el decay
-        // de vórtices apunte siempre a la posición orbital actual
-        n.angle += angVel * dt;
-        n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
-        n.x = CX + Math.cos(n.angle) * n.ringR;
-        n.y = CY + Math.sin(n.angle) * n.ringR;
+        // v5.156: satélites de borde NO rotan (están fijos en su posición)
+        if(!n.isEdgeSat){
+          var dir = n.ringIdx % 2 === 0 ? 1 : -1;
+          var angVel = dir * 0.02 / (1 + n.ringIdx * 0.4);
+          n.angle += angVel * dt;
+          n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
+          n.x = CX + Math.cos(n.angle) * n.ringR;
+          n.y = CY + Math.sin(n.angle) * n.ringR;
+        }
 
         // Pulso visual del nodo
         n.phase += n.speed * dt;
