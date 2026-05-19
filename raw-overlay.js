@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.157
+/* RAW Entry — Overlay v.5.159
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -765,72 +765,65 @@ function _crearDialOverlay(){
     //  vecinos del mismo anillo, en arco curvo).
     // ══════════════════════════════════════════════════════════════════
     // ══════════════════════════════════════════════════════════════════
-    //  v5.157: ESTRUCTURA SIMÉTRICA E INTEGRADA
-    //  Anillos concéntricos con MISMA cantidad de nodos cada uno,
-    //  alineados radialmente (mismo ángulo base por radio). Esto crea
-    //  una malla simétrica donde cada nodo tiene exactamente un
-    //  correspondiente en cada anillo. Conexiones radiales sistemáticas
-    //  + tangenciales completas. Sin nodos sueltos.
+    //  v5.158: MALLADO DENSO SIMÉTRICO + CONSTELACIONES IRREGULARES
+    //  • Anillos uniformes (no ease-out) → sin huecos crecientes hacia afuera
+    //  • Más radios y más anillos → cobertura completa sin saturar
+    //  • Tangenciales con curvatura angular real (arcos siguiendo circunferencia)
+    //  • Constelaciones superpuestas: patrones irregulares tipo mapa estelar
+    //  • Estrellas de fondo dispersas para llenar zonas residuales
     // ══════════════════════════════════════════════════════════════════
     function buildNetwork(){
       nodes = [];
       edges = [];
       pulses = [];
 
-      // Número de "radios" — define la simetría angular global.
-      // Adaptativo al tamaño del viewport pero limitado para no saturar.
-      var nRadii = Math.max(12, Math.min(18, Math.floor(Math.min(W, H) / 80)));
+      // Número de "radios" — más densidad angular para que no haya huecos visibles
+      var nRadii = Math.max(20, Math.min(28, Math.floor(Math.min(W, H) / 55)));
 
-      // Anillos: radios graduados con ease-out hacia los bordes.
-      // El anillo más externo cubre las esquinas (diagonal/2 + margen).
+      // Anillos: distribución UNIFORME (no ease-out) para densidad constante radial
       var diag = Math.hypot(W/2, H/2);
-      var minR = DIAL_R + 90;     // primer anillo: lejos del dial
-      var maxR = diag + 40;       // último anillo: ligeramente fuera para llenar esquinas
-      var nRings = 5;             // 5 anillos para cubrir desde dial hasta esquinas
+      var minR = DIAL_R + 75;
+      var maxR = diag + 30;
+      var nRings = 7;             // más anillos para llenar el espacio sin huecos
 
-      // Offset angular global: rotación inicial aleatoria para que la
-      // simetría no esté siempre alineada igual con los ejes del viewport
+      // Offset angular global aleatorio inicial
       var globalAngleOffset = Math.random() * (Math.PI * 2 / nRadii);
 
       var ringDefs = [];
       for(var ri = 0; ri < nRings; ri++){
+        // Uniforme: ri / (nRings - 1)
         var t = ri / (nRings - 1);
-        // Ease-out: anillos exteriores más espaciados
-        var tCurved = 1 - Math.pow(1 - t, 1.5);
-        var r = minR + (maxR - minR) * tCurved;
+        var r = minR + (maxR - minR) * t;
         var color = PALETTE[ri % PALETTE.length];
         ringDefs.push({ r: r, color: color, ringIdx: ri, nodes: [] });
       }
 
-      // Crear nodos: por cada radio, un nodo en cada anillo, mismo ángulo base.
-      // Esto garantiza alineación radial perfecta.
+      // Crear nodos: por cada radio, un nodo en cada anillo, mismo ángulo base
       for(var ai = 0; ai < nRadii; ai++){
         var baseAngle = globalAngleOffset + (ai / nRadii) * Math.PI * 2;
         for(var ri2 = 0; ri2 < nRings; ri2++){
           var rd = ringDefs[ri2];
-          // Jitter mínimo (igual para todos los anillos en este radio para preservar alineación)
           var angle = baseAngle;
           var r = rd.r;
           var x = CX + Math.cos(angle) * r;
           var y = CY + Math.sin(angle) * r;
-          // Descartar si está completamente fuera del viewport con margen
           if(x < -40 || x > W + 40 || y < -40 || y > H + 40){
-            rd.nodes.push(null); // placeholder para mantener index sincronizado
+            rd.nodes.push(null);
             continue;
           }
-          // Hubs: cada 3 radios (simétrico, no aleatorio)
-          var isHub = (ai % 3 === 0) && (ri2 === 0 || ri2 === Math.floor(nRings/2));
+          // Hubs simétricos: cada 4 radios en anillos selectos
+          var isHub = (ai % 4 === 0) && (ri2 === 1 || ri2 === Math.floor(nRings/2) + 1);
           var node = {
             x: x, y: y,
             angle: angle,
             baseAngle: angle,
-            radialIdx: ai,           // índice del radio (0..nRadii-1)
+            radialIdx: ai,
             ringR: rd.r,
             ringIdx: ri2,
             color: rd.color,
-            phase: ai * 0.4 + ri2 * 0.7, // fase determinista para que la sin-wave no sea caótica
-            speed: 0.5 + (ri2 * 0.1),
-            baseR: isHub ? 1.8 : 0.95,
+            phase: ai * 0.4 + ri2 * 0.7,
+            speed: 0.45 + (ri2 * 0.08),
+            baseR: isHub ? 1.7 : 0.85,
             isHub: isHub,
           };
           rd.nodes.push(node);
@@ -838,17 +831,19 @@ function _crearDialOverlay(){
         }
       }
 
-      // ── CONEXIONES TANGENCIALES (entre nodos vecinos del mismo anillo) ──
-      // Una edge por cada par consecutivo. Mismo color del anillo.
+      // ── TANGENCIALES con curvatura angular real (arco siguiendo el anillo) ──
+      // En lugar de Bézier al CP afuera, hacemos arc real con 3 puntos
+      // intermedios sobre el anillo (suficiente para que se vea como curva)
       ringDefs.forEach(function(rd){
         for(var i = 0; i < nRadii; i++){
           var a = rd.nodes[i];
           var b = rd.nodes[(i + 1) % nRadii];
           if(!a || !b) continue;
+          // CP en el punto medio angular, EXACTAMENTE al radio del anillo
+          // (no afuera) — esto hace que la curva siga la circunferencia
           var midAngle = a.angle + (Math.PI * 2 / nRadii) / 2;
-          var cpR = rd.r + 6;
-          var cpx = CX + Math.cos(midAngle) * cpR;
-          var cpy = CY + Math.sin(midAngle) * cpR;
+          var cpx = CX + Math.cos(midAngle) * rd.r;
+          var cpy = CY + Math.sin(midAngle) * rd.r;
           edges.push({
             a: a, b: b,
             cp: { x: cpx, y: cpy },
@@ -859,23 +854,19 @@ function _crearDialOverlay(){
         }
       });
 
-      // ── CONEXIONES RADIALES (entre anillos adyacentes en el mismo radio) ──
-      // SISTEMÁTICAS: cada radio tiene una línea continua desde el dial
-      // hasta el anillo más externo. No aleatorio.
+      // ── RADIALES entre anillos adyacentes (sistemáticas) ──
       for(var ai2 = 0; ai2 < nRadii; ai2++){
         for(var ri3 = 0; ri3 < nRings - 1; ri3++){
           var n1 = ringDefs[ri3].nodes[ai2];
           var n2 = ringDefs[ri3 + 1].nodes[ai2];
           if(!n1 || !n2) continue;
-          // Curva muy sutil (los nodos están alineados radialmente; mucha
-          // curvatura rompería la simetría)
           var mx = (n1.x + n2.x) / 2;
           var my = (n1.y + n2.y) / 2;
-          // Curva mínima perpendicular — alterna lado por radio (para variedad simétrica)
+          // Curvatura mínima alternada por radio
           var dx = n2.x - n1.x, dy = n2.y - n1.y;
           var len = Math.hypot(dx, dy) || 1;
           var perpX = -dy / len, perpY = dx / len;
-          var off = (ai2 % 2 === 0 ? 1 : -1) * 6; // ±6 perpendicular, alternado
+          var off = (ai2 % 2 === 0 ? 1 : -1) * 4;
           edges.push({
             a: n1, b: n2,
             cp: { x: mx + perpX * off, y: my + perpY * off },
@@ -886,7 +877,7 @@ function _crearDialOverlay(){
         }
       }
 
-      // ── RAÍCES DEL DIAL → primer anillo (una por radio) ──
+      // ── RAÍCES del dial → primer anillo (una por radio) ──
       for(var ai3 = 0; ai3 < nRadii; ai3++){
         var firstNode = ringDefs[0].nodes[ai3];
         if(!firstNode) continue;
@@ -898,10 +889,117 @@ function _crearDialOverlay(){
         var my = (oy + firstNode.y) / 2;
         edges.push({
           a: virtualOrigin, b: firstNode,
-          cp: { x: mx, y: my }, // sin curvatura: la raíz es recta radial
+          cp: { x: mx, y: my },
           color: firstNode.color,
           type: 'root',
           ringIdx: 0,
+        });
+      }
+
+      // ── v5.158: CONSTELACIONES IRREGULARES ──
+      // Capa superpuesta al mallado de anillos. Patrones de 3-6 puntos
+      // con forma irregular (no circular) y líneas finas conectándolos.
+      // Distribuidas en zonas del viewport.
+      buildConstellations();
+
+      // ── v5.158: ESTRELLAS DE FONDO ──
+      // Puntos pequeños dispersos por zonas residuales (no conectados)
+      buildBackgroundStars();
+    }
+
+    // Constelaciones: grupos irregulares con líneas tipo mapa estelar
+    function buildConstellations(){
+      var nConst = 6; // número de constelaciones
+      var diagH = Math.hypot(W/2, H/2);
+
+      for(var c = 0; c < nConst; c++){
+        // Posición del centro de la constelación en una zona del viewport
+        // (división en sectores angulares para distribución equitativa)
+        var sectorAngle = (c / nConst) * Math.PI * 2 + Math.random() * 0.4;
+        var sectorDist = diagH * (0.45 + Math.random() * 0.4); // entre 45% y 85% de la diagonal
+        var ccx = CX + Math.cos(sectorAngle) * sectorDist;
+        var ccy = CY + Math.sin(sectorAngle) * sectorDist;
+        // Limitar al viewport
+        ccx = Math.max(60, Math.min(W - 60, ccx));
+        ccy = Math.max(60, Math.min(H - 60, ccy));
+
+        var color = PALETTE[c % PALETTE.length];
+        // Número irregular de puntos en esta constelación
+        var nPoints = 3 + Math.floor(Math.random() * 4); // 3-6
+        var points = [];
+        for(var p = 0; p < nPoints; p++){
+          // Distribución irregular alrededor del centro: NO circular
+          // Combinación de ángulo random + radio variable
+          var ang = Math.random() * Math.PI * 2;
+          var radDist = 25 + Math.random() * 55; // distancia variable del centro
+          var px = ccx + Math.cos(ang) * radDist;
+          var py = ccy + Math.sin(ang) * radDist;
+          // Mantener dentro del viewport
+          px = Math.max(20, Math.min(W - 20, px));
+          py = Math.max(20, Math.min(H - 20, py));
+          // No invadir el dial
+          if(Math.hypot(px - CX, py - CY) < DIAL_R + 30) continue;
+          var star = {
+            x: px, y: py,
+            color: color,
+            phase: Math.random() * Math.PI * 2,
+            speed: 0.3 + Math.random() * 0.4,
+            baseR: 0.9 + Math.random() * 0.7,
+            isConstellation: true,
+            twinkleSpeed: 1.5 + Math.random() * 2.0, // titilan más rápido (estrella)
+          };
+          // No es Hub ni nodo regular: es una estrella
+          points.push(star);
+          nodes.push(star);
+        }
+        if(points.length < 2) continue;
+
+        // Conectar los puntos en patrón irregular: cada punto al SIGUIENTE
+        // formando una línea poligonal (no cerrada). Esto da el aspecto de
+        // constelación clásica (Osa Mayor, Cassiopeia, etc.)
+        for(var pp = 0; pp < points.length - 1; pp++){
+          var s1 = points[pp];
+          var s2 = points[pp + 1];
+          edges.push({
+            a: s1, b: s2,
+            cp: { x: (s1.x + s2.x)/2, y: (s1.y + s2.y)/2 }, // línea casi recta
+            color: color,
+            type: 'constellation',
+            ringIdx: -1,
+          });
+        }
+        // Conexión extra opcional: cierre del último al primero (forma cerrada)
+        // Solo para algunas constelaciones (asterismos cerrados)
+        if(points.length >= 4 && Math.random() < 0.4){
+          var first = points[0];
+          var last = points[points.length - 1];
+          edges.push({
+            a: last, b: first,
+            cp: { x: (last.x + first.x)/2, y: (last.y + first.y)/2 },
+            color: color,
+            type: 'constellation',
+            ringIdx: -1,
+          });
+        }
+      }
+    }
+
+    // Estrellas de fondo: puntos pequeños sin conexión, dispersos
+    function buildBackgroundStars(){
+      var nStars = Math.floor((W * H) / 32000); // densidad ~1 estrella por 32k px²
+      nStars = Math.max(10, Math.min(30, nStars));
+      for(var s = 0; s < nStars; s++){
+        var sx = 30 + Math.random() * (W - 60);
+        var sy = 30 + Math.random() * (H - 60);
+        // No invadir dial
+        if(Math.hypot(sx - CX, sy - CY) < DIAL_R + 25) continue;
+        nodes.push({
+          x: sx, y: sy,
+          color: '#FFFFFF',
+          phase: Math.random() * Math.PI * 2,
+          speed: 0.2 + Math.random() * 0.5,
+          baseR: 0.3 + Math.random() * 0.5,
+          isBgStar: true,
         });
       }
     }
@@ -1101,18 +1199,19 @@ function _crearDialOverlay(){
       vortices.forEach(function(vx){
         vx.phase += 0.015;
       });
-      // Decay: cada nodo vuelve poco a poco a su baseAngle
+      // Decay: cada nodo de ANILLO vuelve poco a poco a su baseAngle
       nodes.forEach(function(n){
+        if(n.isConstellation || n.isBgStar) return;
         if(n.baseAngle === undefined) n.baseAngle = n.angle;
         var deviation = n.angle - n.baseAngle;
         while(deviation > Math.PI) deviation -= Math.PI * 2;
         while(deviation < -Math.PI) deviation += Math.PI * 2;
         n.angle -= deviation * 0.008;
       });
-      // Aplicar influencia activa de cada vórtice
+      // Aplicar influencia activa de cada vórtice (solo a nodos de anillo)
       vortices.forEach(function(vx){
         nodes.forEach(function(n){
-          if(n === vx.hub) return;
+          if(n === vx.hub || n.isConstellation || n.isBgStar) return;
           var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
           var d = Math.hypot(dx, dy);
           if(d > vx.radius || d < 5) return;
@@ -1120,8 +1219,9 @@ function _crearDialOverlay(){
           n.angle += influence;
         });
       });
-      // Recalcular posiciones
+      // Recalcular posiciones (solo nodos de anillo)
       nodes.forEach(function(n){
+        if(n.isConstellation || n.isBgStar) return;
         n.x = CX + Math.cos(n.angle) * n.ringR;
         n.y = CY + Math.sin(n.angle) * n.ringR;
       });
@@ -1196,8 +1296,16 @@ function _crearDialOverlay(){
     function drawEdge(e){
       var alphaHex = '22';
       var lw = 0.7;
-      if(e.type === 'root'){ alphaHex = '45'; lw = 1.1; }
+      if(e.type === 'root'){
+        // v5.159: raíces SIEMPRE visibles a 360° (alpha más alto, líneas más gruesas)
+        alphaHex = '88';
+        lw = 1.4;
+      }
       else if(e.type === 'tangential'){ alphaHex = '2a'; lw = 0.9; }
+      else if(e.type === 'constellation'){
+        alphaHex = '38';
+        lw = 0.6;
+      }
       pctx.strokeStyle = e.color + alphaHex;
       pctx.lineWidth = lw;
       pctx.beginPath();
@@ -1251,34 +1359,56 @@ function _crearDialOverlay(){
       // 0b) Hints visuales de vórtices
       drawVortexHints();
 
-      // 1) Dibujar edges (curvas tenues — el tejido de fondo)
-      for(var ei = 0; ei < edges.length; ei++) drawEdge(edges[ei]);
+      // 1) Dibujar edges en 2 pasadas:
+      //    primero las no-root (fondo del mallado),
+      //    luego las roots encima para que las trayectorias del centro
+      //    sean siempre claramente visibles a 360° (v5.159)
+      for(var ei = 0; ei < edges.length; ei++){
+        if(edges[ei].type !== 'root') drawEdge(edges[ei]);
+      }
+      for(var er = 0; er < edges.length; er++){
+        if(edges[er].type === 'root') drawEdge(edges[er]);
+      }
 
       // 1b) Vórtices: deflexión angular sobre nodos cercanos
       applyVortexDeflection();
 
-      // 2) Lentísima rotación orbital de los nodos sobre su anillo
-      //    (galaxia que rota muy despacio)
-      // v5.157: TODOS los nodos pertenecen a un anillo (sin satélites sueltos)
-      // → todos rotan con su anillo. Anillos pares en sentido horario,
-      // impares antihorario.
+      // 2) Rotación orbital + render de nodos
       for(var ni = 0; ni < nodes.length; ni++){
         var n = nodes[ni];
-        var dir = n.ringIdx % 2 === 0 ? 1 : -1;
-        var angVel = dir * 0.018 / (1 + n.ringIdx * 0.35);
-        n.angle += angVel * dt;
-        n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
-        n.x = CX + Math.cos(n.angle) * n.ringR;
-        n.y = CY + Math.sin(n.angle) * n.ringR;
+        // Solo los nodos de anillos rotan; constelaciones y bg-stars son fijos
+        if(!n.isConstellation && !n.isBgStar){
+          var dir = n.ringIdx % 2 === 0 ? 1 : -1;
+          var angVel = dir * 0.018 / (1 + n.ringIdx * 0.35);
+          n.angle += angVel * dt;
+          n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
+          n.x = CX + Math.cos(n.angle) * n.ringR;
+          n.y = CY + Math.sin(n.angle) * n.ringR;
+        }
 
         // Pulso visual del nodo
-        n.phase += n.speed * dt;
+        n.phase += (n.twinkleSpeed || n.speed) * dt;
         var pulse = (Math.sin(n.phase) + 1) / 2;
-        var r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
-        var alpha = 0.4 + pulse * 0.5;
+        var r, alpha, blur;
+        if(n.isBgStar){
+          // Estrellas de fondo: muy pequeñas, titileo blanco
+          r = n.baseR * (0.7 + pulse * 0.6);
+          alpha = 0.3 + pulse * 0.5;
+          blur = 2 + pulse * 4;
+        } else if(n.isConstellation){
+          // Estrellas de constelación: más prominentes, titileo más fuerte
+          r = n.baseR * (0.8 + pulse * 0.8);
+          alpha = 0.5 + pulse * 0.5;
+          blur = 4 + pulse * 8;
+        } else {
+          // Nodos de anillo
+          r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
+          alpha = 0.4 + pulse * 0.5;
+          blur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
+        }
         pctx.fillStyle = n.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = n.color;
-        pctx.shadowBlur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
+        pctx.shadowBlur = blur;
         pctx.beginPath();
         pctx.arc(n.x, n.y, r, 0, Math.PI * 2);
         pctx.fill();
