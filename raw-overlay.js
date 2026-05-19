@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.167
+/* RAW Entry — Overlay v.5.168
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -724,31 +724,42 @@ function _crearDialOverlay(){
   // ══════════════════════════════════════════════════════════════════
   var _particlesCanvas = document.createElement('canvas');
   _particlesCanvas.id = 'dial-particles';
-  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.70';
+  _particlesCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:0.75';
   _dialOverlay.appendChild(_particlesCanvas);
 
-  (function initGalaxy(){
+  (function initEverything(){
     // ══════════════════════════════════════════════════════════════════
-    //  v5.167: GALAXIA ROTATORIA
-    //  TODO parte del centro y gira con rotación kepleriana.
-    //  • Estrellas en órbitas (ω = k/√r) — más rápido cerca del centro
-    //  • Brazos espirales que giran como brazos de galaxia
-    //  • Sinapsis fugaces entre estrellas cercanas (aparecen y mueren)
-    //  • Vórtices puntuales con ondas concéntricas (caos)
-    //  • Todo pasa detrás del dial (z-index 0 del canvas)
-    //  • El dial queda visualmente intacto
+    //  v5.168: TODO INTEGRADO Y EN MOVIMIENTO
+    //  • Rayos curvos que parten del CENTRO ABSOLUTO y rotan
+    //  • Estrellas en órbitas keplerianas (nacen, brillan, mueren)
+    //  • Constelaciones (grupos irregulares de estrellas conectadas)
+    //  • Red neuronal: sinapsis fugaces entre estrellas cercanas
+    //  • Pulsos viajando por rayos y sinapsis
+    //  • Vórtices puntuales con ondas concéntricas
+    //  • Trayectorias caóticas de Lorenz
+    //  • Espirales áureas girando
+    //  • Nebulosa moduladora (zonas brillantes/oscuras)
+    //  El dial queda visualmente ENCIMA del canvas (z-index 0).
+    //  Por eso los rayos pueden partir del centro absoluto sin problema.
     // ══════════════════════════════════════════════════════════════════
     var pctx, lastT = 0, animId = null;
     var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0, MAX_R = 0;
     var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
+    var PHI = (1 + Math.sqrt(5)) / 2;
 
-    var stars = [];        // estrellas en órbita
-    var arms  = [];        // brazos espirales (3-4)
-    var synapses = [];     // líneas fugaces entre estrellas
-    var pulses = [];       // pulsos viajando por arms y synapses
-    var vortices = [];     // vórtices puntuales con ondas
+    // Estructuras
+    var stars = [];
+    var rays = [];            // rayos del centro absoluto
+    var constellations = [];  // grupos de estrellas conectadas
+    var synapses = [];        // conexiones fugaces neuronales
+    var pulses = [];
+    var vortices = [];
+    var lorenzTrails = [];    // trayectorias caóticas
+    var spirals = [];         // espirales áureas
+    var nebulaBlobs = [];     // gaussianas moviéndose
 
-    var globalT = 0;       // tiempo global
+    var globalT = 0;
+    var galaxyRotation = 0;   // rotación global de la galaxia
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
@@ -765,30 +776,85 @@ function _crearDialOverlay(){
       pctx.scale(dpr, dpr);
     }
 
-    // ── PARÁMETROS GLOBALES DE ROTACIÓN ────────────────────────────
-    // Velocidad angular kepleriana: ω(r) = K / √r (más rápido cerca,
-    // más lento lejos). Constante K ajustada para que el ciclo más
-    // rápido sea ~80 segundos y el más lento ~250 segundos.
-    var KEPLER_K = 0.18;
+    // ── KEPLER: velocidad angular según radio ──
     function angularVel(r){
-      var safeR = Math.max(DIAL_R, r);
-      return KEPLER_K / Math.sqrt(safeR);
+      return 0.18 / Math.sqrt(Math.max(50, r));
     }
 
-    // ── ESTRELLAS EN ÓRBITAS ───────────────────────────────────────
+    function polar2cart(r, theta){
+      return { x: CX + Math.cos(theta) * r, y: CY + Math.sin(theta) * r };
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  NEBULOSA: blobs gaussianos que se mueven
+    // ══════════════════════════════════════════════════════════════════
+    function initNebula(){
+      nebulaBlobs = [];
+      for(var i = 0; i < 5; i++){
+        nebulaBlobs.push({
+          x: CX + (Math.random() - 0.5) * W * 0.8,
+          y: CY + (Math.random() - 0.5) * H * 0.8,
+          radius: 220 + Math.random() * 180,
+          vx: (Math.random() - 0.5) * 8,
+          vy: (Math.random() - 0.5) * 8,
+          phase: Math.random() * Math.PI * 2,
+          color: PALETTE[i % PALETTE.length],
+        });
+      }
+    }
+
+    function updateNebula(dt){
+      nebulaBlobs.forEach(function(b){
+        b.x += b.vx * dt;
+        b.y += b.vy * dt;
+        if(b.x < 0 || b.x > W) b.vx *= -1;
+        if(b.y < 0 || b.y > H) b.vy *= -1;
+        b.phase += dt * 0.3;
+      });
+    }
+
+    function nebulaIntensityAt(x, y){
+      var sum = 0;
+      for(var i = 0; i < nebulaBlobs.length; i++){
+        var b = nebulaBlobs[i];
+        var d = Math.hypot(x - b.x, y - b.y);
+        if(d < b.radius){
+          var falloff = 1 - (d / b.radius);
+          sum += falloff * falloff * (0.7 + 0.3 * Math.sin(b.phase));
+        }
+      }
+      return Math.min(1, 0.5 + sum * 0.4);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  RAYOS DEL CENTRO ABSOLUTO (parten de CX,CY y rotan)
+    // ══════════════════════════════════════════════════════════════════
+    function buildRays(){
+      rays = [];
+      var nRays = 9;
+      for(var i = 0; i < nRays; i++){
+        rays.push({
+          theta: (i / nRays) * Math.PI * 2 + Math.random() * 0.3,
+          length: 0.55 + ((i * 13) % 5) * 0.10,  // factor de MAX_R
+          rotSpeed: (i % 2 === 0 ? 1 : -1) * (0.025 + (i % 3) * 0.012),
+          curvature: ((i * 7) % 3 - 1) * 0.6,
+          phase: i * 0.6,
+          color: PALETTE[i % PALETTE.length],
+          // Vida pulsante
+          lifePhase: i * Math.PI / 4,
+        });
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  ESTRELLAS EN ÓRBITAS (keplerianas)
+    // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      // Cantidad proporcional al área visible
-      var nStars = Math.max(60, Math.min(120, Math.floor((W * H) / 14000)));
-      // Excluir zona donde está el dial: las estrellas tienen radio mínimo
-      // un poco mayor que el dial, pero algunas pueden estar muy cerca para
-      // que el efecto parta visualmente desde el centro
-      var minR = DIAL_R + 25;
+      var nStars = Math.max(80, Math.min(140, Math.floor((W * H) / 12000)));
       for(var i = 0; i < nStars; i++){
-        // Radio: distribución logarítmica → más estrellas cerca, menos lejos
-        // Pero con exclusión del centro
         var u = Math.random();
-        var r = minR + (MAX_R - minR) * Math.pow(u, 0.7);
+        var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
         var theta = Math.random() * Math.PI * 2;
         stars.push({
           r: r,
@@ -798,34 +864,116 @@ function _crearDialOverlay(){
           phase: Math.random() * Math.PI * 2,
           twinkleSpeed: 0.8 + Math.random() * 1.6,
           baseSize: 0.5 + Math.random() * 1.4,
-          // Ciclo de vida (las estrellas también aparecen y desaparecen)
           age: Math.random() * 10,
           lifespan: 8 + Math.random() * 12,
+          isHub: Math.random() < 0.1,
         });
       }
     }
 
-    // ── BRAZOS ESPIRALES (4 brazos como galaxia) ───────────────────
-    function buildArms(){
-      arms = [];
-      var nArms = 4;
-      var armBaseOffset = Math.random() * Math.PI * 2;
-      for(var a = 0; a < nArms; a++){
-        arms.push({
-          baseAngle: armBaseOffset + (a / nArms) * Math.PI * 2,
-          spiralRate: 0.30 + Math.random() * 0.15,  // grado de espiral (radianes / unidad r)
-          rotSpeed: KEPLER_K / Math.sqrt(DIAL_R * 3) * (a % 2 === 0 ? 1 : 0.9), // misma direccion (galaxia rota como un todo)
-          color: PALETTE[a % PALETTE.length],
-          phase: a * 0.7,
-          maxR: MAX_R * (0.7 + Math.random() * 0.3),
+    // ══════════════════════════════════════════════════════════════════
+    //  CONSTELACIONES (grupos irregulares conectados)
+    // ══════════════════════════════════════════════════════════════════
+    function buildConstellations(){
+      constellations = [];
+      var nConst = 5;
+      for(var c = 0; c < nConst; c++){
+        // Centro del grupo en órbita
+        var cR = 200 + Math.random() * (MAX_R - 250);
+        var cTheta = (c / nConst) * Math.PI * 2 + Math.random() * 0.5;
+        var nPoints = 3 + Math.floor(Math.random() * 4);
+        var points = [];
+        for(var p = 0; p < nPoints; p++){
+          // Cada punto a un offset polar pequeño del centro del grupo
+          var dR = (Math.random() - 0.5) * 80;
+          var dTheta = (Math.random() - 0.5) * 0.4;
+          points.push({
+            dR: dR,
+            dTheta: dTheta,
+            phase: Math.random() * Math.PI * 2,
+            twinkleSpeed: 1.2 + Math.random() * 2.0,
+            baseSize: 0.8 + Math.random() * 0.8,
+          });
+        }
+        constellations.push({
+          cR: cR,
+          cTheta: cTheta,
+          omega: angularVel(cR),
+          points: points,
+          color: PALETTE[c % PALETTE.length],
+          age: Math.random() * 6,
+          lifespan: 10 + Math.random() * 8,
         });
       }
     }
 
-    // ── VÓRTICES PUNTUALES ─────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════
+    //  ESPIRALES ÁUREAS (girando)
+    // ══════════════════════════════════════════════════════════════════
+    function buildSpirals(){
+      spirals = [];
+      for(var i = 0; i < 2; i++){
+        spirals.push({
+          direction: i === 0 ? 1 : -1,
+          phaseOffset: i * Math.PI,
+          turns: 3.5,
+          a: 45,
+          b: 0.306,
+          color: i === 0 ? '#A78BFA' : '#22D3EE',
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (i === 0 ? 0.04 : -0.03),
+          lifePhase: i * Math.PI,
+        });
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  LORENZ
+    // ══════════════════════════════════════════════════════════════════
+    function spawnLorenz(){
+      lorenzTrails.push({
+        x: (Math.random() - 0.5) * 4,
+        y: (Math.random() - 0.5) * 4,
+        z: 5 + Math.random() * 10,
+        history: [],
+        color: Math.random() < 0.5 ? '#4ADE80' : '#C4B5FD',
+        scale: 10 + Math.random() * 6,
+        centerX: CX + (Math.random() - 0.5) * W * 0.6,
+        centerY: CY + (Math.random() - 0.5) * H * 0.6,
+        age: 0,
+        maxAge: 8 + Math.random() * 4,
+      });
+    }
+
+    function updateLorenz(dt){
+      for(var i = lorenzTrails.length - 1; i >= 0; i--){
+        var l = lorenzTrails[i];
+        l.age += dt;
+        if(l.age >= l.maxAge){ lorenzTrails.splice(i, 1); continue; }
+        // Sistema de Lorenz
+        var step = dt * 0.4;
+        var dx = 10 * (l.y - l.x);
+        var dy = l.x * (28 - l.z) - l.y;
+        var dz = l.x * l.y - (8/3) * l.z;
+        l.x += dx * step;
+        l.y += dy * step;
+        l.z += dz * step;
+        var px = l.centerX + l.x * l.scale * 0.5;
+        var py = l.centerY + (l.z - 28) * l.scale * 0.5;
+        if(px < 0 || px > W || py < 0 || py > H){
+          l.age = l.maxAge;
+          continue;
+        }
+        l.history.push({ x: px, y: py });
+        if(l.history.length > 45) l.history.shift();
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  VÓRTICES
+    // ══════════════════════════════════════════════════════════════════
     function spawnVortex(){
-      // Aparece en una posición orbital aleatoria (fuera del dial)
-      var r = DIAL_R + 60 + Math.random() * (MAX_R - DIAL_R - 100);
+      var r = 100 + Math.random() * (MAX_R - 150);
       var theta = Math.random() * Math.PI * 2;
       vortices.push({
         r: r, theta: theta,
@@ -833,54 +981,42 @@ function _crearDialOverlay(){
         color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
         age: 0,
         lifespan: 3 + Math.random() * 2,
-        maxRadius: 60 + Math.random() * 40,
+        maxRadius: 50 + Math.random() * 40,
       });
     }
 
-    // ── SINAPSIS ENTRE ESTRELLAS ───────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════
+    //  SINAPSIS: neuronas conectándose fugazmente
+    // ══════════════════════════════════════════════════════════════════
     function spawnSynapse(){
-      // Tomar 2 estrellas cercanas en este momento
       if(stars.length < 2) return;
       var s1 = stars[Math.floor(Math.random() * stars.length)];
-      // Buscar la estrella más cercana (en distancia 2D actual)
-      var p1 = polar2cart(s1.r, s1.theta);
+      if(!s1._cachedX) return;
       var best = null, bestD = Infinity;
       for(var i = 0; i < stars.length; i++){
         var s2 = stars[i];
-        if(s2 === s1) continue;
-        var p2 = polar2cart(s2.r, s2.theta);
-        var d = Math.hypot(p1.x - p2.x, p1.y - p2.y);
-        // Restricción: que no pase cerca del dial
-        var mx = (p1.x + p2.x) / 2;
-        var my = (p1.y + p2.y) / 2;
-        if(Math.hypot(mx - CX, my - CY) < DIAL_R + 70) continue;
-        if(d < bestD && d < 280){
-          bestD = d;
-          best = s2;
-        }
+        if(s2 === s1 || !s2._cachedX) continue;
+        var d = Math.hypot(s1._cachedX - s2._cachedX, s1._cachedY - s2._cachedY);
+        if(d > 280) continue;
+        if(d < bestD){ bestD = d; best = s2; }
       }
       if(!best) return;
       synapses.push({
         s1: s1, s2: best,
         age: 0,
-        lifespan: 1.2 + Math.random() * 1.5,   // muy fugaz
+        lifespan: 1.0 + Math.random() * 1.5,
         color: s1.color,
       });
     }
 
-    function polar2cart(r, theta){
-      return { x: CX + Math.cos(theta) * r, y: CY + Math.sin(theta) * r };
-    }
-
-    // ── PULSOS SINÁPTICOS ──────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════
+    //  PULSOS
+    // ══════════════════════════════════════════════════════════════════
     function spawnPulse(){
-      // Elegir un brazo o una sinapsis activa
       var pool = [];
-      arms.forEach(function(a){ pool.push({ type:'arm', ref:a }); });
+      rays.forEach(function(r){ pool.push({ type:'ray', ref:r }); });
       synapses.forEach(function(s){
-        if(s.age > s.lifespan * 0.2 && s.age < s.lifespan * 0.8){
-          pool.push({ type:'synapse', ref:s });
-        }
+        if(s.age < s.lifespan * 0.7) pool.push({ type:'synapse', ref:s });
       });
       if(!pool.length) return;
       var sel = pool[Math.floor(Math.random() * pool.length)];
@@ -888,96 +1024,172 @@ function _crearDialOverlay(){
         type: sel.type,
         ref: sel.ref,
         t: 0,
-        speed: 0.4 + Math.random() * 0.35,
-        forward: Math.random() < 0.6,
-        tailT: 0.18 + Math.random() * 0.12,
+        speed: 0.4 + Math.random() * 0.4,
+        forward: sel.type === 'ray' ? (Math.random() < 0.8) : (Math.random() < 0.5),
+        tailT: 0.18 + Math.random() * 0.10,
         life: 1,
       });
     }
 
-    // ── DIBUJO ─────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════
+    //  DIBUJOS
+    // ══════════════════════════════════════════════════════════════════
+
+    function drawSpirals(dt){
+      spirals.forEach(function(sp, idx){
+        sp.rotation += sp.rotSpeed * dt;
+        sp.lifePhase += dt * 0.08;
+        var pulse = (Math.sin(sp.lifePhase) + 1) / 2;
+        var alpha = 0.05 + pulse * 0.18;
+        if(alpha < 0.03) return;
+        pctx.beginPath();
+        var prev = null;
+        var steps = 220;
+        var thetaMax = sp.turns * Math.PI * 2;
+        for(var i = 0; i <= steps; i++){
+          var theta = (i / steps) * thetaMax;
+          var r = sp.a * Math.exp(sp.b * theta);
+          if(r > MAX_R) break;
+          var ang = sp.direction * theta + sp.rotation + sp.phaseOffset;
+          var x = CX + Math.cos(ang) * r;
+          var y = CY + Math.sin(ang) * r;
+          if(!prev) pctx.moveTo(x, y);
+          else pctx.lineTo(x, y);
+          prev = { x: x, y: y };
+        }
+        var alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        pctx.strokeStyle = sp.color + alphaHex;
+        pctx.lineWidth = 0.9;
+        pctx.stroke();
+      });
+    }
+
+    function drawRays(dt){
+      rays.forEach(function(ray){
+        ray.theta += ray.rotSpeed * dt;
+        ray.lifePhase += dt * 0.4;
+        var pulse = (Math.sin(ray.lifePhase) + 1) / 2;
+        var alpha = 0.30 + pulse * 0.45;
+
+        var rayLen = MAX_R * ray.length;
+        var endX = CX + Math.cos(ray.theta) * rayLen;
+        var endY = CY + Math.sin(ray.theta) * rayLen;
+        // Control point: curvado perpendicularmente
+        var midR = rayLen * 0.5;
+        var perpAng = ray.theta + Math.PI / 2;
+        var bend = ray.curvature * rayLen * 0.3;
+        var cpx = CX + Math.cos(ray.theta) * midR + Math.cos(perpAng) * bend;
+        var cpy = CY + Math.sin(ray.theta) * midR + Math.sin(perpAng) * bend;
+        // Cachear para pulsos
+        ray._a = { x: CX, y: CY };
+        ray._b = { x: endX, y: endY };
+        ray._cp = { x: cpx, y: cpy };
+
+        pctx.strokeStyle = ray.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        pctx.lineWidth = 1.0 + pulse * 0.8;
+        pctx.shadowColor = ray.color;
+        pctx.shadowBlur = 6 + pulse * 8;
+        pctx.beginPath();
+        pctx.moveTo(CX, CY);
+        pctx.quadraticCurveTo(cpx, cpy, endX, endY);
+        pctx.stroke();
+        pctx.shadowBlur = 0;
+      });
+    }
+
     function drawStars(dt){
       for(var i = 0; i < stars.length; i++){
         var s = stars[i];
-        // Avanzar órbita
         s.theta += s.omega * dt;
         s.age += dt;
         s.phase += s.twinkleSpeed * dt;
-        // Ciclo de vida: si supera lifespan, respawn en otro lugar
         if(s.age > s.lifespan){
-          s.r = DIAL_R + 25 + (MAX_R - DIAL_R - 25) * Math.pow(Math.random(), 0.7);
+          s.r = 30 + (MAX_R - 30) * Math.pow(Math.random(), 0.7);
           s.theta = Math.random() * Math.PI * 2;
           s.omega = angularVel(s.r);
           s.age = 0;
           s.lifespan = 8 + Math.random() * 12;
           s.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
         }
-        // Fade in/out por ciclo de vida
         var lifeFrac = s.age / s.lifespan;
         var lifeAlpha;
         if(lifeFrac < 0.10) lifeAlpha = lifeFrac / 0.10;
         else if(lifeFrac > 0.85) lifeAlpha = (1 - lifeFrac) / 0.15;
         else lifeAlpha = 1;
-        if(lifeAlpha <= 0) continue;
+        if(lifeAlpha <= 0){ s._cachedX = null; continue; }
         var twinkle = (Math.sin(s.phase) + 1) / 2;
-        var rad = s.baseSize * (0.7 + twinkle * 0.7);
-        var alpha = lifeAlpha * (0.45 + twinkle * 0.45);
+        var rad = s.baseSize * (0.7 + twinkle * 0.7) * (s.isHub ? 1.5 : 1);
         var p = polar2cart(s.r, s.theta);
-        // Skip si invade el dial (no debería pasar pero por seguridad)
-        if(Math.hypot(p.x - CX, p.y - CY) < DIAL_R + 5) continue;
+        // Modular por nebulosa
+        var neb = nebulaIntensityAt(p.x, p.y);
+        var alpha = lifeAlpha * (0.5 + twinkle * 0.45) * neb;
+        s._cachedX = p.x; s._cachedY = p.y;
         pctx.fillStyle = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = s.color;
-        pctx.shadowBlur = 4 + twinkle * 10;
+        pctx.shadowBlur = (s.isHub ? 8 : 4) + twinkle * (s.isHub ? 16 : 8);
         pctx.beginPath();
         pctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
         pctx.fill();
-        // Guardar pos cached para uso por sinapsis
-        s._cachedX = p.x;
-        s._cachedY = p.y;
       }
       pctx.shadowBlur = 0;
     }
 
-    function drawArms(dt){
-      // Cada brazo es una espiral logarítmica que arranca del borde del dial
-      // y se extiende hasta maxR. Rota como un todo.
-      arms.forEach(function(arm){
-        arm.baseAngle += arm.rotSpeed * dt;
-        arm.phase += dt * 0.5;
-        var pulse = (Math.sin(arm.phase) + 1) / 2;
-        var alpha = 0.25 + pulse * 0.35;
-        // Generar puntos de la espiral
-        var steps = 60;
-        var pts = [];
-        for(var i = 0; i <= steps; i++){
-          var frac = i / steps;
-          var r = DIAL_R + 15 + frac * (arm.maxR - DIAL_R - 15);
-          // Espiral: theta = baseAngle + spiralRate * (r - DIAL_R) / 50
-          var theta = arm.baseAngle + arm.spiralRate * (r - DIAL_R) / 50;
-          var x = CX + Math.cos(theta) * r;
-          var y = CY + Math.sin(theta) * r;
-          pts.push({ x: x, y: y });
+    function drawConstellations(dt){
+      for(var c = constellations.length - 1; c >= 0; c--){
+        var con = constellations[c];
+        con.cTheta += con.omega * dt;
+        con.age += dt;
+        if(con.age >= con.lifespan){
+          // Respawn
+          con.cR = 200 + Math.random() * (MAX_R - 250);
+          con.cTheta = Math.random() * Math.PI * 2;
+          con.omega = angularVel(con.cR);
+          con.age = 0;
+          con.lifespan = 10 + Math.random() * 8;
+          con.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
         }
-        // Cachear para uso por pulsos
-        arm._pts = pts;
-        // Dibujar la espiral como serie de segmentos con alpha gradiente
-        // (las partes lejanas más tenues, las cercanas al dial más brillantes)
-        pctx.lineCap = 'round';
-        pctx.lineJoin = 'round';
-        for(var i = 1; i < pts.length; i++){
-          var fadeOut = 1 - (i / pts.length) * 0.6;  // los puntos lejanos más tenues
-          var a = alpha * fadeOut;
-          pctx.strokeStyle = arm.color + Math.floor(a * 255).toString(16).padStart(2, '0');
-          pctx.lineWidth = 1.2 - (i / pts.length) * 0.5;
-          pctx.shadowColor = arm.color;
-          pctx.shadowBlur = 8 * fadeOut * (0.5 + pulse * 0.5);
+        var lifeFrac = con.age / con.lifespan;
+        var lifeAlpha;
+        if(lifeFrac < 0.10) lifeAlpha = lifeFrac / 0.10;
+        else if(lifeFrac > 0.85) lifeAlpha = (1 - lifeFrac) / 0.15;
+        else lifeAlpha = 1;
+        if(lifeAlpha <= 0) continue;
+
+        var centerPt = polar2cart(con.cR, con.cTheta);
+        // Cachear posiciones de cada estrella del grupo
+        var positions = con.points.map(function(p){
+          p.phase += p.twinkleSpeed * dt;
+          return polar2cart(con.cR + p.dR, con.cTheta + p.dTheta);
+        });
+
+        // Dibujar conexiones del grupo (líneas tenues)
+        for(var k = 0; k < positions.length - 1; k++){
+          var a = lifeAlpha * 0.40;
+          pctx.strokeStyle = con.color + Math.floor(a * 255).toString(16).padStart(2, '0');
+          pctx.lineWidth = 0.7;
+          pctx.shadowColor = con.color;
+          pctx.shadowBlur = 4;
           pctx.beginPath();
-          pctx.moveTo(pts[i-1].x, pts[i-1].y);
-          pctx.lineTo(pts[i].x, pts[i].y);
+          pctx.moveTo(positions[k].x, positions[k].y);
+          pctx.lineTo(positions[k+1].x, positions[k+1].y);
           pctx.stroke();
         }
+        // Dibujar las estrellas del grupo (más brillantes que las orbitales)
+        for(var k = 0; k < positions.length; k++){
+          var pp = positions[k];
+          var pt = con.points[k];
+          var twk = (Math.sin(pt.phase) + 1) / 2;
+          var rad = pt.baseSize * (0.8 + twk * 0.8);
+          var a = lifeAlpha * (0.6 + twk * 0.4);
+          pctx.fillStyle = con.color + Math.floor(a * 230).toString(16).padStart(2, '0');
+          pctx.shadowColor = con.color;
+          pctx.shadowBlur = 6 + twk * 10;
+          pctx.beginPath();
+          pctx.arc(pp.x, pp.y, rad, 0, Math.PI * 2);
+          pctx.fill();
+        }
         pctx.shadowBlur = 0;
-      });
+      }
     }
 
     function drawSynapses(dt){
@@ -988,19 +1200,15 @@ function _crearDialOverlay(){
           synapses.splice(i, 1);
           continue;
         }
-        // Fade in/out muy rápido (fugaz)
         var frac = syn.age / syn.lifespan;
         var alpha;
         if(frac < 0.25) alpha = frac / 0.25;
         else if(frac > 0.65) alpha = (1 - frac) / 0.35;
         else alpha = 1;
         alpha *= 0.55;
-        var p1 = polar2cart(syn.s1.r, syn.s1.theta);
-        var p2 = polar2cart(syn.s2.r, syn.s2.theta);
-        // Cachear extremos
-        syn._p1 = p1;
-        syn._p2 = p2;
-        // Control point: leve curvatura
+        if(!syn.s1._cachedX || !syn.s2._cachedX) continue;
+        var p1 = { x: syn.s1._cachedX, y: syn.s1._cachedY };
+        var p2 = { x: syn.s2._cachedX, y: syn.s2._cachedY };
         var mx = (p1.x + p2.x) / 2;
         var my = (p1.y + p2.y) / 2;
         var dx = p2.x - p1.x, dy = p2.y - p1.y;
@@ -1008,10 +1216,11 @@ function _crearDialOverlay(){
         var perpX = -dy / len, perpY = dx / len;
         var off = 18;
         syn._cp = { x: mx + perpX * off, y: my + perpY * off };
+        syn._p1 = p1; syn._p2 = p2;
         pctx.strokeStyle = syn.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-        pctx.lineWidth = 0.9;
+        pctx.lineWidth = 0.95;
         pctx.shadowColor = syn.color;
-        pctx.shadowBlur = 6;
+        pctx.shadowBlur = 5;
         pctx.beginPath();
         pctx.moveTo(p1.x, p1.y);
         pctx.quadraticCurveTo(syn._cp.x, syn._cp.y, p2.x, p2.y);
@@ -1024,24 +1233,19 @@ function _crearDialOverlay(){
       for(var i = vortices.length - 1; i >= 0; i--){
         var v = vortices[i];
         v.age += dt;
-        if(v.age >= v.lifespan){
-          vortices.splice(i, 1);
-          continue;
-        }
-        // El vórtice también orbita
+        if(v.age >= v.lifespan){ vortices.splice(i, 1); continue; }
         v.theta += v.omega * dt;
         var p = polar2cart(v.r, v.theta);
-        // Dibujar 3 ondas concéntricas con expansión + fade
         var frac = v.age / v.lifespan;
         for(var k = 0; k < 3; k++){
           var phaseFrac = (frac + k * 0.25) % 1;
           var radius = phaseFrac * v.maxRadius;
-          var alpha = (1 - phaseFrac) * 0.45;
-          if(alpha < 0.02) continue;
-          pctx.strokeStyle = v.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+          var a = (1 - phaseFrac) * 0.40;
+          if(a < 0.02) continue;
+          pctx.strokeStyle = v.color + Math.floor(a * 255).toString(16).padStart(2, '0');
           pctx.lineWidth = 1.0;
           pctx.shadowColor = v.color;
-          pctx.shadowBlur = 6;
+          pctx.shadowBlur = 5;
           pctx.beginPath();
           pctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
           pctx.stroke();
@@ -1050,146 +1254,160 @@ function _crearDialOverlay(){
       }
     }
 
-    function drawPulse(p){
-      var ax, ay, bx, by, cpx, cpy;
-      if(p.type === 'arm'){
-        var pts = p.ref._pts;
-        if(!pts || pts.length < 2){ return; }
-        // El "path" del brazo: usar t para indexar la lista de puntos
-        var idx = p.t * (pts.length - 1);
-        var i0 = Math.floor(idx);
-        var i1 = Math.min(pts.length - 1, i0 + 1);
-        var frac = idx - i0;
-        var headX = pts[i0].x + (pts[i1].x - pts[i0].x) * frac;
-        var headY = pts[i0].y + (pts[i1].y - pts[i0].y) * frac;
-        // Tail (puntos anteriores)
+    function drawLorenz(){
+      lorenzTrails.forEach(function(traj){
+        if(traj.history.length < 2) return;
+        var lifeFrac = traj.age / traj.maxAge;
+        var globalAlpha = 1;
+        if(lifeFrac < 0.15) globalAlpha = lifeFrac / 0.15;
+        else if(lifeFrac > 0.80) globalAlpha = (1 - lifeFrac) / 0.20;
+        globalAlpha = Math.max(0, Math.min(1, globalAlpha));
+        if(globalAlpha < 0.02) return;
         pctx.lineCap = 'round';
-        var tailSteps = 8;
-        for(var s = 0; s < tailSteps; s++){
-          var tailIdx = idx - s - 1;
-          if(tailIdx < 0) break;
-          var ti0 = Math.floor(tailIdx);
-          var ti1 = Math.min(pts.length - 1, ti0 + 1);
-          var tf = tailIdx - ti0;
-          var tx = pts[ti0].x + (pts[ti1].x - pts[ti0].x) * tf;
-          var ty = pts[ti0].y + (pts[ti1].y - pts[ti0].y) * tf;
-          var a = (1 - s / tailSteps) * p.life * 0.8;
-          pctx.strokeStyle = p.ref.color + Math.floor(a * 230).toString(16).padStart(2, '0');
-          pctx.lineWidth = 2.0 * (1 - s / tailSteps);
+        for(var i = 1; i < traj.history.length; i++){
+          var a = (i / traj.history.length) * 0.50 * globalAlpha;
+          pctx.strokeStyle = traj.color + Math.floor(a * 200).toString(16).padStart(2, '0');
+          pctx.lineWidth = 0.9 * (i / traj.history.length) + 0.3;
           pctx.beginPath();
-          // Conectar segmento anterior con actual
-          var prevIdx = idx - s;
-          var pi0 = Math.floor(prevIdx);
-          var pi1 = Math.min(pts.length - 1, pi0 + 1);
-          var pf = prevIdx - pi0;
-          var px = pts[pi0].x + (pts[pi1].x - pts[pi0].x) * pf;
-          var py = pts[pi0].y + (pts[pi1].y - pts[pi0].y) * pf;
-          pctx.moveTo(px, py);
-          pctx.lineTo(tx, ty);
+          pctx.moveTo(traj.history[i-1].x, traj.history[i-1].y);
+          pctx.lineTo(traj.history[i].x, traj.history[i].y);
           pctx.stroke();
         }
-        // Cabeza brillante
-        pctx.fillStyle = p.ref.color;
-        pctx.shadowColor = p.ref.color;
-        pctx.shadowBlur = 14;
+        var head = traj.history[traj.history.length - 1];
+        pctx.fillStyle = traj.color;
+        pctx.shadowColor = traj.color;
+        pctx.shadowBlur = 8 * globalAlpha;
         pctx.beginPath();
-        pctx.arc(headX, headY, 2.6, 0, Math.PI * 2);
+        pctx.arc(head.x, head.y, 1.6 * globalAlpha, 0, Math.PI * 2);
         pctx.fill();
         pctx.shadowBlur = 0;
-      } else if(p.type === 'synapse'){
-        var syn = p.ref;
-        if(!syn._p1 || !syn._p2) return;
-        var t = p.forward ? p.t : (1 - p.t);
-        // Bezier sample
-        function bp(tt){
-          var u = 1 - tt;
-          return {
-            x: u*u*syn._p1.x + 2*u*tt*syn._cp.x + tt*tt*syn._p2.x,
-            y: u*u*syn._p1.y + 2*u*tt*syn._cp.y + tt*tt*syn._p2.y,
-          };
+      });
+    }
+
+    function bezierPoint(a, cp, b, t){
+      var u = 1 - t;
+      return {
+        x: u*u*a.x + 2*u*t*cp.x + t*t*b.x,
+        y: u*u*a.y + 2*u*t*cp.y + t*t*b.y,
+      };
+    }
+
+    function drawPulses(){
+      for(var pi = pulses.length - 1; pi >= 0; pi--){
+        var p = pulses[pi];
+        var a, cp, b, color;
+        if(p.type === 'ray'){
+          var ray = p.ref;
+          if(!ray._a) continue;
+          a = ray._a; cp = ray._cp; b = ray._b; color = ray.color;
+        } else {
+          var syn = p.ref;
+          if(!syn._p1 || syn.age >= syn.lifespan) {
+            pulses.splice(pi, 1);
+            continue;
+          }
+          a = syn._p1; cp = syn._cp; b = syn._p2; color = syn.color;
         }
+        var t = p.forward ? p.t : (1 - p.t);
         var samples = [];
-        var steps = 10;
+        var steps = 12;
         for(var i = 0; i <= steps; i++){
           var tt = t - (p.forward ? 1 : -1) * (i / steps) * p.tailT;
           if(tt < 0 || tt > 1) continue;
-          samples.push({ pt: bp(tt), alpha: 1 - i / steps });
+          samples.push({ pt: bezierPoint(a, cp, b, tt), alpha: 1 - i / steps });
         }
-        if(samples.length < 2) return;
+        if(samples.length < 2) continue;
         pctx.lineCap = 'round';
         for(var s = 1; s < samples.length; s++){
-          var a = samples[s].alpha * p.life * 0.95;
-          pctx.strokeStyle = syn.color + Math.floor(a * 230).toString(16).padStart(2, '0');
-          pctx.lineWidth = 1.8 * samples[s].alpha;
+          var aa = samples[s].alpha * p.life * 0.95;
+          pctx.strokeStyle = color + Math.floor(aa * 230).toString(16).padStart(2, '0');
+          pctx.lineWidth = (p.type === 'ray' ? 2.0 : 1.7) * samples[s].alpha;
           pctx.beginPath();
           pctx.moveTo(samples[s-1].pt.x, samples[s-1].pt.y);
           pctx.lineTo(samples[s].pt.x, samples[s].pt.y);
           pctx.stroke();
         }
-        var head = bp(t);
-        pctx.fillStyle = syn.color;
-        pctx.shadowColor = syn.color;
-        pctx.shadowBlur = 10;
+        var head = bezierPoint(a, cp, b, t);
+        pctx.fillStyle = color;
+        pctx.shadowColor = color;
+        pctx.shadowBlur = p.type === 'ray' ? 14 : 10;
         pctx.beginPath();
-        pctx.arc(head.x, head.y, 2.0, 0, Math.PI * 2);
+        pctx.arc(head.x, head.y, p.type === 'ray' ? 2.6 : 2.0, 0, Math.PI * 2);
         pctx.fill();
         pctx.shadowBlur = 0;
       }
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  FRAME PRINCIPAL
+    // ══════════════════════════════════════════════════════════════════
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       lastT = t;
       if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
       globalT += dt;
+      galaxyRotation += 0.01 * dt;
 
-      // 1) Brazos espirales (rotando, debajo de las estrellas)
-      drawArms(dt);
+      // 1) Actualizar nebulosa
+      updateNebula(dt);
 
-      // 2) Vórtices puntuales (ondas concéntricas)
+      // 2) Espirales áureas (fondo)
+      drawSpirals(dt);
+
+      // 3) Rayos del centro (giran)
+      drawRays(dt);
+
+      // 4) Lorenz
+      updateLorenz(dt);
+      drawLorenz();
+
+      // 5) Vórtices
       drawVortices(dt);
 
-      // 3) Sinapsis fugaces
+      // 6) Sinapsis
       drawSynapses(dt);
 
-      // 4) Estrellas en órbita (encima de las líneas, brillan más)
+      // 7) Constelaciones
+      drawConstellations(dt);
+
+      // 8) Estrellas
       drawStars(dt);
 
-      // 5) Pulsos sinápticos
+      // 9) Pulsos (encima de todo)
       for(var pi = pulses.length - 1; pi >= 0; pi--){
         var p = pulses[pi];
         p.t += p.speed * dt;
         if(p.t > 1 + p.tailT){ pulses.splice(pi, 1); continue; }
         if(p.t > 1) p.life = Math.max(0, 1 - (p.t - 1) / p.tailT);
-        drawPulse(p);
       }
+      drawPulses();
 
-      // Spawns periódicos
-      // Sinapsis fugaces: spawn frecuente
-      if(synapses.length < 4 && Math.random() < 0.08){
-        spawnSynapse();
-      }
-      // Pulsos: mantener actividad
-      if(pulses.length < 6 && Math.random() < 0.05){
-        spawnPulse();
-      }
-      // Vórtices: raros, dramáticos
-      if(vortices.length < 2 && Math.random() < 0.008){
-        spawnVortex();
-      }
+      // Spawns
+      if(synapses.length < 5 && Math.random() < 0.10) spawnSynapse();
+      if(pulses.length < 8 && Math.random() < 0.07) spawnPulse();
+      if(vortices.length < 2 && Math.random() < 0.008) spawnVortex();
+      if(lorenzTrails.length < 2 && Math.random() < 0.005) spawnLorenz();
 
       animId = requestAnimationFrame(frame);
     }
 
     function start(){
       resize();
+      initNebula();
+      buildRays();
       buildStars();
-      buildArms();
+      buildConstellations();
+      buildSpirals();
       synapses = [];
       pulses = [];
       vortices = [];
+      lorenzTrails = [];
       globalT = 0;
+      galaxyRotation = 0;
+      // Pre-spawn algunas cosas
+      for(var i = 0; i < 2; i++) spawnLorenz();
+      for(var i = 0; i < 3; i++) spawnPulse();
       lastT = 0;
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
@@ -1205,11 +1423,15 @@ function _crearDialOverlay(){
     window.addEventListener('resize', function(){
       if(_particlesCanvas.offsetParent !== null){
         resize();
+        initNebula();
+        buildRays();
         buildStars();
-        buildArms();
+        buildConstellations();
+        buildSpirals();
       }
     });
   })();
+
 
 
 
