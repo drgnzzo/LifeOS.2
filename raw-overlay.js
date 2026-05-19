@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.168
+/* RAW Entry — Overlay v.5.169
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -750,6 +750,9 @@ function _crearDialOverlay(){
     // Estructuras
     var stars = [];
     var rays = [];            // rayos del centro absoluto
+    var meteors = [];         // v5.169: estrellas fugaces / meteoros
+    var dust = [];            // v5.169: polvo cósmico (puntitos pequeños)
+    var orbitRings = [];      // v5.169: anillos orbitales sutiles
     var constellations = [];  // grupos de estrellas conectadas
     var synapses = [];        // conexiones fugaces neuronales
     var pulses = [];
@@ -831,7 +834,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildRays(){
       rays = [];
-      var nRays = 9;
+      var nRays = 14;  // v5.169: más rayos
       for(var i = 0; i < nRays; i++){
         rays.push({
           theta: (i / nRays) * Math.PI * 2 + Math.random() * 0.3,
@@ -851,7 +854,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(80, Math.min(140, Math.floor((W * H) / 12000)));
+      var nStars = Math.max(140, Math.min(220, Math.floor((W * H) / 8000)));  // v5.169: más estrellas
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
         var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
@@ -876,7 +879,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildConstellations(){
       constellations = [];
-      var nConst = 5;
+      var nConst = 8;  // v5.169: más constelaciones
       for(var c = 0; c < nConst; c++){
         // Centro del grupo en órbita
         var cR = 200 + Math.random() * (MAX_R - 250);
@@ -1339,6 +1342,144 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════════════════════════════
+    //  v5.169: METEOROS (estrellas fugaces)
+    // ══════════════════════════════════════════════════════════════════
+    function spawnMeteor(){
+      // Aparece en un borde y viaja en dirección al lado opuesto con curva
+      var side = Math.floor(Math.random() * 4);
+      var startX, startY, endX, endY;
+      switch(side){
+        case 0: startX = Math.random() * W; startY = -20; endX = startX + (Math.random() - 0.5) * 600; endY = H + 20; break;
+        case 1: startX = W + 20; startY = Math.random() * H; endX = -20; endY = startY + (Math.random() - 0.5) * 600; break;
+        case 2: startX = Math.random() * W; startY = H + 20; endX = startX + (Math.random() - 0.5) * 600; endY = -20; break;
+        case 3: startX = -20; startY = Math.random() * H; endX = W + 20; endY = startY + (Math.random() - 0.5) * 600; break;
+      }
+      meteors.push({
+        startX: startX, startY: startY,
+        endX: endX, endY: endY,
+        t: 0,
+        speed: 0.7 + Math.random() * 0.6,    // 0.7-1.3 unidades/seg (rápidos)
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+        trailLen: 90 + Math.random() * 80,   // longitud del rastro
+      });
+    }
+
+    function drawMeteors(dt){
+      for(var i = meteors.length - 1; i >= 0; i--){
+        var m = meteors[i];
+        m.t += m.speed * dt;
+        if(m.t >= 1){ meteors.splice(i, 1); continue; }
+        // Posición actual
+        var hx = m.startX + (m.endX - m.startX) * m.t;
+        var hy = m.startY + (m.endY - m.startY) * m.t;
+        // Posición de la cola (atrás en el camino)
+        var totalDist = Math.hypot(m.endX - m.startX, m.endY - m.startY);
+        var tailFrac = m.trailLen / totalDist;
+        var tt = Math.max(0, m.t - tailFrac);
+        var tx = m.startX + (m.endX - m.startX) * tt;
+        var ty = m.startY + (m.endY - m.startY) * tt;
+        // Gradiente lineal del rastro
+        var grad = pctx.createLinearGradient(tx, ty, hx, hy);
+        grad.addColorStop(0, m.color + '00');
+        grad.addColorStop(1, m.color + 'ee');
+        pctx.strokeStyle = grad;
+        pctx.lineWidth = 1.6;
+        pctx.shadowColor = m.color;
+        pctx.shadowBlur = 10;
+        pctx.beginPath();
+        pctx.moveTo(tx, ty);
+        pctx.lineTo(hx, hy);
+        pctx.stroke();
+        // Cabeza brillante
+        pctx.fillStyle = m.color;
+        pctx.shadowBlur = 14;
+        pctx.beginPath();
+        pctx.arc(hx, hy, 2.2, 0, Math.PI * 2);
+        pctx.fill();
+        pctx.shadowBlur = 0;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.169: POLVO CÓSMICO (puntitos diminutos)
+    // ══════════════════════════════════════════════════════════════════
+    function buildDust(){
+      dust = [];
+      var n = Math.floor((W * H) / 5500);  // alta densidad de puntitos
+      for(var i = 0; i < n; i++){
+        // Polvo en coordenadas polares (también orbita lentamente)
+        var r = 40 + Math.random() * (MAX_R - 40);
+        var theta = Math.random() * Math.PI * 2;
+        dust.push({
+          r: r,
+          theta: theta,
+          omega: angularVel(r) * 0.7,   // un poco más lento
+          phase: Math.random() * Math.PI * 2,
+          twinkleSpeed: 0.5 + Math.random() * 1.5,
+          baseSize: 0.15 + Math.random() * 0.45,
+          color: Math.random() < 0.7 ? '#FFFFFF' : PALETTE[Math.floor(Math.random() * PALETTE.length)],
+        });
+      }
+    }
+
+    function drawDust(dt){
+      for(var i = 0; i < dust.length; i++){
+        var d = dust[i];
+        d.theta += d.omega * dt;
+        d.phase += d.twinkleSpeed * dt;
+        var twk = (Math.sin(d.phase) + 1) / 2;
+        var alpha = 0.18 + twk * 0.30;
+        var p = polar2cart(d.r, d.theta);
+        // Modular por nebulosa
+        var neb = nebulaIntensityAt(p.x, p.y);
+        alpha *= neb;
+        pctx.fillStyle = d.color + Math.floor(alpha * 200).toString(16).padStart(2, '0');
+        pctx.beginPath();
+        pctx.arc(p.x, p.y, d.baseSize * (0.7 + twk * 0.5), 0, Math.PI * 2);
+        pctx.fill();
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.169: ANILLOS ORBITALES (sugieren las órbitas, muy sutiles)
+    // ══════════════════════════════════════════════════════════════════
+    function buildOrbitRings(){
+      orbitRings = [];
+      // 4 anillos a radios variados
+      var radii = [
+        DIAL_R + 90,
+        DIAL_R + 220,
+        DIAL_R + 380,
+        DIAL_R + 580,
+      ];
+      radii.forEach(function(r, i){
+        if(r >= MAX_R) return;
+        orbitRings.push({
+          r: r,
+          phase: i * Math.PI / 3,
+          phaseSpeed: 0.15 + i * 0.05,
+          color: PALETTE[i % PALETTE.length],
+        });
+      });
+    }
+
+    function drawOrbitRings(dt){
+      orbitRings.forEach(function(ring){
+        ring.phase += ring.phaseSpeed * dt;
+        var pulse = (Math.sin(ring.phase) + 1) / 2;
+        var alpha = 0.04 + pulse * 0.08;     // MUY sutil
+        if(alpha < 0.02) return;
+        pctx.strokeStyle = ring.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        pctx.lineWidth = 0.6;
+        pctx.setLineDash([5, 12]);            // discontinua para evocar órbita
+        pctx.beginPath();
+        pctx.arc(CX, CY, ring.r, 0, Math.PI * 2);
+        pctx.stroke();
+        pctx.setLineDash([]);
+      });
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     //  FRAME PRINCIPAL
     // ══════════════════════════════════════════════════════════════════
     function frame(t){
@@ -1352,29 +1493,38 @@ function _crearDialOverlay(){
       // 1) Actualizar nebulosa
       updateNebula(dt);
 
-      // 2) Espirales áureas (fondo)
+      // 2) Polvo cósmico (capa más al fondo)
+      drawDust(dt);
+
+      // 3) Anillos orbitales sutiles
+      drawOrbitRings(dt);
+
+      // 4) Espirales áureas (fondo)
       drawSpirals(dt);
 
-      // 3) Rayos del centro (giran)
+      // 5) Rayos del centro (giran)
       drawRays(dt);
 
-      // 4) Lorenz
+      // 6) Lorenz
       updateLorenz(dt);
       drawLorenz();
 
-      // 5) Vórtices
+      // 7) Vórtices
       drawVortices(dt);
 
-      // 6) Sinapsis
+      // 8) Sinapsis
       drawSynapses(dt);
 
-      // 7) Constelaciones
+      // 9) Constelaciones
       drawConstellations(dt);
 
-      // 8) Estrellas
+      // 10) Estrellas
       drawStars(dt);
 
-      // 9) Pulsos (encima de todo)
+      // 11) Meteoros (encima de las estrellas, dramáticos)
+      drawMeteors(dt);
+
+      // 12) Pulsos (encima de todo)
       for(var pi = pulses.length - 1; pi >= 0; pi--){
         var p = pulses[pi];
         p.t += p.speed * dt;
@@ -1383,11 +1533,12 @@ function _crearDialOverlay(){
       }
       drawPulses();
 
-      // Spawns
-      if(synapses.length < 5 && Math.random() < 0.10) spawnSynapse();
-      if(pulses.length < 8 && Math.random() < 0.07) spawnPulse();
-      if(vortices.length < 2 && Math.random() < 0.008) spawnVortex();
-      if(lorenzTrails.length < 2 && Math.random() < 0.005) spawnLorenz();
+      // Spawns periódicos
+      if(synapses.length < 7 && Math.random() < 0.12) spawnSynapse();
+      if(pulses.length < 10 && Math.random() < 0.09) spawnPulse();
+      if(vortices.length < 3 && Math.random() < 0.012) spawnVortex();
+      if(lorenzTrails.length < 2 && Math.random() < 0.006) spawnLorenz();
+      if(meteors.length < 3 && Math.random() < 0.015) spawnMeteor();
 
       animId = requestAnimationFrame(frame);
     }
@@ -1399,15 +1550,19 @@ function _crearDialOverlay(){
       buildStars();
       buildConstellations();
       buildSpirals();
+      buildDust();          // v5.169
+      buildOrbitRings();    // v5.169
       synapses = [];
       pulses = [];
       vortices = [];
       lorenzTrails = [];
+      meteors = [];         // v5.169
       globalT = 0;
       galaxyRotation = 0;
       // Pre-spawn algunas cosas
       for(var i = 0; i < 2; i++) spawnLorenz();
       for(var i = 0; i < 3; i++) spawnPulse();
+      for(var i = 0; i < 2; i++) spawnMeteor();   // v5.169
       lastT = 0;
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
@@ -1428,6 +1583,8 @@ function _crearDialOverlay(){
         buildStars();
         buildConstellations();
         buildSpirals();
+        buildDust();          // v5.169
+        buildOrbitRings();    // v5.169
       }
     });
   })();
