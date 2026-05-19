@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.172
+/* RAW Entry — Overlay v.5.173
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1485,39 +1485,130 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     //  v5.169: ANILLOS ORBITALES (sugieren las órbitas, muy sutiles)
     // ══════════════════════════════════════════════════════════════════
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.172: ANILLOS CONCÉNTRICOS tipo HALO / DYSON / STARGATE
+    //  Estructuras arquitectónicas, no apenas-visible-dash:
+    //  • Anillo principal sólido con glow
+    //  • Anillo paralelo dual (estilo Halo)
+    //  • Segmentos brillantes ("ventanas") que rotan
+    //  • Tick marks geométricos (estilo Stargate, sin glifos)
+    // ══════════════════════════════════════════════════════════════════
     function buildOrbitRings(){
       orbitRings = [];
-      // 4 anillos a radios variados
-      var radii = [
-        DIAL_R + 90,
-        DIAL_R + 220,
-        DIAL_R + 380,
-        DIAL_R + 580,
-      ];
-      radii.forEach(function(r, i){
-        if(r >= MAX_R) return;
+      // 8 anillos a radios graduados — densidad uniforme desde dial hasta horizonte
+      var minR = DIAL_R + 80;
+      var maxR_local = Math.min(MAX_R - 40, Math.hypot(W/2, H/2) + 20);
+      var nRings = 8;
+      for(var i = 0; i < nRings; i++){
+        var t = i / (nRings - 1);
+        var r = minR + (maxR_local - minR) * t;
+        if(r >= MAX_R - 10) break;
+        // Determinar tipo: alternar para variedad
+        var style;
+        if(i === 0 || i === 3 || i === 6) style = 'halo';        // anillo doble
+        else if(i === 1 || i === 5) style = 'segmented';         // con ventanas rotantes
+        else if(i === 2 || i === 7) style = 'stargate';          // con tick marks
+        else style = 'solid';                                     // anillo simple
         orbitRings.push({
           r: r,
-          phase: i * Math.PI / 3,
-          phaseSpeed: 0.15 + i * 0.05,
+          phase: i * Math.PI / 4,
+          phaseSpeed: 0.12 + i * 0.03,
           color: PALETTE[i % PALETTE.length],
+          style: style,
+          // Rotación propia para los anillos con elementos rotatorios
+          rotation: Math.random() * Math.PI * 2,
+          rotSpeed: (i % 2 === 0 ? 1 : -1) * (0.04 + (i % 3) * 0.02),
+          // Número de segmentos/ticks (8-16 según tamaño)
+          nSegments: 8 + (i % 5) * 2,
         });
-      });
+      }
     }
 
     function drawOrbitRings(dt){
       orbitRings.forEach(function(ring){
         ring.phase += ring.phaseSpeed * dt;
+        ring.rotation += ring.rotSpeed * dt;
         var pulse = (Math.sin(ring.phase) + 1) / 2;
-        var alpha = 0.04 + pulse * 0.08;     // MUY sutil
-        if(alpha < 0.02) return;
-        pctx.strokeStyle = ring.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
-        pctx.lineWidth = 0.6;
-        pctx.setLineDash([5, 12]);            // discontinua para evocar órbita
+        // Alpha base más alto (eran demasiado sutiles)
+        var alpha = 0.12 + pulse * 0.16;
+        if(alpha < 0.04) return;
+
+        var col = ring.color;
+        var alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+
+        // --- ANILLO PRINCIPAL (todos los estilos lo tienen) ---
+        pctx.strokeStyle = col + alphaHex;
+        pctx.lineWidth = 1.0;
+        pctx.shadowColor = col;
+        pctx.shadowBlur = 4 + pulse * 4;
         pctx.beginPath();
         pctx.arc(CX, CY, ring.r, 0, Math.PI * 2);
         pctx.stroke();
-        pctx.setLineDash([]);
+
+        if(ring.style === 'halo'){
+          // Anillo paralelo dual (interior y exterior, 4-6px de separación)
+          var separation = 5;
+          var outerAlpha = Math.floor(alpha * 0.7 * 255).toString(16).padStart(2, '0');
+          pctx.strokeStyle = col + outerAlpha;
+          pctx.lineWidth = 0.6;
+          pctx.beginPath();
+          pctx.arc(CX, CY, ring.r + separation, 0, Math.PI * 2);
+          pctx.stroke();
+          pctx.beginPath();
+          pctx.arc(CX, CY, ring.r - separation, 0, Math.PI * 2);
+          pctx.stroke();
+        } else if(ring.style === 'segmented'){
+          // "Ventanas" brillantes rotando sobre el anillo
+          pctx.shadowBlur = 8 + pulse * 6;
+          var segArc = (Math.PI * 2) / ring.nSegments;
+          var segLen = segArc * 0.35;  // 35% de cada segmento es brillante
+          for(var s = 0; s < ring.nSegments; s++){
+            var a0 = ring.rotation + s * segArc;
+            var a1 = a0 + segLen;
+            // Solo cada 2 segmentos para no saturar
+            if(s % 2 !== 0) continue;
+            var segAlpha = alpha * (1.4 + pulse * 0.6);
+            segAlpha = Math.min(0.85, segAlpha);
+            pctx.strokeStyle = col + Math.floor(segAlpha * 255).toString(16).padStart(2, '0');
+            pctx.lineWidth = 2.0;
+            pctx.beginPath();
+            pctx.arc(CX, CY, ring.r, a0, a1);
+            pctx.stroke();
+          }
+        } else if(ring.style === 'stargate'){
+          // Tick marks geométricos perpendiculares al anillo
+          pctx.shadowBlur = 6;
+          var tickLen = 7;
+          var tickAlpha = Math.floor(alpha * 1.3 * 255).toString(16).padStart(2, '0');
+          pctx.strokeStyle = col + tickAlpha;
+          pctx.lineWidth = 1.2;
+          for(var t2 = 0; t2 < ring.nSegments; t2++){
+            var ang = ring.rotation + (t2 / ring.nSegments) * Math.PI * 2;
+            var innerR = ring.r - tickLen / 2;
+            var outerR = ring.r + tickLen / 2;
+            var ix = CX + Math.cos(ang) * innerR;
+            var iy = CY + Math.sin(ang) * innerR;
+            var ox = CX + Math.cos(ang) * outerR;
+            var oy = CY + Math.sin(ang) * outerR;
+            pctx.beginPath();
+            pctx.moveTo(ix, iy);
+            pctx.lineTo(ox, oy);
+            pctx.stroke();
+          }
+          // Puntos luminosos cada 4 ticks (nodos brillantes estilo stargate)
+          pctx.fillStyle = col;
+          pctx.shadowBlur = 10;
+          for(var t3 = 0; t3 < ring.nSegments; t3 += 4){
+            var ang2 = ring.rotation + (t3 / ring.nSegments) * Math.PI * 2;
+            var px = CX + Math.cos(ang2) * ring.r;
+            var py = CY + Math.sin(ang2) * ring.r;
+            pctx.beginPath();
+            pctx.arc(px, py, 1.8 + pulse * 0.7, 0, Math.PI * 2);
+            pctx.fill();
+          }
+        }
+
+        pctx.shadowBlur = 0;
       });
     }
 
