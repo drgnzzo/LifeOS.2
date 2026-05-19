@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.154
+/* RAW Entry — Overlay v.5.153
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -732,17 +732,6 @@ function _crearDialOverlay(){
     var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0;
     var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
 
-    // ── v5.154: Capas matemáticas ──────────────────────────────────
-    // Geometría Euclidiana: hexágonos áureos rotando lento detrás del dial
-    // Vorticial: campo de velocidad rotacional que afecta nodos sutilmente
-    // Caos: atractor de Clifford genera trazos lentos en el fondo
-    var _euclideanRot = 0;           // fase de rotación de geometría sagrada
-    var _vortexT = 0;                // tiempo del campo vortex
-    var _chaosPath = [];             // historial de puntos del atractor
-    var _chaosX = 0.1, _chaosY = 0;  // estado del atractor de Clifford
-    var CLIFFORD = { a: -1.4, b: 1.6, c: 1.0, d: 0.7 }; // parámetros estables
-    var PHI = (1 + Math.sqrt(5)) / 2; // razón áurea
-
     function resize(){
       var dpr = window.devicePixelRatio || 1;
       W = window.innerWidth;
@@ -911,189 +900,6 @@ function _crearDialOverlay(){
       }
     }
 
-    // ══════════════════════════════════════════════════════════════════
-    //  ECUACIONES Y CAOS — v5.154
-    //  • Espirales logarítmicas (golden ratio φ) superpuestas al campo
-    //  • Atractor de Lorenz discretizado → trayectorias caóticas
-    //  • Vórtices locales: nodos cerca de hubs reciben deflexión rotacional
-    //  • Perturbación fractal (Koch-like) sutil en algunas tangenciales
-    // ══════════════════════════════════════════════════════════════════
-    var PHI = (1 + Math.sqrt(5)) / 2;          // golden ratio
-    var spirals = [];                           // espirales logarítmicas
-    var chaosTrajectories = [];                 // partículas Lorenz
-    var vortices = [];                          // centros de vórtice
-
-    function initEquations(){
-      spirals = [];
-      chaosTrajectories = [];
-      vortices = [];
-
-      // 2 espirales áureas: una horaria, otra antihoraria, fase desplazada
-      for(var s = 0; s < 2; s++){
-        spirals.push({
-          direction: s === 0 ? 1 : -1,
-          phaseOffset: s * Math.PI,
-          turns: 3.2,                            // 3+ vueltas completas
-          // r = a · e^(b·θ) con b derivado de φ: cot(α) donde α=ángulo áureo
-          a: DIAL_R + 18,
-          b: 0.306 * (s === 0 ? 1 : 0.85),       // ≈ ln(φ)/(π/2) ajustado
-          color: s === 0 ? '#A78BFA' : '#22D3EE',
-          rotation: Math.random() * Math.PI * 2, // ángulo inicial
-          rotSpeed: (s === 0 ? 0.015 : -0.012),  // rotación lenta
-        });
-      }
-
-      // Vórtices: ubicar en 2-3 hubs aleatorios
-      var hubsArr = nodes.filter(function(n){ return n.isHub; });
-      for(var v = 0; v < Math.min(3, hubsArr.length); v++){
-        var h = hubsArr[Math.floor(Math.random() * hubsArr.length)];
-        if(vortices.some(function(vx){ return vx.hub === h; })) continue;
-        vortices.push({
-          hub: h,
-          strength: 0.4 + Math.random() * 0.5,
-          radius: 90 + Math.random() * 40,
-          phase: Math.random() * Math.PI * 2,
-        });
-      }
-
-      // 2 trayectorias caóticas (Lorenz attractor proyectado a 2D)
-      for(var c = 0; c < 2; c++){
-        chaosTrajectories.push({
-          x: (Math.random() - 0.5) * 4,
-          y: (Math.random() - 0.5) * 4,
-          z: 5 + Math.random() * 10,
-          history: [],
-          color: c === 0 ? '#4ADE80' : '#C4B5FD',
-          scale: 12 + Math.random() * 6,
-          centerX: CX + (Math.random() - 0.5) * (W * 0.3),
-          centerY: CY + (Math.random() - 0.5) * (H * 0.3),
-          // Parámetros del sistema de Lorenz (clásicos)
-          sigma: 10, rho: 28, beta: 8/3,
-        });
-      }
-    }
-
-    function stepLorenz(traj, dt){
-      // Sistema clásico de Lorenz:
-      // dx/dt = σ(y − x)
-      // dy/dt = x(ρ − z) − y
-      // dz/dt = xy − βz
-      var step = dt * 0.4; // factor de tiempo (más bajo = más lento/suave)
-      var dx = traj.sigma * (traj.y - traj.x);
-      var dy = traj.x * (traj.rho - traj.z) - traj.y;
-      var dz = traj.x * traj.y - traj.beta * traj.z;
-      traj.x += dx * step;
-      traj.y += dy * step;
-      traj.z += dz * step;
-      // Proyección a 2D: usar (x, z) como coords, escalar y centrar
-      var px = traj.centerX + traj.x * traj.scale * 0.5;
-      var py = traj.centerY + (traj.z - traj.rho) * traj.scale * 0.5;
-      // Mantener dentro del viewport (loop suave)
-      if(px < 0 || px > W || py < 0 || py > H){
-        // Reset si se salió
-        traj.x = (Math.random() - 0.5) * 4;
-        traj.y = (Math.random() - 0.5) * 4;
-        traj.z = 5 + Math.random() * 10;
-        traj.history = [];
-        traj.centerX = CX + (Math.random() - 0.5) * (W * 0.3);
-        traj.centerY = CY + (Math.random() - 0.5) * (H * 0.3);
-        return;
-      }
-      traj.history.push({ x: px, y: py });
-      if(traj.history.length > 80) traj.history.shift();
-    }
-
-    function drawChaosTrajectories(){
-      chaosTrajectories.forEach(function(traj){
-        if(traj.history.length < 2) return;
-        pctx.lineCap = 'round';
-        pctx.lineJoin = 'round';
-        // Trazo con gradiente de alpha (cola desvanecida)
-        for(var i = 1; i < traj.history.length; i++){
-          var a = (i / traj.history.length) * 0.55;
-          pctx.strokeStyle = traj.color + Math.floor(a * 200).toString(16).padStart(2, '0');
-          pctx.lineWidth = 0.9 * (i / traj.history.length) + 0.3;
-          pctx.beginPath();
-          pctx.moveTo(traj.history[i-1].x, traj.history[i-1].y);
-          pctx.lineTo(traj.history[i].x, traj.history[i].y);
-          pctx.stroke();
-        }
-        // Cabeza brillante
-        var head = traj.history[traj.history.length - 1];
-        pctx.fillStyle = traj.color;
-        pctx.shadowColor = traj.color;
-        pctx.shadowBlur = 8;
-        pctx.beginPath();
-        pctx.arc(head.x, head.y, 1.5, 0, Math.PI * 2);
-        pctx.fill();
-        pctx.shadowBlur = 0;
-      });
-    }
-
-    function drawSpirals(t){
-      spirals.forEach(function(sp){
-        sp.rotation += sp.rotSpeed * 0.016; // suave avance
-        pctx.beginPath();
-        var maxR = Math.hypot(W/2, H/2);
-        var prev = null;
-        // r = a·e^(b·θ), θ desde 0 hasta turns·2π
-        var steps = 220;
-        var thetaMax = sp.turns * Math.PI * 2;
-        for(var i = 0; i <= steps; i++){
-          var theta = (i / steps) * thetaMax;
-          var r = sp.a * Math.exp(sp.b * theta);
-          if(r > maxR) break;
-          var ang = sp.direction * theta + sp.rotation + sp.phaseOffset;
-          var x = CX + Math.cos(ang) * r;
-          var y = CY + Math.sin(ang) * r;
-          if(!prev) pctx.moveTo(x, y);
-          else pctx.lineTo(x, y);
-          prev = { x: x, y: y };
-        }
-        // Stroke con alpha bajo (espiral siempre presente, sutil)
-        pctx.strokeStyle = sp.color + '24';
-        pctx.lineWidth = 0.8;
-        pctx.stroke();
-      });
-    }
-
-    function applyVortexDeflection(){
-      // Los nodos cercanos a un vórtice reciben una rotación local extra.
-      // (No reescribimos posiciones permanentemente; aplicamos offset visual)
-      // Por simplicidad: agregar a n.angle un delta proporcional a 1/dist
-      vortices.forEach(function(vx){
-        vx.phase += 0.015;
-        nodes.forEach(function(n){
-          if(n === vx.hub) return;
-          var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
-          var d = Math.hypot(dx, dy);
-          if(d > vx.radius || d < 5) return;
-          // Influencia inversa a la distancia
-          var influence = (1 - d / vx.radius) * vx.strength * 0.0015;
-          n.angle += influence;
-          // Recalcular posición con el ángulo actualizado
-          n.x = CX + Math.cos(n.angle) * n.ringR;
-          n.y = CY + Math.sin(n.angle) * n.ringR;
-        });
-      });
-    }
-
-    function drawVortexHints(){
-      // Hint visual: aro tenue rotando alrededor del centro del vórtice
-      vortices.forEach(function(vx){
-        for(var i = 0; i < 3; i++){
-          var ringR = (i + 1) * 18;
-          if(ringR > vx.radius) break;
-          var ang = vx.phase + i * 0.8;
-          pctx.beginPath();
-          pctx.arc(vx.hub.x, vx.hub.y, ringR, ang, ang + Math.PI * 1.3);
-          pctx.strokeStyle = vx.hub.color + '20';
-          pctx.lineWidth = 0.5;
-          pctx.stroke();
-        }
-      });
-    }
-
     function bezierPoint(a, cp, b, t){
       var u = 1 - t;
       return {
@@ -1179,17 +985,8 @@ function _crearDialOverlay(){
       if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
 
-      // 0a) Espirales áureas de fondo (debajo de todo)
-      drawSpirals(t);
-
-      // 0b) Hints visuales de vórtices
-      drawVortexHints();
-
       // 1) Dibujar edges (curvas tenues — el tejido de fondo)
       for(var ei = 0; ei < edges.length; ei++) drawEdge(edges[ei]);
-
-      // 1b) Vórtices: deflexión angular sobre nodos cercanos
-      applyVortexDeflection();
 
       // 2) Lentísima rotación orbital de los nodos sobre su anillo
       //    (galaxia que rota muy despacio)
@@ -1235,19 +1032,12 @@ function _crearDialOverlay(){
         spawnPulse();
       }
 
-      // 5) Lorenz attractor: avanzar y dibujar trayectorias caóticas
-      chaosTrajectories.forEach(function(traj){
-        stepLorenz(traj, dt);
-      });
-      drawChaosTrajectories();
-
       animId = requestAnimationFrame(frame);
     }
 
     function start(){
       resize();
       buildNetwork();
-      initEquations(); // v5.154: espirales áureas, vórtices, Lorenz
       // Pre-spawn: poblar el campo desde el principio
       for(var i = 0; i < 4; i++){
         var e = edges[Math.floor(Math.random() * edges.length)];
@@ -1279,7 +1069,6 @@ function _crearDialOverlay(){
       if(_particlesCanvas.offsetParent !== null){
         resize();
         buildNetwork();
-        initEquations();
       }
     });
   })();
