@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.159
+/* RAW Entry — Overlay v.5.160
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -765,82 +765,96 @@ function _crearDialOverlay(){
     //  vecinos del mismo anillo, en arco curvo).
     // ══════════════════════════════════════════════════════════════════
     // ══════════════════════════════════════════════════════════════════
-    //  v5.158: MALLADO DENSO SIMÉTRICO + CONSTELACIONES IRREGULARES
-    //  • Anillos uniformes (no ease-out) → sin huecos crecientes hacia afuera
-    //  • Más radios y más anillos → cobertura completa sin saturar
-    //  • Tangenciales con curvatura angular real (arcos siguiendo circunferencia)
-    //  • Constelaciones superpuestas: patrones irregulares tipo mapa estelar
-    //  • Estrellas de fondo dispersas para llenar zonas residuales
+    //  v5.160: ESTRUCTURA NEBULAR (cosmic web)
+    //  Inspirado en el "cosmic web" real: distribución filamentosa donde
+    //  algunas zonas tienen densidad y otras son voids respirables.
+    //  • Mallado simétrico 12 radios × 4 anillos
+    //  • FUNCIÓN DE MODULACIÓN angular: cada radio tiene "fuerza" 0..1
+    //    derivada de armónicos superpuestos (campo suave, no aleatorio)
+    //  • Edges con alpha proporcional a la fuerza del radio
+    //  • Tangenciales/radiales solo en zonas con fuerza suficiente
+    //  • Raíces del dial SIEMPRE 360° (intensidad variable)
+    //  • Niebla nebular: gradientes radiales tenues en zonas densas
     // ══════════════════════════════════════════════════════════════════
+    var radialStrength = [];
+    var nebulaFog = [];
+
     function buildNetwork(){
       nodes = [];
       edges = [];
       pulses = [];
+      nebulaFog = [];
 
-      // Número de "radios" — más densidad angular para que no haya huecos visibles
-      var nRadii = Math.max(20, Math.min(28, Math.floor(Math.min(W, H) / 55)));
-
-      // Anillos: distribución UNIFORME (no ease-out) para densidad constante radial
+      var nRadii = 12;
       var diag = Math.hypot(W/2, H/2);
-      var minR = DIAL_R + 75;
-      var maxR = diag + 30;
-      var nRings = 7;             // más anillos para llenar el espacio sin huecos
+      var minR = DIAL_R + 85;
+      var maxR = diag + 20;
+      var nRings = 4;
 
-      // Offset angular global aleatorio inicial
       var globalAngleOffset = Math.random() * (Math.PI * 2 / nRadii);
+
+      // ── MODULACIÓN angular: suma de armónicos no resonantes ──
+      var seedA = Math.random() * Math.PI * 2;
+      var seedB = Math.random() * Math.PI * 2;
+      var seedC = Math.random() * Math.PI * 2;
+      radialStrength = [];
+      for(var ai0 = 0; ai0 < nRadii; ai0++){
+        var theta = (ai0 / nRadii) * Math.PI * 2;
+        var v = 0.5
+              + 0.30 * Math.sin(theta + seedA)
+              + 0.18 * Math.sin(2 * theta + seedB)
+              + 0.10 * Math.sin(3 * theta + seedC);
+        v = Math.max(0.15, Math.min(1.0, v));
+        radialStrength.push(v);
+      }
 
       var ringDefs = [];
       for(var ri = 0; ri < nRings; ri++){
-        // Uniforme: ri / (nRings - 1)
         var t = ri / (nRings - 1);
         var r = minR + (maxR - minR) * t;
-        var color = PALETTE[ri % PALETTE.length];
-        ringDefs.push({ r: r, color: color, ringIdx: ri, nodes: [] });
+        ringDefs.push({ r: r, color: PALETTE[ri % PALETTE.length], ringIdx: ri, nodes: [] });
       }
 
-      // Crear nodos: por cada radio, un nodo en cada anillo, mismo ángulo base
+      // Nodos (todos creados; el render usará strength)
       for(var ai = 0; ai < nRadii; ai++){
         var baseAngle = globalAngleOffset + (ai / nRadii) * Math.PI * 2;
+        var strength = radialStrength[ai];
         for(var ri2 = 0; ri2 < nRings; ri2++){
           var rd = ringDefs[ri2];
-          var angle = baseAngle;
-          var r = rd.r;
-          var x = CX + Math.cos(angle) * r;
-          var y = CY + Math.sin(angle) * r;
+          var x = CX + Math.cos(baseAngle) * rd.r;
+          var y = CY + Math.sin(baseAngle) * rd.r;
           if(x < -40 || x > W + 40 || y < -40 || y > H + 40){
             rd.nodes.push(null);
             continue;
           }
-          // Hubs simétricos: cada 4 radios en anillos selectos
-          var isHub = (ai % 4 === 0) && (ri2 === 1 || ri2 === Math.floor(nRings/2) + 1);
+          var isHub = strength > 0.75 && (ri2 === 1 || ri2 === 2);
           var node = {
             x: x, y: y,
-            angle: angle,
-            baseAngle: angle,
+            angle: baseAngle,
+            baseAngle: baseAngle,
             radialIdx: ai,
             ringR: rd.r,
             ringIdx: ri2,
             color: rd.color,
             phase: ai * 0.4 + ri2 * 0.7,
-            speed: 0.45 + (ri2 * 0.08),
-            baseR: isHub ? 1.7 : 0.85,
+            speed: 0.4 + (ri2 * 0.08),
+            baseR: isHub ? 1.7 : 0.8,
             isHub: isHub,
+            strength: strength,
           };
           rd.nodes.push(node);
           nodes.push(node);
         }
       }
 
-      // ── TANGENCIALES con curvatura angular real (arco siguiendo el anillo) ──
-      // En lugar de Bézier al CP afuera, hacemos arc real con 3 puntos
-      // intermedios sobre el anillo (suficiente para que se vea como curva)
+      // Tangenciales: solo si la fuerza media entre radios adyacentes es alta
       ringDefs.forEach(function(rd){
         for(var i = 0; i < nRadii; i++){
           var a = rd.nodes[i];
           var b = rd.nodes[(i + 1) % nRadii];
           if(!a || !b) continue;
-          // CP en el punto medio angular, EXACTAMENTE al radio del anillo
-          // (no afuera) — esto hace que la curva siga la circunferencia
+          var midStrength = (radialStrength[i] + radialStrength[(i+1) % nRadii]) / 2;
+          if(midStrength < 0.45) continue;
           var midAngle = a.angle + (Math.PI * 2 / nRadii) / 2;
           var cpx = CX + Math.cos(midAngle) * rd.r;
           var cpy = CY + Math.sin(midAngle) * rd.r;
@@ -850,161 +864,75 @@ function _crearDialOverlay(){
             color: rd.color,
             type: 'tangential',
             ringIdx: rd.ringIdx,
+            strength: midStrength,
           });
         }
       });
 
-      // ── RADIALES entre anillos adyacentes (sistemáticas) ──
-      for(var ai2 = 0; ai2 < nRadii; ai2++){
+      // Radiales: solo en radios con fuerza media o alta
+      for(var ai3 = 0; ai3 < nRadii; ai3++){
+        if(radialStrength[ai3] < 0.40) continue;
         for(var ri3 = 0; ri3 < nRings - 1; ri3++){
-          var n1 = ringDefs[ri3].nodes[ai2];
-          var n2 = ringDefs[ri3 + 1].nodes[ai2];
+          var n1 = ringDefs[ri3].nodes[ai3];
+          var n2 = ringDefs[ri3 + 1].nodes[ai3];
           if(!n1 || !n2) continue;
           var mx = (n1.x + n2.x) / 2;
           var my = (n1.y + n2.y) / 2;
-          // Curvatura mínima alternada por radio
           var dx = n2.x - n1.x, dy = n2.y - n1.y;
           var len = Math.hypot(dx, dy) || 1;
           var perpX = -dy / len, perpY = dx / len;
-          var off = (ai2 % 2 === 0 ? 1 : -1) * 4;
+          var off = (ai3 % 2 === 0 ? 1 : -1) * 3;
           edges.push({
             a: n1, b: n2,
             cp: { x: mx + perpX * off, y: my + perpY * off },
             color: n1.color,
             type: 'radial',
             ringIdx: ri3,
+            strength: radialStrength[ai3],
           });
         }
       }
 
-      // ── RAÍCES del dial → primer anillo (una por radio) ──
-      for(var ai3 = 0; ai3 < nRadii; ai3++){
-        var firstNode = ringDefs[0].nodes[ai3];
+      // Raíces del dial: SIEMPRE 360°, intensidad variable
+      for(var ai4 = 0; ai4 < nRadii; ai4++){
+        var firstNode = ringDefs[0].nodes[ai4];
         if(!firstNode) continue;
         var ang = firstNode.angle;
         var ox = CX + Math.cos(ang) * DIAL_R;
         var oy = CY + Math.sin(ang) * DIAL_R;
         var virtualOrigin = { x: ox, y: oy, color: firstNode.color, isVirtual: true };
-        var mx = (ox + firstNode.x) / 2;
-        var my = (oy + firstNode.y) / 2;
+        var mx2 = (ox + firstNode.x) / 2;
+        var my2 = (oy + firstNode.y) / 2;
         edges.push({
           a: virtualOrigin, b: firstNode,
-          cp: { x: mx, y: my },
+          cp: { x: mx2, y: my2 },
           color: firstNode.color,
           type: 'root',
           ringIdx: 0,
+          strength: radialStrength[ai4],
         });
       }
 
-      // ── v5.158: CONSTELACIONES IRREGULARES ──
-      // Capa superpuesta al mallado de anillos. Patrones de 3-6 puntos
-      // con forma irregular (no circular) y líneas finas conectándolos.
-      // Distribuidas en zonas del viewport.
-      buildConstellations();
-
-      // ── v5.158: ESTRELLAS DE FONDO ──
-      // Puntos pequeños dispersos por zonas residuales (no conectados)
-      buildBackgroundStars();
-    }
-
-    // Constelaciones: grupos irregulares con líneas tipo mapa estelar
-    function buildConstellations(){
-      var nConst = 6; // número de constelaciones
-      var diagH = Math.hypot(W/2, H/2);
-
-      for(var c = 0; c < nConst; c++){
-        // Posición del centro de la constelación en una zona del viewport
-        // (división en sectores angulares para distribución equitativa)
-        var sectorAngle = (c / nConst) * Math.PI * 2 + Math.random() * 0.4;
-        var sectorDist = diagH * (0.45 + Math.random() * 0.4); // entre 45% y 85% de la diagonal
-        var ccx = CX + Math.cos(sectorAngle) * sectorDist;
-        var ccy = CY + Math.sin(sectorAngle) * sectorDist;
-        // Limitar al viewport
-        ccx = Math.max(60, Math.min(W - 60, ccx));
-        ccy = Math.max(60, Math.min(H - 60, ccy));
-
-        var color = PALETTE[c % PALETTE.length];
-        // Número irregular de puntos en esta constelación
-        var nPoints = 3 + Math.floor(Math.random() * 4); // 3-6
-        var points = [];
-        for(var p = 0; p < nPoints; p++){
-          // Distribución irregular alrededor del centro: NO circular
-          // Combinación de ángulo random + radio variable
-          var ang = Math.random() * Math.PI * 2;
-          var radDist = 25 + Math.random() * 55; // distancia variable del centro
-          var px = ccx + Math.cos(ang) * radDist;
-          var py = ccy + Math.sin(ang) * radDist;
-          // Mantener dentro del viewport
-          px = Math.max(20, Math.min(W - 20, px));
-          py = Math.max(20, Math.min(H - 20, py));
-          // No invadir el dial
-          if(Math.hypot(px - CX, py - CY) < DIAL_R + 30) continue;
-          var star = {
-            x: px, y: py,
-            color: color,
-            phase: Math.random() * Math.PI * 2,
-            speed: 0.3 + Math.random() * 0.4,
-            baseR: 0.9 + Math.random() * 0.7,
-            isConstellation: true,
-            twinkleSpeed: 1.5 + Math.random() * 2.0, // titilan más rápido (estrella)
-          };
-          // No es Hub ni nodo regular: es una estrella
-          points.push(star);
-          nodes.push(star);
-        }
-        if(points.length < 2) continue;
-
-        // Conectar los puntos en patrón irregular: cada punto al SIGUIENTE
-        // formando una línea poligonal (no cerrada). Esto da el aspecto de
-        // constelación clásica (Osa Mayor, Cassiopeia, etc.)
-        for(var pp = 0; pp < points.length - 1; pp++){
-          var s1 = points[pp];
-          var s2 = points[pp + 1];
-          edges.push({
-            a: s1, b: s2,
-            cp: { x: (s1.x + s2.x)/2, y: (s1.y + s2.y)/2 }, // línea casi recta
-            color: color,
-            type: 'constellation',
-            ringIdx: -1,
-          });
-        }
-        // Conexión extra opcional: cierre del último al primero (forma cerrada)
-        // Solo para algunas constelaciones (asterismos cerrados)
-        if(points.length >= 4 && Math.random() < 0.4){
-          var first = points[0];
-          var last = points[points.length - 1];
-          edges.push({
-            a: last, b: first,
-            cp: { x: (last.x + first.x)/2, y: (last.y + first.y)/2 },
-            color: color,
-            type: 'constellation',
-            ringIdx: -1,
-          });
-        }
-      }
-    }
-
-    // Estrellas de fondo: puntos pequeños sin conexión, dispersos
-    function buildBackgroundStars(){
-      var nStars = Math.floor((W * H) / 32000); // densidad ~1 estrella por 32k px²
-      nStars = Math.max(10, Math.min(30, nStars));
-      for(var s = 0; s < nStars; s++){
-        var sx = 30 + Math.random() * (W - 60);
-        var sy = 30 + Math.random() * (H - 60);
-        // No invadir dial
-        if(Math.hypot(sx - CX, sy - CY) < DIAL_R + 25) continue;
-        nodes.push({
-          x: sx, y: sy,
-          color: '#FFFFFF',
+      // Niebla nebular en zonas densas (top 3-4 radios)
+      var sortedByStrength = radialStrength
+        .map(function(s, i){ return { i: i, s: s }; })
+        .sort(function(a, b){ return b.s - a.s; })
+        .slice(0, 3);
+      sortedByStrength.forEach(function(item){
+        var midAngle = globalAngleOffset + (item.i / nRadii) * Math.PI * 2;
+        var fogR = (DIAL_R + diag) / 2;
+        var fx = CX + Math.cos(midAngle) * fogR;
+        var fy = CY + Math.sin(midAngle) * fogR;
+        nebulaFog.push({
+          x: fx, y: fy,
+          radius: 200 + item.s * 80,
+          color: PALETTE[item.i % PALETTE.length],
+          baseAlpha: 0.04 + item.s * 0.04,
           phase: Math.random() * Math.PI * 2,
-          speed: 0.2 + Math.random() * 0.5,
-          baseR: 0.3 + Math.random() * 0.5,
-          isBgStar: true,
         });
-      }
+      });
     }
 
-    // ══════════════════════════════════════════════════════════════════
     //  ECUACIONES Y CAOS — v5.154
     //  • Espirales logarítmicas (golden ratio φ) superpuestas al campo
     //  • Atractor de Lorenz discretizado → trayectorias caóticas
@@ -1015,6 +943,77 @@ function _crearDialOverlay(){
     var spirals = [];                           // espirales logarítmicas
     var chaosTrajectories = [];                 // partículas Lorenz
     var vortices = [];                          // centros de vórtice
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.160: NEBULOSA Y RESPIRACIÓN GLOBAL
+    //  • nebulaBlobs: campo de densidad por gaussianas que modula alpha
+    //  • globalBreath: seno muy lento que sube/baja opacidad del campo
+    //  La nebulosa flota lentamente — zonas brillan, zonas se desvanecen.
+    //  Las trayectorias del DIAL (raíces) son inmunes (siempre 100%).
+    // ══════════════════════════════════════════════════════════════════
+    var nebulaBlobs = [];
+    var globalBreathPhase = 0;
+
+    function initNebula(){
+      nebulaBlobs = [];
+      // 3-5 "blobs" de densidad — gaussianas que se mueven lentamente.
+      // Cada uno tiene un centro, un radio de influencia, y desfase de
+      // movimiento. La densidad efectiva en (x,y) será la SUMA de las
+      // gaussianas, normalizada al rango [0.4, 1.0] (nunca apaga del todo).
+      var nBlobs = 4;
+      for(var i = 0; i < nBlobs; i++){
+        var ang = (i / nBlobs) * Math.PI * 2 + Math.random() * 0.5;
+        var dist = Math.min(W, H) * (0.25 + Math.random() * 0.2);
+        nebulaBlobs.push({
+          cx: CX + Math.cos(ang) * dist,
+          cy: CY + Math.sin(ang) * dist,
+          radius: Math.min(W, H) * (0.20 + Math.random() * 0.15),
+          intensity: 0.5 + Math.random() * 0.5,
+          // Movimiento: deriva en una dirección
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.5) * 6,
+          // Pulso de intensidad propio
+          pulsePhase: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.05 + Math.random() * 0.08,
+        });
+      }
+    }
+
+    function updateNebula(dt){
+      // Mover blobs lentamente, rebotar suavemente en bordes
+      nebulaBlobs.forEach(function(b){
+        b.cx += b.vx * dt;
+        b.cy += b.vy * dt;
+        // Si se acerca demasiado a borde, invertir velocidad
+        var margin = 60;
+        if(b.cx < margin || b.cx > W - margin) b.vx *= -1;
+        if(b.cy < margin || b.cy > H - margin) b.vy *= -1;
+        // Pulso propio
+        b.pulsePhase += b.pulseSpeed * dt;
+      });
+    }
+
+    // Devuelve un factor [0..1] que indica densidad de la nebulosa en (x,y)
+    // 1 = zona brillante, ~0.4 = zona tenue (nunca apaga completamente)
+    function nebulaDensityAt(x, y){
+      var total = 0;
+      for(var i = 0; i < nebulaBlobs.length; i++){
+        var b = nebulaBlobs[i];
+        var dx = x - b.cx, dy = y - b.cy;
+        var d2 = dx*dx + dy*dy;
+        var r2 = b.radius * b.radius;
+        if(d2 > r2 * 4) continue;
+        // Gaussiana: e^(-d²/(2σ²)) con σ = radius/2
+        var sigma2 = (b.radius * b.radius) * 0.5;
+        var g = Math.exp(-d2 / sigma2);
+        // Modular por pulso propio del blob
+        var pulse = 0.7 + 0.3 * (Math.sin(b.pulsePhase) + 1) / 2;
+        total += g * b.intensity * pulse;
+      }
+      // Mapear total a [0.4, 1.0]: hay siempre algo de visibilidad mínima
+      total = Math.min(1, total);
+      return 0.4 + 0.6 * total;
+    }
 
     function initEquations(){
       spirals = [];
@@ -1049,12 +1048,12 @@ function _crearDialOverlay(){
         });
       }
 
-      // 2 trayectorias caóticas (Lorenz attractor proyectado a 2D)
-      for(var c = 0; c < 2; c++){
-        chaosTrajectories.push(makeLorenzTraj(c));
-      }
+      // v5.160: Lorenz trajectories ELIMINADAS — saturaban visualmente
+      // y rompían la sensación contemplativa. La nebulosa+espirales+pulsos
+      // ya aportan suficiente caos visual sin abrumar.
     }
 
+    // makeLorenzTraj queda definida pero no se usa (chaosTrajectories vacío)
     function makeLorenzTraj(idx){
       // v5.155: respawn en zona con menor densidad de pulsos activos
       var cx = CX, cy = CY;
@@ -1284,7 +1283,7 @@ function _crearDialOverlay(){
       pulses.push({
         edge: edge,
         t: 0,
-        speed: 0.35 + Math.random() * 0.40,
+        speed: 0.6 + Math.random() * 0.6,
         forward: forward,
         life: 1,
         color: edge.color,
@@ -1296,17 +1295,28 @@ function _crearDialOverlay(){
     function drawEdge(e){
       var alphaHex = '22';
       var lw = 0.7;
+      var immune = false; // raíces siempre 100% visibles
       if(e.type === 'root'){
-        // v5.159: raíces SIEMPRE visibles a 360° (alpha más alto, líneas más gruesas)
         alphaHex = '88';
         lw = 1.4;
+        immune = true;
       }
       else if(e.type === 'tangential'){ alphaHex = '2a'; lw = 0.9; }
       else if(e.type === 'constellation'){
         alphaHex = '38';
         lw = 0.6;
       }
-      pctx.strokeStyle = e.color + alphaHex;
+      // v5.160: aplicar modulación de nebulosa + respiración global
+      var alpha = parseInt(alphaHex, 16) / 255;
+      if(!immune){
+        var midX = (e.a.x + e.b.x) / 2;
+        var midY = (e.a.y + e.b.y) / 2;
+        var neb = nebulaDensityAt(midX, midY);
+        var breath = 0.65 + 0.35 * (Math.sin(globalBreathPhase) + 1) / 2;
+        alpha = alpha * neb * breath;
+      }
+      var finalHex = Math.max(0, Math.min(255, Math.floor(alpha * 255))).toString(16).padStart(2, '0');
+      pctx.strokeStyle = e.color + finalHex;
       pctx.lineWidth = lw;
       pctx.beginPath();
       pctx.moveTo(e.a.x, e.a.y);
@@ -1353,6 +1363,10 @@ function _crearDialOverlay(){
       if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
 
+      // v5.160: avanzar nebulosa moduladora y respiración global
+      globalBreathPhase += dt * 0.6;
+      if(typeof updateNebula === 'function') updateNebula(dt);
+
       // 0a) Espirales áureas de fondo (debajo de todo)
       drawSpirals(t);
 
@@ -1379,34 +1393,38 @@ function _crearDialOverlay(){
         // Solo los nodos de anillos rotan; constelaciones y bg-stars son fijos
         if(!n.isConstellation && !n.isBgStar){
           var dir = n.ringIdx % 2 === 0 ? 1 : -1;
-          var angVel = dir * 0.018 / (1 + n.ringIdx * 0.35);
+          var angVel = dir * 0.05 / (1 + n.ringIdx * 0.35);
           n.angle += angVel * dt;
           n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
           n.x = CX + Math.cos(n.angle) * n.ringR;
           n.y = CY + Math.sin(n.angle) * n.ringR;
         }
 
-        // Pulso visual del nodo
+        // Pulso visual del nodo (con modulación de nebulosa para nodos exteriores)
         n.phase += (n.twinkleSpeed || n.speed) * dt;
         var pulse = (Math.sin(n.phase) + 1) / 2;
         var r, alpha, blur;
         if(n.isBgStar){
-          // Estrellas de fondo: muy pequeñas, titileo blanco
           r = n.baseR * (0.7 + pulse * 0.6);
           alpha = 0.3 + pulse * 0.5;
           blur = 2 + pulse * 4;
         } else if(n.isConstellation){
-          // Estrellas de constelación: más prominentes, titileo más fuerte
           r = n.baseR * (0.8 + pulse * 0.8);
           alpha = 0.5 + pulse * 0.5;
           blur = 4 + pulse * 8;
         } else {
-          // Nodos de anillo
           r = n.baseR + pulse * (n.isHub ? 1.8 : 1.2);
           alpha = 0.4 + pulse * 0.5;
           blur = (n.isHub ? 10 : 6) + pulse * (n.isHub ? 14 : 8);
         }
-        pctx.fillStyle = n.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
+        // v5.160: modular por nebulosa (excepto primer anillo que es "núcleo")
+        var coreImmune = (!n.isBgStar && !n.isConstellation && n.ringIdx === 0);
+        if(!coreImmune){
+          var neb = nebulaDensityAt(n.x, n.y);
+          var breath = 0.65 + 0.35 * (Math.sin(globalBreathPhase) + 1) / 2;
+          alpha = alpha * neb * breath;
+        }
+        pctx.fillStyle = n.color + Math.max(0, Math.min(255, Math.floor(alpha * 220))).toString(16).padStart(2, '0');
         pctx.shadowColor = n.color;
         pctx.shadowBlur = blur;
         pctx.beginPath();
@@ -1433,11 +1451,8 @@ function _crearDialOverlay(){
         spawnPulse();
       }
 
-      // 5) Lorenz attractor: avanzar y dibujar trayectorias caóticas
-      chaosTrajectories.forEach(function(traj){
-        stepLorenz(traj, dt);
-      });
-      drawChaosTrajectories();
+      // 5) v5.160: Lorenz eliminado — no se ejecuta (array vacío)
+      // chaosTrajectories permanece como [] para compatibilidad
 
       animId = requestAnimationFrame(frame);
     }
@@ -1445,7 +1460,9 @@ function _crearDialOverlay(){
     function start(){
       resize();
       buildNetwork();
-      initEquations(); // v5.154: espirales áureas, vórtices, Lorenz
+      initEquations();
+      initNebula();   // v5.160: nebulosa moduladora
+      globalBreathPhase = 0;
       // Pre-spawn: poblar el campo desde el principio
       for(var i = 0; i < 4; i++){
         var e = edges[Math.floor(Math.random() * edges.length)];
