@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.163
+/* RAW Entry — Overlay v.5.164
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -779,10 +779,61 @@ function _crearDialOverlay(){
       edges = [];
       pulses = [];
 
-      // v5.163: zona de exclusión MUY GRANDE — el dial debe quedar
-      // completamente despejado, no solo el círculo central sino
-      // toda el área de cards e información circundante.
-      var exclusionR = DIAL_R + 180;
+      // v5.164: 2 capas de animación.
+      // CAPA INTERIOR (radial): líneas curvas que emanan del dial pero
+      //   en un anillo dedicado, sin pegarse al borde ni invadir los textos.
+      // CAPA EXTERIOR (orgánica): mallado Poisson + filamentos.
+      var dialInnerR = DIAL_R + 30;    // borde interior de la capa radial
+      var dialOuterR = DIAL_R + 130;   // borde exterior de la capa radial
+      var exclusionR = dialOuterR;     // los nodos Poisson empiezan después
+
+      // ══════════════════════════════════════════════════════════════════
+      //  CAPA INTERIOR: anillo radial alrededor del dial
+      //  Líneas curvas suaves que emanan radialmente sin saturar el centro.
+      //  Las curvas NO son rectas (eso eran los "rayos pegajosos"); son
+      //  Bézier en arco — siguen un patrón polar pero con vida orgánica.
+      // ══════════════════════════════════════════════════════════════════
+      var nRadialLines = 14;                    // un poco más denso que el zodiaco
+      var radialOffset = Math.random() * (Math.PI * 2 / nRadialLines);
+      for(var rl = 0; rl < nRadialLines; rl++){
+        var ang = radialOffset + (rl / nRadialLines) * Math.PI * 2;
+        // Algunas líneas son largas y otras cortas (asimetría visual)
+        var lengthFactor = 0.6 + ((rl * 7) % 4) * 0.13;  // 0.6 - 0.99
+        var lineLength = (dialOuterR - dialInnerR) * lengthFactor;
+        var startR = dialInnerR + 5;
+        var endR = startR + lineLength;
+        var ax = CX + Math.cos(ang) * startR;
+        var ay = CY + Math.sin(ang) * startR;
+        var bx = CX + Math.cos(ang) * endR;
+        var by = CY + Math.sin(ang) * endR;
+        // Control point: curvado perpendicularmente al radio para que NO sea recto
+        var midR = (startR + endR) / 2;
+        var midAng = ang + 0.10;        // ligero offset angular en el medio = curva
+        var cpx = CX + Math.cos(midAng) * midR;
+        var cpy = CY + Math.sin(midAng) * midR;
+        var color = PALETTE[rl % PALETTE.length];
+        // Nodo terminal en la punta exterior
+        var tipNode = {
+          x: bx, y: by,
+          color: color,
+          phase: rl * 0.5,
+          speed: 0.5 + (rl % 3) * 0.1,
+          baseR: 0.9,
+          isHub: (rl % 4 === 0),
+          isRadialTip: true,
+        };
+        if(tipNode.isHub) tipNode.baseR = 1.5;
+        nodes.push(tipNode);
+        // Origen virtual en el borde del dial
+        var origin = { x: ax, y: ay, color: color, isVirtual: true };
+        edges.push({
+          a: origin, b: tipNode,
+          cp: { x: cpx, y: cpy },
+          color: color,
+          type: 'radial-inner',
+          strength: 0.7,
+        });
+      }
 
       // ── DISTRIBUCIÓN POISSON-DISK: nodos uniformemente esparcidos ──
       // Espaciado mínimo entre nodos: 80px. Algorítmico simple (rejilla
@@ -913,7 +964,7 @@ function _crearDialOverlay(){
           var dx = nb.x - n1.x, dy = nb.y - n1.y;
           var len = Math.hypot(dx, dy) || 1;
           var perpX = -dy / len, perpY = dx / len;
-          var off = ((i + k) % 3 - 1) * 12;
+          var off = ((i + k * 3) % 5 - 2) * 18;  // v5.164: más curvatura, menos poligonal
           var cpx = mx + perpX * off;
           var cpy = my + perpY * off;
           // v5.163: descartar si la curva pasa cerca del dial
@@ -928,6 +979,37 @@ function _crearDialOverlay(){
           added++;
         }
       }
+
+      // ── v5.164: PUENTE entre capa radial y capa orgánica ──
+      // Conectar algunos radial-tips con el nodo Poisson más cercano.
+      // Esto integra las 2 capas — el universo se siente conectado.
+      var radialTips = nodes.filter(function(n){ return n.isRadialTip; });
+      radialTips.forEach(function(tip, idx){
+        // Solo ~50% de los tips conectan al exterior, para no saturar
+        if(idx % 2 !== 0) return;
+        // Buscar nodo Poisson más cercano (no radial-tip)
+        var nearest = null, minD = Infinity;
+        for(var pn = 0; pn < nodes.length; pn++){
+          var cand = nodes[pn];
+          if(cand === tip || cand.isRadialTip) continue;
+          var d = Math.hypot(tip.x - cand.x, tip.y - cand.y);
+          if(d < minD){ minD = d; nearest = cand; }
+        }
+        if(!nearest || minD > 280) return;
+        var mx = (tip.x + nearest.x) / 2;
+        var my = (tip.y + nearest.y) / 2;
+        var dx = nearest.x - tip.x, dy = nearest.y - tip.y;
+        var len = Math.hypot(dx, dy) || 1;
+        var perpX = -dy / len, perpY = dx / len;
+        var off = (idx % 2 === 0 ? 1 : -1) * 18;
+        edges.push({
+          a: tip, b: nearest,
+          cp: { x: mx + perpX * off, y: my + perpY * off },
+          color: tip.color,
+          type: 'bridge',
+          strength: 0.55,
+        });
+      });
 
       // ── FILAMENTOS LARGOS: 4-6 curvas que cruzan la pantalla ──
       // Bézier que va de un borde a otro, pasando lejos del dial.
@@ -1308,10 +1390,13 @@ function _crearDialOverlay(){
     }
 
     function drawEdge(e){
-      // v5.162: tipos nuevos — mesh (nodos cercanos), filament (cruza pantalla)
+      // v5.164: tipos nuevos — radial-inner (capa radial), bridge (puente),
+      // mesh (orgánico), filament (cruza pantalla)
       var alphaHex = '50';
       var lw = 0.8;
-      if(e.type === 'mesh'){ alphaHex = '50'; lw = 0.85; }
+      if(e.type === 'radial-inner'){ alphaHex = '70'; lw = 1.1; }   // capa radial visible
+      else if(e.type === 'bridge'){ alphaHex = '48'; lw = 0.85; }    // puente entre capas
+      else if(e.type === 'mesh'){ alphaHex = '50'; lw = 0.85; }
       else if(e.type === 'filament'){ alphaHex = '40'; lw = 1.1; }
       else if(e.type === 'tangential'){ alphaHex = '55'; lw = 1.0; }
       else if(e.type === 'radial'){ alphaHex = '50'; lw = 0.9; }
