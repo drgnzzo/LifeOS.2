@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.170
+/* RAW Entry — Overlay v.5.171
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -753,6 +753,8 @@ function _crearDialOverlay(){
     var meteors = [];         // v5.169: estrellas fugaces / meteoros
     var dust = [];            // v5.169: polvo cósmico (puntitos pequeños)
     var orbitRings = [];      // v5.169: anillos orbitales sutiles
+    var interMesh = [];       // v5.171: red interestelar (no pasa por el centro)
+    var mandalas = [];        // v5.171: geometría tipo crop circles
     var constellations = [];  // grupos de estrellas conectadas
     var synapses = [];        // conexiones fugaces neuronales
     var pulses = [];
@@ -1079,7 +1081,8 @@ function _crearDialOverlay(){
         var pulse = (Math.sin(ray.lifePhase) + 1) / 2;
         var alpha = 0.30 + pulse * 0.45;
 
-        var rayLen = MAX_R * ray.length;
+        // v5.171: rayLen MÁS ALLÁ de MAX_R para que se pierdan en el horizonte
+        var rayLen = (MAX_R + 200) * ray.length + 150;
         var endX = CX + Math.cos(ray.theta) * rayLen;
         var endY = CY + Math.sin(ray.theta) * rayLen;
         // Control point: curvado perpendicularmente
@@ -1519,6 +1522,232 @@ function _crearDialOverlay(){
     }
 
     // ══════════════════════════════════════════════════════════════════
+    //  v5.171: RED INTERESTELAR (sinapsis que NO pasa por el centro)
+    //  Conexiones efímeras entre estrellas cercanas que descartan
+    //  cualquier traza cuyo midpoint quede dentro del radio del dial.
+    //  Se distingue de las "synapses" en que tienen vida más larga
+    //  y forman cadenas de varias estrellas (no solo 2).
+    // ══════════════════════════════════════════════════════════════════
+    function spawnInterMesh(){
+      if(stars.length < 3) return;
+      // Punto de partida: una estrella activa con posición cacheada
+      var attempts = 0;
+      var start = null;
+      while(attempts < 8 && !start){
+        var cand = stars[Math.floor(Math.random() * stars.length)];
+        if(cand._cachedX) start = cand;
+        attempts++;
+      }
+      if(!start) return;
+
+      // Construir cadena de 3-5 nodos: cada uno conectado al siguiente más cercano
+      var chain = [start];
+      var current = start;
+      var nLinks = 2 + Math.floor(Math.random() * 3); // 2-4 enlaces (3-5 nodos)
+      var used = { };
+      used[stars.indexOf(start)] = true;
+
+      for(var step = 0; step < nLinks; step++){
+        // Buscar vecino cercano que NO pase por el centro
+        var nextNode = null, bestD = Infinity;
+        for(var k = 0; k < stars.length; k++){
+          if(used[k]) continue;
+          var cand2 = stars[k];
+          if(!cand2._cachedX) continue;
+          var d = Math.hypot(current._cachedX - cand2._cachedX, current._cachedY - cand2._cachedY);
+          if(d > 300 || d < 60) continue;
+          // Midpoint de la línea
+          var mx = (current._cachedX + cand2._cachedX) / 2;
+          var my = (current._cachedY + cand2._cachedY) / 2;
+          // Descartar si pasa cerca del dial
+          if(Math.hypot(mx - CX, my - CY) < DIAL_R + 80) continue;
+          if(d < bestD){ bestD = d; nextNode = cand2; }
+        }
+        if(!nextNode) break;
+        chain.push(nextNode);
+        used[stars.indexOf(nextNode)] = true;
+        current = nextNode;
+      }
+      if(chain.length < 2) return;
+
+      interMesh.push({
+        chain: chain,
+        age: 0,
+        lifespan: 3.5 + Math.random() * 3.0,  // vive 3.5-6.5s
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+      });
+    }
+
+    function drawInterMesh(dt){
+      for(var i = interMesh.length - 1; i >= 0; i--){
+        var im = interMesh[i];
+        im.age += dt;
+        if(im.age >= im.lifespan){ interMesh.splice(i, 1); continue; }
+        var frac = im.age / im.lifespan;
+        var alpha;
+        if(frac < 0.20) alpha = frac / 0.20;
+        else if(frac > 0.70) alpha = (1 - frac) / 0.30;
+        else alpha = 1;
+        alpha *= 0.55;
+        // Verificar que todas las estrellas de la cadena siguen activas
+        var allActive = true;
+        for(var k = 0; k < im.chain.length; k++){
+          if(!im.chain[k]._cachedX){ allActive = false; break; }
+        }
+        if(!allActive){ interMesh.splice(i, 1); continue; }
+
+        // Dibujar la cadena: segmentos consecutivos con leve curva
+        pctx.lineCap = 'round';
+        for(var k = 0; k < im.chain.length - 1; k++){
+          var s1 = im.chain[k], s2 = im.chain[k + 1];
+          var mx = (s1._cachedX + s2._cachedX) / 2;
+          var my = (s1._cachedY + s2._cachedY) / 2;
+          var dx = s2._cachedX - s1._cachedX, dy = s2._cachedY - s1._cachedY;
+          var len = Math.hypot(dx, dy) || 1;
+          var perpX = -dy / len, perpY = dx / len;
+          var off = (k % 2 === 0 ? 1 : -1) * 14;
+          var cpx = mx + perpX * off;
+          var cpy = my + perpY * off;
+          pctx.strokeStyle = im.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+          pctx.lineWidth = 0.85;
+          pctx.shadowColor = im.color;
+          pctx.shadowBlur = 4;
+          pctx.beginPath();
+          pctx.moveTo(s1._cachedX, s1._cachedY);
+          pctx.quadraticCurveTo(cpx, cpy, s2._cachedX, s2._cachedY);
+          pctx.stroke();
+        }
+        pctx.shadowBlur = 0;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.171: MANDALAS / CROP CIRCLES
+    //  Geometría con simetría rotacional en zonas alejadas del centro
+    //  Aparecen, giran, se desvanecen. NUNCA en el centro.
+    // ══════════════════════════════════════════════════════════════════
+    function spawnMandala(){
+      // Posición en una de las zonas alejadas del dial
+      var attempt = 0;
+      var px, py;
+      while(attempt < 15){
+        // Punto random en el viewport
+        px = 100 + Math.random() * (W - 200);
+        py = 100 + Math.random() * (H - 200);
+        // Debe estar lejos del dial
+        if(Math.hypot(px - CX, py - CY) > DIAL_R + 200) break;
+        attempt++;
+      }
+      if(attempt >= 15) return;
+
+      var radius = 35 + Math.random() * 50;
+      // Verificar que el mandala completo cabe en el viewport
+      if(px - radius < 20 || px + radius > W - 20) return;
+      if(py - radius < 20 || py + radius > H - 20) return;
+
+      var nPoints = 6 + Math.floor(Math.random() * 5); // 6-10 puntos (simetría rotacional)
+      var pattern = Math.floor(Math.random() * 3);     // 0=flor, 1=estrella, 2=anillos
+
+      mandalas.push({
+        x: px, y: py,
+        radius: radius,
+        nPoints: nPoints,
+        pattern: pattern,
+        rotation: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() < 0.5 ? 1 : -1) * (0.15 + Math.random() * 0.25),
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+        age: 0,
+        lifespan: 6 + Math.random() * 4,
+      });
+    }
+
+    function drawMandalas(dt){
+      for(var i = mandalas.length - 1; i >= 0; i--){
+        var m = mandalas[i];
+        m.age += dt;
+        if(m.age >= m.lifespan){ mandalas.splice(i, 1); continue; }
+        m.rotation += m.rotSpeed * dt;
+        var frac = m.age / m.lifespan;
+        var alpha;
+        if(frac < 0.20) alpha = frac / 0.20;
+        else if(frac > 0.75) alpha = (1 - frac) / 0.25;
+        else alpha = 1;
+        alpha *= 0.42;
+
+        var col = m.color + Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        pctx.strokeStyle = col;
+        pctx.fillStyle = col;
+        pctx.shadowColor = m.color;
+        pctx.shadowBlur = 6;
+        pctx.lineWidth = 0.8;
+
+        if(m.pattern === 0){
+          // Patrón flor: círculos pequeños distribuidos angularmente
+          // + un círculo central
+          pctx.beginPath();
+          pctx.arc(m.x, m.y, m.radius * 0.35, 0, Math.PI * 2);
+          pctx.stroke();
+          for(var k = 0; k < m.nPoints; k++){
+            var ang = m.rotation + (k / m.nPoints) * Math.PI * 2;
+            var cx = m.x + Math.cos(ang) * m.radius * 0.6;
+            var cy = m.y + Math.sin(ang) * m.radius * 0.6;
+            pctx.beginPath();
+            pctx.arc(cx, cy, m.radius * 0.25, 0, Math.PI * 2);
+            pctx.stroke();
+          }
+        } else if(m.pattern === 1){
+          // Patrón estrella: líneas radiales con punto en cada extremo
+          for(var k = 0; k < m.nPoints; k++){
+            var ang = m.rotation + (k / m.nPoints) * Math.PI * 2;
+            var ex = m.x + Math.cos(ang) * m.radius;
+            var ey = m.y + Math.sin(ang) * m.radius;
+            pctx.beginPath();
+            pctx.moveTo(m.x, m.y);
+            pctx.lineTo(ex, ey);
+            pctx.stroke();
+            // Punto en la punta
+            pctx.beginPath();
+            pctx.arc(ex, ey, 1.5, 0, Math.PI * 2);
+            pctx.fill();
+          }
+          // Líneas entre puntos alternos (estrella interna)
+          if(m.nPoints >= 6){
+            pctx.beginPath();
+            for(var k = 0; k < m.nPoints; k++){
+              var ang = m.rotation + (k / m.nPoints) * Math.PI * 2;
+              var nextAng = m.rotation + ((k + 2) % m.nPoints / m.nPoints) * Math.PI * 2;
+              var ax = m.x + Math.cos(ang) * m.radius;
+              var ay = m.y + Math.sin(ang) * m.radius;
+              var bx = m.x + Math.cos(nextAng) * m.radius;
+              var by = m.y + Math.sin(nextAng) * m.radius;
+              pctx.moveTo(ax, ay);
+              pctx.lineTo(bx, by);
+            }
+            pctx.stroke();
+          }
+        } else {
+          // Patrón anillos concéntricos con puntos en ellos
+          for(var ring = 1; ring <= 3; ring++){
+            var rr = m.radius * (ring / 3);
+            pctx.beginPath();
+            pctx.arc(m.x, m.y, rr, 0, Math.PI * 2);
+            pctx.stroke();
+            // Puntos sobre el anillo
+            for(var k = 0; k < m.nPoints; k++){
+              var ang = m.rotation * (ring % 2 === 0 ? 1 : -1) + (k / m.nPoints) * Math.PI * 2;
+              var px2 = m.x + Math.cos(ang) * rr;
+              var py2 = m.y + Math.sin(ang) * rr;
+              pctx.beginPath();
+              pctx.arc(px2, py2, 1.2, 0, Math.PI * 2);
+              pctx.fill();
+            }
+          }
+        }
+        pctx.shadowBlur = 0;
+      }
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     //  FRAME PRINCIPAL
     // ══════════════════════════════════════════════════════════════════
     function frame(t){
@@ -1554,6 +1783,12 @@ function _crearDialOverlay(){
       // 8) Sinapsis
       drawSynapses(dt);
 
+      // 8b) v5.171: Red interestelar (cadenas que no pasan por el centro)
+      drawInterMesh(dt);
+
+      // 8c) v5.171: Mandalas / crop circles geométricos
+      drawMandalas(dt);
+
       // 9) Constelaciones
       drawConstellations(dt);
 
@@ -1570,7 +1805,76 @@ function _crearDialOverlay(){
         if(p.t > 1 + p.tailT){ pulses.splice(pi, 1); continue; }
         if(p.t > 1) p.life = Math.max(0, 1 - (p.t - 1) / p.tailT);
       }
+      // v5.171: HALOS DE INTERACCIÓN — cada card visible emite un halo
+      // tenue al canvas. Las partículas/estrellas que pasan cerca quedan
+      // "iluminadas" porque el halo se acumula con el additive blending.
+      try {
+        if(window._hudPanels){
+          pctx.save();
+          pctx.globalCompositeOperation = 'lighter';
+          for(var hp = 0; hp < window._hudPanels.length; hp++){
+            var card = window._hudPanels[hp].el;
+            if(!card || !card.offsetParent) continue;
+            var rect = card.getBoundingClientRect();
+            if(rect.width < 10 || rect.height < 10) continue;
+            // Solo cards visibles
+            if(rect.bottom < 0 || rect.top > H) continue;
+            if(rect.right < 0 || rect.left > W) continue;
+            var cx = rect.left + rect.width / 2;
+            var cy = rect.top + rect.height / 2;
+            var radius = Math.max(rect.width, rect.height) * 0.7;
+            // Color: usar el accent de la card si está, sino violeta default
+            var hue = card.style.getPropertyValue('--ac') || '#A78BFA';
+            // Hex hue → simple RGB
+            if(hue.charAt(0) !== '#'){ hue = '#A78BFA'; }
+            // Glow modulado por el tiempo global (pulsa lento)
+            var glowPulse = 0.55 + 0.45 * Math.sin(globalT * 0.7 + hp * 0.5);
+            var alpha = 0.04 + glowPulse * 0.04;
+            var halo = pctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+            halo.addColorStop(0, hue + Math.floor(alpha * 255).toString(16).padStart(2, '0'));
+            halo.addColorStop(0.6, hue + '08');
+            halo.addColorStop(1, hue + '00');
+            pctx.fillStyle = halo;
+            pctx.fillRect(cx - radius, cy - radius, radius * 2, radius * 2);
+          }
+          pctx.restore();
+        }
+      } catch(e){}
+
       drawPulses();
+
+      // v5.171: Vignette suave en los bordes — todo se desvanece al
+      // acercarse a los límites del viewport, así nada termina "cortado"
+      var vignetteMargin = 80;
+      var grad = pctx.createLinearGradient(0, 0, 0, H);
+      // Compose using two passes: usar globalCompositeOperation 'destination-out'
+      pctx.save();
+      pctx.globalCompositeOperation = 'destination-out';
+      // Top fade
+      var topGrad = pctx.createLinearGradient(0, 0, 0, vignetteMargin);
+      topGrad.addColorStop(0, 'rgba(0,0,0,1)');
+      topGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      pctx.fillStyle = topGrad;
+      pctx.fillRect(0, 0, W, vignetteMargin);
+      // Bottom fade
+      var botGrad = pctx.createLinearGradient(0, H - vignetteMargin, 0, H);
+      botGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      botGrad.addColorStop(1, 'rgba(0,0,0,1)');
+      pctx.fillStyle = botGrad;
+      pctx.fillRect(0, H - vignetteMargin, W, vignetteMargin);
+      // Left fade
+      var leftGrad = pctx.createLinearGradient(0, 0, vignetteMargin, 0);
+      leftGrad.addColorStop(0, 'rgba(0,0,0,1)');
+      leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      pctx.fillStyle = leftGrad;
+      pctx.fillRect(0, 0, vignetteMargin, H);
+      // Right fade
+      var rightGrad = pctx.createLinearGradient(W - vignetteMargin, 0, W, 0);
+      rightGrad.addColorStop(0, 'rgba(0,0,0,0)');
+      rightGrad.addColorStop(1, 'rgba(0,0,0,1)');
+      pctx.fillStyle = rightGrad;
+      pctx.fillRect(W - vignetteMargin, 0, vignetteMargin, H);
+      pctx.restore();
 
       // Spawns periódicos
       if(synapses.length < 7 && Math.random() < 0.12) spawnSynapse();
@@ -1578,6 +1882,9 @@ function _crearDialOverlay(){
       if(vortices.length < 3 && Math.random() < 0.012) spawnVortex();
       if(lorenzTrails.length < 2 && Math.random() < 0.006) spawnLorenz();
       if(meteors.length < 3 && Math.random() < 0.015) spawnMeteor();
+      // v5.171: Red interestelar y mandalas
+      if(interMesh.length < 4 && Math.random() < 0.025) spawnInterMesh();
+      if(mandalas.length < 3 && Math.random() < 0.008) spawnMandala();
 
       animId = requestAnimationFrame(frame);
     }
@@ -1596,6 +1903,8 @@ function _crearDialOverlay(){
       vortices = [];
       lorenzTrails = [];
       meteors = [];         // v5.169
+      interMesh = [];       // v5.171
+      mandalas = [];        // v5.171
       globalT = 0;
       galaxyRotation = 0;
       // Pre-spawn algunas cosas
@@ -4288,24 +4597,29 @@ function _crearDialOverlay(){
       return;
     }
 
-    // v5.147: el panel CRECE para mostrar todo su contenido sin scroll interno.
-    // Limitamos solo al viewport (vh - margen) para no salirse de pantalla.
-    var maxH = window.innerHeight - 80; // margen para barra superior + bottom
+    // v5.171: el panel CRECE para mostrar todo su contenido pero reserva
+    // espacio inferior para que NO tape el mini-dial / botón regresar.
+    // El mini-dial vive en la zona inferior del viewport (~120-140px de margen).
+    var maxH = window.innerHeight - 180; // antes 80 — más margen para mini-dial
     contentNaturalH = Math.max(280, contentNaturalH);
     var finalH = Math.min(contentNaturalH, maxH);
 
-    // Centrar el panel verticalmente respecto a la zona disponible si cabe ahí,
-    // o subirlo hasta ~40px del top si necesita más espacio que zonaH.
+    // v5.171: el bottom del panel NO debe sobrepasar (innerHeight - 140)
+    // para dejar al mini-dial visible. Ajustamos finalY garantizando esto.
+    var minTopMargin = 80;
+    var maxBottomY = window.innerHeight - 140;
     var finalY;
     if(contentNaturalH <= zonaH){
-      // Cabe en la zona normal: centrar dentro
       finalY = zonaY + Math.max(0, Math.round((zonaH - finalH)/2));
     } else {
-      // Necesita más alto: subir y dejar margen mínimo del top
-      finalY = Math.max(80, zonaY - Math.round((finalH - zonaH)/2));
-      // Si aún se sale por abajo, ajustar
-      if(finalY + finalH > window.innerHeight - 20){
-        finalY = Math.max(80, window.innerHeight - 20 - finalH);
+      finalY = Math.max(minTopMargin, zonaY - Math.round((finalH - zonaH)/2));
+    }
+    // Hard cap: si el bottom del panel sobrepasa maxBottomY, subirlo
+    if(finalY + finalH > maxBottomY){
+      finalY = Math.max(minTopMargin, maxBottomY - finalH);
+      // Si aún no cabe, reducir el alto
+      if(finalY + finalH > maxBottomY){
+        finalH = maxBottomY - finalY;
       }
     }
 
