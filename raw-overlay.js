@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.154
+/* RAW Entry — Overlay v.5.155
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -808,13 +808,13 @@ function _crearDialOverlay(){
           var node = {
             x: x, y: y,
             angle: angle,
+            baseAngle: angle, // v5.155: ángulo de equilibrio para decay de vórtices
             ringR: rd.r,
             ringIdx: rd.ringIdx,
             color: rd.color,
             phase: Math.random() * Math.PI * 2,
             speed: 0.5 + Math.random() * 0.7,
             baseR: 0.9 + Math.random() * 1.0,
-            // Algunos nodos son "hubs": más grandes y brillantes
             isHub: Math.random() < 0.18,
           };
           if(node.isHub){
@@ -958,59 +958,95 @@ function _crearDialOverlay(){
 
       // 2 trayectorias caóticas (Lorenz attractor proyectado a 2D)
       for(var c = 0; c < 2; c++){
-        chaosTrajectories.push({
-          x: (Math.random() - 0.5) * 4,
-          y: (Math.random() - 0.5) * 4,
-          z: 5 + Math.random() * 10,
-          history: [],
-          color: c === 0 ? '#4ADE80' : '#C4B5FD',
-          scale: 12 + Math.random() * 6,
-          centerX: CX + (Math.random() - 0.5) * (W * 0.3),
-          centerY: CY + (Math.random() - 0.5) * (H * 0.3),
-          // Parámetros del sistema de Lorenz (clásicos)
-          sigma: 10, rho: 28, beta: 8/3,
-        });
+        chaosTrajectories.push(makeLorenzTraj(c));
       }
     }
 
+    function makeLorenzTraj(idx){
+      // v5.155: respawn en zona con menor densidad de pulsos activos
+      var cx = CX, cy = CY;
+      if(pulses && pulses.length > 0){
+        // Probar 6 candidatos aleatorios, elegir el más alejado del pulso más cercano
+        var best = null, bestDist = -1;
+        for(var k = 0; k < 6; k++){
+          var tx = CX + (Math.random() - 0.5) * (W * 0.7);
+          var ty = CY + (Math.random() - 0.5) * (H * 0.7);
+          // Distancia al pulso más cercano
+          var minD = Infinity;
+          for(var pi = 0; pi < pulses.length; pi++){
+            var pp = pulses[pi];
+            var pt = bezierPoint(pp.edge.a, pp.edge.cp, pp.edge.b, pp.t);
+            var d = Math.hypot(tx - pt.x, ty - pt.y);
+            if(d < minD) minD = d;
+          }
+          if(minD > bestDist){ bestDist = minD; best = { x: tx, y: ty }; }
+        }
+        if(best){ cx = best.x; cy = best.y; }
+      } else {
+        cx = CX + (Math.random() - 0.5) * (W * 0.5);
+        cy = CY + (Math.random() - 0.5) * (H * 0.5);
+      }
+      return {
+        x: (Math.random() - 0.5) * 4,
+        y: (Math.random() - 0.5) * 4,
+        z: 5 + Math.random() * 10,
+        history: [],
+        color: (idx === 0 || (typeof idx === 'undefined' && Math.random() < 0.5)) ? '#4ADE80' : '#C4B5FD',
+        scale: 12 + Math.random() * 6,
+        centerX: cx,
+        centerY: cy,
+        sigma: 10, rho: 28, beta: 8/3,
+        // v5.155: vida útil — fade in/out y luego respawn
+        age: 0,
+        maxAge: 7 + Math.random() * 5, // 7-12 segundos
+      };
+    }
+
     function stepLorenz(traj, dt){
+      // v5.155: avanzar edad, marcar para respawn si excede vida útil
+      traj.age += dt;
+      if(traj.age >= traj.maxAge){
+        // Reemplazar con nueva trayectoria en zona despejada
+        var idx = chaosTrajectories.indexOf(traj);
+        if(idx >= 0) chaosTrajectories[idx] = makeLorenzTraj(idx);
+        return;
+      }
       // Sistema clásico de Lorenz:
-      // dx/dt = σ(y − x)
-      // dy/dt = x(ρ − z) − y
-      // dz/dt = xy − βz
-      var step = dt * 0.4; // factor de tiempo (más bajo = más lento/suave)
+      var step = dt * 0.4;
       var dx = traj.sigma * (traj.y - traj.x);
       var dy = traj.x * (traj.rho - traj.z) - traj.y;
       var dz = traj.x * traj.y - traj.beta * traj.z;
       traj.x += dx * step;
       traj.y += dy * step;
       traj.z += dz * step;
-      // Proyección a 2D: usar (x, z) como coords, escalar y centrar
       var px = traj.centerX + traj.x * traj.scale * 0.5;
       var py = traj.centerY + (traj.z - traj.rho) * traj.scale * 0.5;
-      // Mantener dentro del viewport (loop suave)
+      // Si se sale del viewport: respawn inmediato
       if(px < 0 || px > W || py < 0 || py > H){
-        // Reset si se salió
-        traj.x = (Math.random() - 0.5) * 4;
-        traj.y = (Math.random() - 0.5) * 4;
-        traj.z = 5 + Math.random() * 10;
-        traj.history = [];
-        traj.centerX = CX + (Math.random() - 0.5) * (W * 0.3);
-        traj.centerY = CY + (Math.random() - 0.5) * (H * 0.3);
+        var idx2 = chaosTrajectories.indexOf(traj);
+        if(idx2 >= 0) chaosTrajectories[idx2] = makeLorenzTraj(idx2);
         return;
       }
       traj.history.push({ x: px, y: py });
-      if(traj.history.length > 80) traj.history.shift();
+      // v5.155: trail más corto (50 puntos) y descarte progresivo
+      if(traj.history.length > 50) traj.history.shift();
     }
 
     function drawChaosTrajectories(){
       chaosTrajectories.forEach(function(traj){
         if(traj.history.length < 2) return;
+        // v5.155: fade-in al spawn, fade-out cerca del fin de vida
+        var lifeFrac = traj.age / traj.maxAge;
+        var globalAlpha = 1;
+        if(lifeFrac < 0.15) globalAlpha = lifeFrac / 0.15;           // fade-in
+        else if(lifeFrac > 0.75) globalAlpha = (1 - lifeFrac) / 0.25; // fade-out
+        globalAlpha = Math.max(0, Math.min(1, globalAlpha));
+        if(globalAlpha < 0.02) return;
+
         pctx.lineCap = 'round';
         pctx.lineJoin = 'round';
-        // Trazo con gradiente de alpha (cola desvanecida)
         for(var i = 1; i < traj.history.length; i++){
-          var a = (i / traj.history.length) * 0.55;
+          var a = (i / traj.history.length) * 0.55 * globalAlpha;
           pctx.strokeStyle = traj.color + Math.floor(a * 200).toString(16).padStart(2, '0');
           pctx.lineWidth = 0.9 * (i / traj.history.length) + 0.3;
           pctx.beginPath();
@@ -1018,25 +1054,31 @@ function _crearDialOverlay(){
           pctx.lineTo(traj.history[i].x, traj.history[i].y);
           pctx.stroke();
         }
-        // Cabeza brillante
         var head = traj.history[traj.history.length - 1];
         pctx.fillStyle = traj.color;
         pctx.shadowColor = traj.color;
-        pctx.shadowBlur = 8;
+        pctx.shadowBlur = 8 * globalAlpha;
         pctx.beginPath();
-        pctx.arc(head.x, head.y, 1.5, 0, Math.PI * 2);
+        pctx.arc(head.x, head.y, 1.5 * globalAlpha, 0, Math.PI * 2);
         pctx.fill();
         pctx.shadowBlur = 0;
       });
     }
 
     function drawSpirals(t){
-      spirals.forEach(function(sp){
-        sp.rotation += sp.rotSpeed * 0.016; // suave avance
+      spirals.forEach(function(sp, idx){
+        sp.rotation += sp.rotSpeed * 0.016;
+        // v5.155: pulsación de visibilidad — cada espiral late con periodo distinto.
+        // Pasa de casi invisible a ligeramente visible y de regreso.
+        if(sp.lifePhase === undefined) sp.lifePhase = idx * Math.PI;
+        sp.lifePhase += 0.006; // periodo ~17 seg
+        var pulse = (Math.sin(sp.lifePhase) + 1) / 2; // 0..1
+        var alpha = pulse * 0.18; // máximo 0.18 (antes era 0.14 constante)
+        if(alpha < 0.02) return;
+
         pctx.beginPath();
         var maxR = Math.hypot(W/2, H/2);
         var prev = null;
-        // r = a·e^(b·θ), θ desde 0 hasta turns·2π
         var steps = 220;
         var thetaMax = sp.turns * Math.PI * 2;
         for(var i = 0; i <= steps; i++){
@@ -1050,31 +1092,45 @@ function _crearDialOverlay(){
           else pctx.lineTo(x, y);
           prev = { x: x, y: y };
         }
-        // Stroke con alpha bajo (espiral siempre presente, sutil)
-        pctx.strokeStyle = sp.color + '24';
+        var alphaHex = Math.floor(alpha * 255).toString(16).padStart(2, '0');
+        pctx.strokeStyle = sp.color + alphaHex;
         pctx.lineWidth = 0.8;
         pctx.stroke();
       });
     }
 
     function applyVortexDeflection(){
-      // Los nodos cercanos a un vórtice reciben una rotación local extra.
-      // (No reescribimos posiciones permanentemente; aplicamos offset visual)
-      // Por simplicidad: agregar a n.angle un delta proporcional a 1/dist
+      // v5.155: la deflexión se REINICIA cada vez (no acumula permanentemente).
+      // Cada nodo tiene un baseAngle. Los vórtices crean un offset temporal.
+      // Cuando se aleja del vórtice o este "se mueve", el nodo se relaja a baseAngle.
       vortices.forEach(function(vx){
         vx.phase += 0.015;
+      });
+      // Decay: cada nodo vuelve poco a poco a su baseAngle
+      nodes.forEach(function(n){
+        if(n.baseAngle === undefined) n.baseAngle = n.angle;
+        // Pull suave hacia baseAngle (más fuerte si está muy desviado)
+        var deviation = n.angle - n.baseAngle;
+        // Normalizar a [-π, π]
+        while(deviation > Math.PI) deviation -= Math.PI * 2;
+        while(deviation < -Math.PI) deviation += Math.PI * 2;
+        n.angle -= deviation * 0.008; // pull lento
+      });
+      // Aplicar influencia activa de cada vórtice
+      vortices.forEach(function(vx){
         nodes.forEach(function(n){
           if(n === vx.hub) return;
           var dx = n.x - vx.hub.x, dy = n.y - vx.hub.y;
           var d = Math.hypot(dx, dy);
           if(d > vx.radius || d < 5) return;
-          // Influencia inversa a la distancia
-          var influence = (1 - d / vx.radius) * vx.strength * 0.0015;
+          var influence = (1 - d / vx.radius) * vx.strength * 0.0008; // más sutil
           n.angle += influence;
-          // Recalcular posición con el ángulo actualizado
-          n.x = CX + Math.cos(n.angle) * n.ringR;
-          n.y = CY + Math.sin(n.angle) * n.ringR;
         });
+      });
+      // Recalcular posiciones
+      nodes.forEach(function(n){
+        n.x = CX + Math.cos(n.angle) * n.ringR;
+        n.y = CY + Math.sin(n.angle) * n.ringR;
       });
     }
 
@@ -1102,18 +1158,35 @@ function _crearDialOverlay(){
       };
     }
 
-    // Spawn pulso por una edge (preferencia: roots y tangenciales)
+    // Spawn pulso por una edge. v5.155: detecta zonas vacías —
+    // de varios candidatos elige el que esté más lejos de pulsos existentes.
     function spawnPulse(){
       if(!edges.length) return;
-      // Sesgo: 40% roots, 35% tangenciales, 25% radiales
-      var pool = [];
       var r = Math.random();
+      var pool = [];
       if(r < 0.40) pool = edges.filter(function(e){ return e.type === 'root'; });
       else if(r < 0.75) pool = edges.filter(function(e){ return e.type === 'tangential'; });
       else pool = edges.filter(function(e){ return e.type === 'radial'; });
       if(!pool.length) pool = edges;
-      var edge = pool[Math.floor(Math.random() * pool.length)];
-      // Dirección: roots siempre forward (del dial hacia afuera)
+
+      // Elegir entre 4 candidatos el más alejado de pulsos activos
+      var bestEdge = null, bestScore = -1;
+      var nCand = Math.min(4, pool.length);
+      for(var k = 0; k < nCand; k++){
+        var cand = pool[Math.floor(Math.random() * pool.length)];
+        // Punto medio de la edge candidata
+        var mid = bezierPoint(cand.a, cand.cp, cand.b, 0.5);
+        // Distancia mínima al pulso activo más cercano
+        var minD = Infinity;
+        for(var pi = 0; pi < pulses.length; pi++){
+          var pp = pulses[pi];
+          var pt = bezierPoint(pp.edge.a, pp.edge.cp, pp.edge.b, pp.t);
+          var dd = Math.hypot(mid.x - pt.x, mid.y - pt.y);
+          if(dd < minD) minD = dd;
+        }
+        if(minD > bestScore){ bestScore = minD; bestEdge = cand; }
+      }
+      var edge = bestEdge || pool[0];
       var forward = edge.type === 'root' ? (Math.random() < 0.85) : (Math.random() < 0.5);
       pulses.push({
         edge: edge,
@@ -1195,11 +1268,12 @@ function _crearDialOverlay(){
       //    (galaxia que rota muy despacio)
       for(var ni = 0; ni < nodes.length; ni++){
         var n = nodes[ni];
-        // Dirección: anillos pares en sentido horario, impares antihorario
         var dir = n.ringIdx % 2 === 0 ? 1 : -1;
-        // Velocidad angular MUY lenta (anillos interiores más rápidos)
         var angVel = dir * 0.02 / (1 + n.ringIdx * 0.4);
+        // v5.155: rotar tanto angle como baseAngle para que el decay
+        // de vórtices apunte siempre a la posición orbital actual
         n.angle += angVel * dt;
+        n.baseAngle = (n.baseAngle || n.angle) + angVel * dt;
         n.x = CX + Math.cos(n.angle) * n.ringR;
         n.y = CY + Math.sin(n.angle) * n.ringR;
 
