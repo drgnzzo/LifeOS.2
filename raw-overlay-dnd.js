@@ -1,19 +1,14 @@
-/* RAW Entry — Overlay Drag & Drop v.5.193
+/* RAW Entry — Overlay Drag & Drop v.5.195
 
-   ── FIX v5.193: "el layout se desconfigura al soltar un panel" ──
-   CAUSA RAÍZ (definitiva): al soltar, onUp actualizaba bien _side/_order
-   en memoria, pero limpiaba SOLO el transform del panel antes de llamar
-   _reposicionarHUD. El panel movido conservaba el width/height inline de
-   su columna ANTERIOR. _reposicionarHUD mide scrollHeight para apilar los
-   paneles → con un width equivocado, la altura medida salía mal → toda la
-   columna se apilaba con posiciones incorrectas. Recargar lo "arreglaba"
-   porque restoreLayout + _reposicionarHUD corrían en frío, sin estilos
-   residuales.
-   FIX: en onUp, antes de reposicionar, se limpian TODAS las dimensiones
-   inline del panel movido (transform, width, height, maxHeight, overflowY,
-   left, top). Además _reposicionarHUD se invoca en el requestAnimationFrame
-   siguiente — no de forma síncrona — para que el navegador aplique primero
-   la limpieza de estilos y las alturas se midan reales.
+   ── FIX v5.195: "el layout se desconfigura al soltar un panel" ──
+   El fix de fondo va en raw-overlay.js (_reposicionarHUD limpia
+   transforms residuales antes de medir). Aqui, en onUp:
+   - Se limpian TODAS las dimensiones inline del panel movido
+     (transform, width, height, maxHeight, overflowY, left, top)
+     para que _reposicionarHUD lo mida desde cero.
+   - Se revirtio el requestAnimationFrame de v5.193: _reposicionarHUD
+     se llama de forma SINCRONA. Ya fuerza reflow internamente al leer
+     scrollHeight, y el rAF dejaba una ventana visible de layout roto.
 
    ── Heredado v5.142 ──
    FIX BUG "layout se rompe al soltar una card". Causa raíz: 3 bugs
@@ -472,14 +467,12 @@
 
       clearGhostSlots();
 
-      // ─── FIX v5.193: causa raíz del "layout se desconfigura al soltar" ───
+      // ─── FIX v5.193+v5.195: "layout se desconfigura al soltar" ───
       // _reposicionarHUD mide scrollHeight de cada panel para apilarlos. Si
-      // el panel arrastrado conserva el transform Y el width/height de su
-      // columna ANTERIOR, se mide con un ancho equivocado → su alto sale mal
-      // → toda la columna se apila con posiciones incorrectas.
-      // Solución: limpiar transform + TODAS las dimensiones inline del panel
-      // movido, para que _reposicionarHUD lo mida desde cero con el ancho de
-      // su columna nueva. positionCol reasigna width/left/top después.
+      // el panel arrastrado conserva transform o el width/height de su
+      // columna ANTERIOR, se mide mal → toda la columna se apila mal.
+      // Limpiar TODAS las dimensiones inline del panel movido para que
+      // _reposicionarHUD lo mida desde cero. positionCol reasigna después.
       panelEl.style.transform = '';
       panelEl.style.width     = '';
       panelEl.style.height    = '';
@@ -488,15 +481,13 @@
       panelEl.style.left      = '';
       panelEl.style.top       = '';
 
-      // Reposicionar en el SIGUIENTE frame: así el navegador aplica primero
-      // la limpieza de estilos de arriba y _reposicionarHUD mide alturas
-      // reales y correctas. Llamarlo de forma síncrona aquí mediría el panel
-      // a mitad de transición.
+      // v5.195: reposicionar de forma SÍNCRONA. _reposicionarHUD ya fuerza
+      // reflow internamente al leer scrollHeight, así que no hace falta
+      // esperar un frame; hacerlo asíncrono dejaba una ventana donde el
+      // layout se veía roto. Llamada directa = aterrizaje inmediato.
+      if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
       saveLayout();
-      requestAnimationFrame(function(){
-        if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
-        requestAnimationFrame(function(){ buildGhostSlots(); });
-      });
+      buildGhostSlots();
 
       _state.dragEl = null;
       _state.dragSide = null;

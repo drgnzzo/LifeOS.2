@@ -1,4 +1,17 @@
-/* RAW Entry — Overlay v.5.193
+/* RAW Entry — Overlay v.5.195
+   FIX (de fondo) "layout se desconfigura al soltar un panel".
+
+   ── Cambio v5.195 ──
+   _reposicionarHUD ahora limpia el transform residual de TODOS los
+   paneles al inicio de la rama normal, ANTES de medir alturas. Un
+   transform activo (animacion previa o drag recien terminado)
+   contaminaba la medicion de scrollHeight → topMaxH se disparaba →
+   colTopY enorme → las columnas laterales se apilaban hasta el fondo
+   (sintoma: "movi una card y todas se bajaron"). La rama de regreso
+   de expandido ya limpiaba transforms; la rama normal no — ese era
+   el hueco real. v5.193/5.194 atacaron un sintoma, no la causa.
+
+   ── Heredado v5.193 ──
    REDISEÑO card expandida de FIJOS (mockup).
 
    ── Cambio v5.193 ──
@@ -3385,6 +3398,23 @@ function _crearDialOverlay(){
 
     function getTop(side){
       return window._hudPanels.filter(function(hp){ return hp.el._side===side; });
+    }
+
+    // ─── FIX v5.195: blindaje contra "layout roto al soltar un panel" ───
+    // Antes de cualquier medición de scrollHeight/offsetHeight, limpiar el
+    // transform residual de TODOS los paneles. Un transform activo (de una
+    // animación previa o de un drag recién terminado) hace que las alturas
+    // se midan inconsistentes → topMaxH se contamina → colTopY se dispara
+    // → las columnas laterales se apilan hasta el fondo. La rama de regreso
+    // de expandido ya limpiaba esto; la rama normal no, y ese era el hueco.
+    // No tocar paneles en cascada de entrada (_animatingEntry) ni el panel
+    // expandido (no aplica en rama normal, pero por seguridad).
+    if(!window._hudExpanded){
+      window._hudPanels.forEach(function(hp){
+        if(hp.el && !hp.el._animatingEntry){
+          hp.el.style.transform = '';
+        }
+      });
     }
 
     var expandedEl = window._hudExpanded;
