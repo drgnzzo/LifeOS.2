@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.181
+/* RAW Entry — Overlay v.5.184
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1081,89 +1081,132 @@ function _crearDialOverlay(){
     //  horizonte de eventos). Queda detrás del dial.
     // ══════════════════════════════════════════════════════════════════
     var warpParticles = [];
+    // v5.184: ciclo cósmico — contracción (big crunch) ↔ expansión (big bang)
+    var cosmicPhase = 0;            // 0..1 dentro del ciclo
+    var cosmicMode = 'crunch';      // 'crunch' (cae al centro) o 'bang' (sale)
+    var cosmicCycleTime = 0;
 
     function buildWarp(){
       warpParticles = [];
-      var nWarp = 90;
+      // El warp ahora abarca TODA la interfaz — partículas distribuidas
+      // por todo el viewport, no solo cerca del dial.
+      var nWarp = 220;
+      var diag = Math.hypot(W/2, H/2);
       for(var i = 0; i < nWarp; i++){
-        warpParticles.push(spawnWarpParticle());
+        warpParticles.push(spawnWarpParticle(diag));
       }
     }
 
-    function spawnWarpParticle(){
-      // Nace en un radio exterior y espirala hacia el centro
-      var rOuter = DIAL_R * (1.4 + Math.random() * 1.3);
+    function spawnWarpParticle(diag){
+      if(diag === undefined) diag = Math.hypot(W/2, H/2);
+      // Radio distribuido por TODA la pantalla (desde cerca del centro
+      // hasta más allá de las esquinas). Distribución uniforme en área.
+      var minR = 30;
+      var maxR = diag + 60;
+      // sqrt para densidad uniforme por área
+      var r = minR + (maxR - minR) * Math.sqrt(Math.random());
       return {
-        r: rOuter,
+        r: r,
         theta: Math.random() * Math.PI * 2,
-        rStart: rOuter,
-        // El "warp" hace que el toroide tenga inclinación: comprimimos en Y
-        // para simular la perspectiva de un disco visto en ángulo
+        rHome: r,                       // radio "de reposo" — punto de equilibrio
         color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
-        size: 0.5 + Math.random() * 1.3,
+        size: 0.4 + Math.random() * 1.4,
         phase: Math.random() * Math.PI * 2,
       };
     }
 
     function drawWarp(dt){
-      // Radio del horizonte de eventos: justo dentro del dial
-      var eventHorizon = DIAL_R * 0.45;
+      var diag = Math.hypot(W/2, H/2);
+      var eventHorizon = DIAL_R * 0.40;
+
+      // ── CICLO CÓSMICO: big crunch ↔ big bang ──
+      // Periodo total ~24s: 12s contrayéndose, 12s expandiéndose.
+      cosmicCycleTime += dt;
+      var CYCLE = 24;
+      var halfCycle = CYCLE / 2;
+      var tInCycle = cosmicCycleTime % CYCLE;
+      // cosmicForce: -1 = contracción máxima (hacia el centro)
+      //              +1 = expansión máxima (hacia afuera)
+      // Transición suave con seno para que no haya cambios bruscos.
+      var cosmicForce = Math.sin((tInCycle / CYCLE) * Math.PI * 2);
+      // cosmicForce > 0 → primera mitad: contracción
+      //               < 0 → segunda mitad: expansión
+      // (usamos -cosmicForce para que arranque contrayéndose)
+      var force = -cosmicForce;
+
       for(var i = 0; i < warpParticles.length; i++){
         var w = warpParticles[i];
-        // Velocidad angular: acelera cuanto más cerca del centro (kepleriana extrema)
-        var angVel = 0.35 / Math.sqrt(Math.max(20, w.r)) * 3.0;
+
+        // ── ROTACIÓN KEPLERIANA: más rápido cerca del centro ──
+        // ω = K / r^1.5 (tercera ley de Kepler: T² ∝ r³ → ω ∝ r^-1.5)
+        // Reducimos el factor cerca del centro para que sea "más lento en el warp"
+        var safeR = Math.max(eventHorizon, w.r);
+        var angVel = (90 / Math.pow(safeR, 1.05)) * 0.5;  // v5.184: más lento
         w.theta += angVel * dt;
-        // Caída radial: acelera hacia el centro
-        var fallSpeed = 14 + (1 - w.r / w.rStart) * 60;
-        w.r -= fallSpeed * dt;
-        w.phase += dt * 2;
-        // Si cruzó el horizonte de eventos → renace afuera
-        if(w.r <= eventHorizon){
-          warpParticles[i] = spawnWarpParticle();
-          continue;
+        w.phase += dt * 1.5;
+
+        // ── MOVIMIENTO RADIAL: ciclo contracción/expansión ──
+        // La fuerza cósmica empuja hacia el centro (force>0) o hacia afuera (force<0).
+        // Cuanto más lejos del centro, más "sienten" la expansión;
+        // cuanto más cerca, más "sienten" la contracción (gravedad).
+        var gravityPull = 30 * (1 - Math.min(1, w.r / diag)); // fuerte cerca del centro
+        var expansionPush = 45 * (w.r / diag);                 // fuerte lejos del centro
+        // Velocidad radial según la fase del ciclo
+        var radialVel;
+        if(force > 0){
+          // Contracción: cae hacia el centro, acelera cerca (gravedad)
+          radialVel = -(gravityPull + 20) * force;
+        } else {
+          // Expansión: sale hacia afuera, acelera lejos
+          radialVel = (expansionPush + 20) * (-force);
         }
-        // Posición con compresión toroidal en Y (disco inclinado ~60°)
-        var tilt = 0.42;  // factor de compresión vertical
+        w.r += radialVel * dt;
+
+        // Límites: si cruza el horizonte, reaparece en el borde;
+        // si se va más allá del borde, reaparece cerca del centro.
+        if(w.r <= eventHorizon){
+          w.r = eventHorizon + 2;
+        } else if(w.r > diag + 80){
+          w.r = diag + 80;
+        }
+
+        // ── RENDER ──
         var px = CX + Math.cos(w.theta) * w.r;
-        var py = CY + Math.sin(w.theta) * w.r * tilt;
-        // Alpha: más brillante cuanto más cerca del centro (calentamiento)
-        var proximity = 1 - (w.r - eventHorizon) / (w.rStart - eventHorizon);
-        proximity = Math.max(0, Math.min(1, proximity));
+        var py = CY + Math.sin(w.theta) * w.r;
+        // proximity: 1 en el centro, 0 en el borde
+        var proximity = 1 - Math.min(1, w.r / diag);
         var twinkle = 0.6 + 0.4 * Math.sin(w.phase);
-        var alpha = (0.25 + proximity * 0.6) * twinkle;
-        // Tamaño: las partículas se estiran al caer (efecto spaghettification leve)
-        var radius = w.size * (0.7 + proximity * 1.0);
-        // Color shift: hacia el blanco-azul al acercarse (blueshift)
-        var col = proximity > 0.7 ? '#E0F2FE' : w.color;
-        pctx.fillStyle = col + Math.floor(alpha * 220).toString(16).padStart(2, '0');
+        // Brillo: más en el centro (calentamiento) y modulado por el ciclo
+        var cycleGlow = 0.7 + 0.3 * Math.abs(cosmicForce);
+        var alpha = (0.20 + proximity * 0.55) * twinkle * cycleGlow;
+        var radius = w.size * (0.7 + proximity * 0.9);
+        // Blueshift cerca del centro
+        var col = proximity > 0.72 ? '#E0F2FE' : w.color;
+        pctx.fillStyle = col + Math.floor(Math.max(0, Math.min(1, alpha)) * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = col;
-        pctx.shadowBlur = 3 + proximity * 12;
+        pctx.shadowBlur = 2 + proximity * 12;
         pctx.beginPath();
         pctx.arc(px, py, radius, 0, Math.PI * 2);
         pctx.fill();
       }
       pctx.shadowBlur = 0;
 
-      // Anillo de luz del horizonte de eventos (photon ring)
-      var ringPulse = 0.6 + 0.4 * Math.sin(globalT * 1.5);
+      // ── PHOTON RING (horizonte de eventos) ──
+      // Pulsa más fuerte en el momento de máxima contracción
+      var crunchIntensity = Math.max(0, force); // 0..1, máximo en el crunch
+      var ringPulse = 0.5 + 0.5 * Math.sin(globalT * 1.5) + crunchIntensity * 0.4;
       var photonGrad = pctx.createRadialGradient(
-        CX, CY, eventHorizon * 0.6,
-        CX, CY, eventHorizon * 1.6
+        CX, CY, eventHorizon * 0.5,
+        CX, CY, eventHorizon * 2.0
       );
       photonGrad.addColorStop(0, 'rgba(224,242,254,0)');
-      photonGrad.addColorStop(0.6, 'rgba(167,139,250,' + (0.10 * ringPulse) + ')');
-      photonGrad.addColorStop(0.85, 'rgba(103,232,249,' + (0.18 * ringPulse) + ')');
+      photonGrad.addColorStop(0.55, 'rgba(167,139,250,' + (0.10 * ringPulse).toFixed(3) + ')');
+      photonGrad.addColorStop(0.82, 'rgba(103,232,249,' + (0.16 * ringPulse).toFixed(3) + ')');
       photonGrad.addColorStop(1, 'rgba(224,242,254,0)');
       pctx.fillStyle = photonGrad;
-      pctx.save();
-      // Aplicar la misma compresión toroidal al photon ring
-      pctx.translate(CX, CY);
-      pctx.scale(1, 0.42);
-      pctx.translate(-CX, -CY);
       pctx.beginPath();
-      pctx.arc(CX, CY, eventHorizon * 1.6, 0, Math.PI * 2);
+      pctx.arc(CX, CY, eventHorizon * 2.0, 0, Math.PI * 2);
       pctx.fill();
-      pctx.restore();
     }
 
     function drawSpirals(dt){
