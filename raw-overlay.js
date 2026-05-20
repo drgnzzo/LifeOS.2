@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.178
+/* RAW Entry — Overlay v.5.187
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -783,6 +783,7 @@ function _crearDialOverlay(){
     var orbitRings = [];      // v5.169: anillos orbitales sutiles
     var interMesh = [];       // v5.171: red interestelar (no pasa por el centro)
     var mandalas = [];        // v5.171: geometría tipo crop circles
+    var warpParticles = [];   // v5.181: disco de acreción / agujero negro central
     var constellations = [];  // grupos de estrellas conectadas
     var synapses = [];        // conexiones fugaces neuronales
     var pulses = [];
@@ -884,7 +885,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(140, Math.min(220, Math.floor((W * H) / 8000)));  // v5.169: más estrellas
+      var nStars = Math.max(263, Math.min(413, Math.floor((W * H) / 4267)));  // v5.180: +50% estrellas
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
         var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
@@ -1072,6 +1073,146 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     //  DIBUJOS
     // ══════════════════════════════════════════════════════════════════
+
+    // ══════════════════════════════════════════════════════════════════
+    //  v5.181: EFECTO WARP / AGUJERO NEGRO (prueba)
+    //  Disco de acreción toroidal en el centro absoluto. Partículas que
+    //  espiralan hacia adentro acelerando (como materia cayendo al
+    //  horizonte de eventos). Queda detrás del dial.
+    // ══════════════════════════════════════════════════════════════════
+    var warpParticles = [];
+    // v5.184: ciclo cósmico — contracción (big crunch) ↔ expansión (big bang)
+    var cosmicPhase = 0;            // 0..1 dentro del ciclo
+    var cosmicMode = 'crunch';      // 'crunch' (cae al centro) o 'bang' (sale)
+    var cosmicCycleTime = 0;
+
+    function buildWarp(){
+      warpParticles = [];
+      // El warp ahora abarca TODA la interfaz — partículas distribuidas
+      // por todo el viewport, no solo cerca del dial.
+      var nWarp = 600;  // v5.185: warp masivo
+      var diag = Math.hypot(W/2, H/2);
+      for(var i = 0; i < nWarp; i++){
+        warpParticles.push(spawnWarpParticle(diag));
+      }
+    }
+
+    function spawnWarpParticle(diag){
+      if(diag === undefined) diag = Math.hypot(W/2, H/2);
+      // Radio distribuido por TODA la pantalla (desde cerca del centro
+      // hasta más allá de las esquinas). Distribución uniforme en área.
+      var minR = 30;
+      var maxR = diag + 60;
+      // sqrt para densidad uniforme por área
+      var r = minR + (maxR - minR) * Math.sqrt(Math.random());
+      return {
+        r: r,
+        theta: Math.random() * Math.PI * 2,
+        rHome: r,                       // radio "de reposo" — punto de equilibrio
+        color: PALETTE[Math.floor(Math.random() * PALETTE.length)],
+        size: 0.4 + Math.random() * 1.4,
+        phase: Math.random() * Math.PI * 2,
+      };
+    }
+
+    function drawWarp(dt){
+      var diag = Math.hypot(W/2, H/2);
+      var eventHorizon = DIAL_R * 0.55;  // v5.186: zona de absorción más amplia
+
+      // ── CICLO CÓSMICO: big crunch ↔ big bang ──
+      // Periodo total ~24s: 12s contrayéndose, 12s expandiéndose.
+      cosmicCycleTime += dt;
+      var CYCLE = 40;  // v5.185: ciclo más lento
+      var halfCycle = CYCLE / 2;
+      var tInCycle = cosmicCycleTime % CYCLE;
+      // cosmicForce: -1 = contracción máxima (hacia el centro)
+      //              +1 = expansión máxima (hacia afuera)
+      // Transición suave con seno para que no haya cambios bruscos.
+      var cosmicForce = Math.sin((tInCycle / CYCLE) * Math.PI * 2);
+      // cosmicForce > 0 → primera mitad: contracción
+      //               < 0 → segunda mitad: expansión
+      // (usamos -cosmicForce para que arranque contrayéndose)
+      var force = -cosmicForce;
+
+      for(var i = 0; i < warpParticles.length; i++){
+        var w = warpParticles[i];
+
+        // ── ROTACIÓN KEPLERIANA: más rápido cerca del centro ──
+        // ω = K / r^1.5 (tercera ley de Kepler: T² ∝ r³ → ω ∝ r^-1.5)
+        // Reducimos el factor cerca del centro para que sea "más lento en el warp"
+        var safeR = Math.max(eventHorizon, w.r);
+        var angVel = (90 / Math.pow(safeR, 1.05)) * 0.3;  // v5.185: aún más lento
+        w.theta += angVel * dt;
+        w.phase += dt * 1.5;
+
+        // ── MOVIMIENTO RADIAL: ciclo contracción/expansión ──
+        // La fuerza cósmica empuja hacia el centro (force>0) o hacia afuera (force<0).
+        // Cuanto más lejos del centro, más "sienten" la expansión;
+        // cuanto más cerca, más "sienten" la contracción (gravedad).
+        var gravityPull = 30 * (1 - Math.min(1, w.r / diag)); // fuerte cerca del centro
+        var expansionPush = 45 * (w.r / diag);                 // fuerte lejos del centro
+        // Velocidad radial según la fase del ciclo
+        var radialVel;
+        if(force > 0){
+          // Contracción: cae hacia el centro, acelera cerca (gravedad)
+          radialVel = -(gravityPull + 12) * force * 0.6;  // v5.185: más lento
+        } else {
+          // Expansión: sale hacia afuera, acelera lejos
+          radialVel = (expansionPush + 12) * (-force) * 0.6;  // v5.185: más lento
+        }
+        w.r += radialVel * dt;
+
+        // v5.186: ABSORCIÓN — el agujero negro "se come" las partículas
+        // que cruzan el horizonte de eventos. Renacen lejos (en el borde).
+        if(w.r <= eventHorizon){
+          // Tragada: renace en un radio exterior aleatorio
+          var diagNow = Math.hypot(W/2, H/2);
+          w.r = diagNow * (0.55 + Math.random() * 0.55);
+          w.theta = Math.random() * Math.PI * 2;
+          w.rHome = w.r;
+          w.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+          // Pequeña marca para fade-in al renacer
+          w._reborn = 0;
+        } else if(w.r > diag + 80){
+          w.r = diag + 80;
+        }
+        // Avanzar el fade-in de renacimiento
+        if(w._reborn !== undefined && w._reborn < 1){
+          w._reborn = Math.min(1, w._reborn + dt * 1.5);
+        }
+
+        // ── RENDER ──
+        var px = CX + Math.cos(w.theta) * w.r;
+        var py = CY + Math.sin(w.theta) * w.r;
+        // proximity: 1 en el centro, 0 en el borde
+        var proximity = 1 - Math.min(1, w.r / diag);
+        var twinkle = 0.6 + 0.4 * Math.sin(w.phase);
+        // Brillo: más en el centro (calentamiento) y modulado por el ciclo
+        var cycleGlow = 0.7 + 0.3 * Math.abs(cosmicForce);
+        var alpha = (0.20 + proximity * 0.55) * twinkle * cycleGlow;
+        // v5.186: fade-in al renacer (tras ser tragada por el agujero negro)
+        if(w._reborn !== undefined && w._reborn < 1){
+          alpha *= w._reborn;
+        }
+        // v5.186: cerca del horizonte la partícula se "estira" y acelera su
+        // brillo — efecto de ser absorbida (último destello antes de caer)
+        var nearHorizon = Math.max(0, 1 - (w.r - eventHorizon) / (DIAL_R * 1.2));
+        if(nearHorizon > 0){
+          alpha *= (1 + nearHorizon * 0.8);   // último destello
+        }
+        var radius = w.size * (0.7 + proximity * 0.9) * (1 + nearHorizon * 0.6);
+        // Blueshift cerca del centro
+        var col = proximity > 0.72 ? '#E0F2FE' : w.color;
+        pctx.fillStyle = col + Math.floor(Math.max(0, Math.min(1, alpha)) * 220).toString(16).padStart(2, '0');
+        pctx.shadowColor = col;
+        pctx.shadowBlur = 2 + proximity * 12 + nearHorizon * 10;
+        pctx.beginPath();
+        pctx.arc(px, py, radius, 0, Math.PI * 2);
+        pctx.fill();
+      }
+      pctx.shadowBlur = 0;
+      // v5.185: photon ring eliminado (el halo del centro molestaba)
+    }
 
     function drawSpirals(dt){
       spirals.forEach(function(sp, idx){
@@ -1492,7 +1633,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildDust(){
       dust = [];
-      var n = Math.floor((W * H) / 4400);  // v5.177: +25% densidad de polvo cósmico
+      var n = Math.floor((W * H) / 2933);  // v5.180: +50% densidad de polvo cósmico
       for(var i = 0; i < n; i++){
         // Polvo en coordenadas polares (también orbita lentamente)
         var r = 40 + Math.random() * (MAX_R - 40);
@@ -1901,7 +2042,10 @@ function _crearDialOverlay(){
       drawDust(dt);
 
       // 3) Anillos orbitales sutiles
-      drawOrbitRings(dt);
+      // v5.187: drawOrbitRings desactivado (aros mecánicos poco orgánicos)
+
+      // 3b) v5.181: Efecto warp / agujero negro (centro)
+      drawWarp(dt);
 
       // 4) Espirales áureas (fondo)
       drawSpirals(dt);
@@ -1909,9 +2053,9 @@ function _crearDialOverlay(){
       // 5) Rayos del centro (giran)
       drawRays(dt);
 
-      // 6) Lorenz
-      updateLorenz(dt);
-      drawLorenz();
+      // 6) v5.179: Lorenz e interMesh eliminados (aparecían/desaparecían sin propósito)
+      // updateLorenz(dt);
+      // drawLorenz();
 
       // 7) Vórtices
       drawVortices(dt);
@@ -1919,8 +2063,8 @@ function _crearDialOverlay(){
       // 8) Sinapsis
       drawSynapses(dt);
 
-      // 8b) v5.171: Red interestelar (cadenas que no pasan por el centro)
-      drawInterMesh(dt);
+      // 8b) v5.179: red interestelar también eliminada
+      // drawInterMesh(dt);
 
       // 8c) v5.171: Mandalas eliminados en v5.172 (distraían)
       // drawMandalas(dt);
@@ -2013,9 +2157,9 @@ function _crearDialOverlay(){
       pctx.restore();
 
       // Spawns periódicos
-      if(synapses.length < 7 && Math.random() < 0.12) spawnSynapse();
+      // v5.179: sinapsis desactivadas (líneas entre estrellas que parecían no tener origen)
       if(pulses.length < 10 && Math.random() < 0.09) spawnPulse();
-      if(vortices.length < 3 && Math.random() < 0.012) spawnVortex();
+      // v5.179: vórtices desactivados (ondas concéntricas que aparecían en puntos sin contexto)
       // v5.177: Lorenz desactivado (trazos caóticos sin propósito visible)
       if(meteors.length < 3 && Math.random() < 0.015) spawnMeteor();
       // v5.171: Red interestelar y mandalas
@@ -2034,7 +2178,8 @@ function _crearDialOverlay(){
       buildConstellations();
       buildSpirals();
       buildDust();          // v5.169
-      buildOrbitRings();    // v5.169
+      // v5.187: buildOrbitRings desactivado
+      buildWarp();          // v5.181
       synapses = [];
       pulses = [];
       vortices = [];
@@ -2069,7 +2214,8 @@ function _crearDialOverlay(){
         buildConstellations();
         buildSpirals();
         buildDust();          // v5.169
-        buildOrbitRings();    // v5.169
+        // v5.187: buildOrbitRings desactivado
+      buildWarp();          // v5.181
       }
     });
   })();
