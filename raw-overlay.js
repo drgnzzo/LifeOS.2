@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.175
+/* RAW Entry — Overlay v.5.177
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -677,7 +677,7 @@ function _crearDialOverlay(){
   _dialCanvas = document.createElement('canvas');
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
-  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(580px,40vw);height:min(580px,40vw);position:relative;pointer-events:auto;z-index:1';
+  _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(580px,40vw);height:min(580px,40vw);position:relative;pointer-events:auto;z-index:5';
   _dialCtx = _dialCanvas.getContext('2d');
 
   _dialOverlay.style.cssText = [
@@ -711,6 +711,33 @@ function _crearDialOverlay(){
     document.head.appendChild(ks);
   }
   _dialOverlay.appendChild(_glowEl);
+
+  // ══════════════════════════════════════════════════════════════════
+  //  v5.176: DISCO BLUR detrás del dial
+  //  Capa con backdrop-filter circular que desenfoca las partículas
+  //  del fondo en la zona del dial. Z-index 0.5 (entre el canvas de
+  //  partículas y el canvas del dial). Resultado: el dial se ve nítido
+  //  encima, las partículas se ven difuminadas a través de él, creando
+  //  profundidad y respetando la jerarquía visual.
+  // ══════════════════════════════════════════════════════════════════
+  var _dialBlurDisc = document.createElement('div');
+  _dialBlurDisc.id = 'dial-blur-disc';
+  _dialBlurDisc.style.cssText = [
+    'position:absolute',
+    'left:50%','top:50%',
+    'width:min(640px,44vw)','height:min(640px,44vw)',
+    'transform:translate(-50%,-50%)',
+    'border-radius:50%',
+    'pointer-events:none',
+    'z-index:0',
+    'backdrop-filter:blur(12px) saturate(110%)',
+    '-webkit-backdrop-filter:blur(12px) saturate(110%)',
+    // Mask radial: full opaque en el centro, fade hacia el borde
+    // para que la transición a "sin blur" sea gradual y no se note el corte
+    '-webkit-mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 78%)',
+    'mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 78%)',
+  ].join(';');
+  _dialOverlay.appendChild(_dialBlurDisc);
 
   // ══════════════════════════════════════════════════════════════════
   //  v5.152: ESTRUCTURA TIPO ANILLOS DE DYSON / GALAXIA CIBERNÉTICA
@@ -1464,7 +1491,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildDust(){
       dust = [];
-      var n = Math.floor((W * H) / 5500);  // alta densidad de puntitos
+      var n = Math.floor((W * H) / 4400);  // v5.177: +25% densidad de polvo cósmico
       for(var i = 0; i < n; i++){
         // Polvo en coordenadas polares (también orbita lentamente)
         var r = 40 + Math.random() * (MAX_R - 40);
@@ -1988,10 +2015,10 @@ function _crearDialOverlay(){
       if(synapses.length < 7 && Math.random() < 0.12) spawnSynapse();
       if(pulses.length < 10 && Math.random() < 0.09) spawnPulse();
       if(vortices.length < 3 && Math.random() < 0.012) spawnVortex();
-      if(lorenzTrails.length < 2 && Math.random() < 0.006) spawnLorenz();
+      // v5.177: Lorenz desactivado (trazos caóticos sin propósito visible)
       if(meteors.length < 3 && Math.random() < 0.015) spawnMeteor();
       // v5.171: Red interestelar y mandalas
-      if(interMesh.length < 4 && Math.random() < 0.025) spawnInterMesh();
+      // v5.177: interMesh desactivado (cadenas confusas sin destino claro)
       // v5.172: mandalas desactivados (aparecían/desaparecían y distraían)
       // if(mandalas.length < 3 && Math.random() < 0.008) spawnMandala();
 
@@ -2017,7 +2044,7 @@ function _crearDialOverlay(){
       globalT = 0;
       galaxyRotation = 0;
       // Pre-spawn algunas cosas
-      for(var i = 0; i < 2; i++) spawnLorenz();
+      // v5.177: pre-spawn Lorenz desactivado
       for(var i = 0; i < 3; i++) spawnPulse();
       for(var i = 0; i < 2; i++) spawnMeteor();   // v5.169
       lastT = 0;
