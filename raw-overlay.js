@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.188
+/* RAW Entry — Overlay v.5.189
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -2486,7 +2486,7 @@ function _crearDialOverlay(){
       '.hud-h{display:flex;align-items:center;gap:10px;padding:14px 16px 12px}',
       '.hud-h-ico{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}',
       '.hud-h-ico i{font-size:12px}',
-      '.hud-h-t{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;flex:1}',
+      '.hud-h-t{font-size:11px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud-h-k{font-size:14px;font-weight:800;color:rgba(220,220,240,0.35);letter-spacing:.10em;cursor:default;line-height:0}',
       '.hud-h-expand{background:transparent;border:0;cursor:pointer;padding:5px;border-radius:5px;display:flex;align-items:center;justify-content:center;transition:background .15s,transform .15s;opacity:.55}',
       '.hud-h-expand:hover{opacity:1;background:rgba(255,255,255,0.06);transform:scale(1.1)}',
@@ -2535,18 +2535,21 @@ function _crearDialOverlay(){
       '.hud-hero-chip .chip-sub{font-size:8px;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.10em}',
       // mini-bar (fondo emergencia)
       '.hud-mini{padding:0 16px 14px}',
-      '.hud-mini-row{display:flex;align-items:center;justify-content:space-between;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(200,208,230,0.50);margin-bottom:6px}',
-      '.hud-mini-row .v{font-size:11px;font-weight:800;color:var(--ac);letter-spacing:0;text-transform:none;font-family:JetBrains Mono,monospace;white-space:nowrap}',
+      '.hud-mini-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:rgba(200,208,230,0.50);margin-bottom:6px}',
+      // v5.189: el label flexible con ellipsis, el valor con su espacio
+      '.hud-mini-row > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-mini-row .v{font-size:11px;font-weight:800;color:var(--ac);letter-spacing:0;text-transform:none;font-family:JetBrains Mono,monospace;white-space:nowrap;flex-shrink:0}',
       '.hud-mini-bar{height:5px;background:rgba(255,255,255,0.05);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.04)}',
       '.hud-mini-fill{height:100%;border-radius:999px;transition:width .8s ease}',
       // row
-      '.hud-row{display:flex;align-items:center;gap:10px;padding:8px 16px}',
+      '.hud-row{display:flex;align-items:center;gap:9px;padding:8px 14px}',
       '.hud-row + .hud-row{border-top:1px solid rgba(255,255,255,0.04)}',
       '.hud-row-ico{width:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px}',
-      '.hud-row-l{flex:1;min-width:0;font-size:13px;font-weight:600;color:rgba(220,224,235,0.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-row-bar{width:60px;height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;flex-shrink:0}',
+      '.hud-row-l{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:rgba(220,224,235,0.78);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-row-bar{width:54px;height:3px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;flex-shrink:0}',
       '.hud-row-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease}',
-      '.hud-row-v{font-size:13px;font-weight:700;letter-spacing:0;flex-shrink:0;text-align:right;min-width:78px;font-family:JetBrains Mono,monospace;white-space:nowrap}',
+      // v5.189: hud-row-v con overflow controlado para valores largos
+      '.hud-row-v{font-size:12.5px;font-weight:700;letter-spacing:0;flex-shrink:0;text-align:right;min-width:62px;max-width:120px;font-family:JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       // maslow
       '.hud-mas{padding:8px 16px}',
       '.hud-mas + .hud-mas{border-top:1px solid rgba(255,255,255,0.04)}',
@@ -2569,16 +2572,19 @@ function _crearDialOverlay(){
       '.hud-need-v{font-size:9px;font-weight:800;font-family:JetBrains Mono,monospace;flex-shrink:0;line-height:1;white-space:nowrap}',
       '.hud-need-v .max{opacity:.40;font-weight:700;font-size:7.5px}',
       // CTA pie
-      '.hud-cta{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
+      '.hud-cta{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 16px;cursor:pointer;border-top:1px solid var(--ac-15);transition:padding .15s,background .15s}',
       '.hud-cta:hover{background:var(--ac-08);padding-left:20px}',
-      '.hud-cta .lbl{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}',
-      '.hud-cta .chev{font-size:9px;opacity:.7}',
+      '.hud-cta .lbl{font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-cta .chev{font-size:9px;opacity:.7;flex-shrink:0}',
       // duo (Activity+Logros)
-      '.hud-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px}',
-      '.hud-trio-cell{padding:10px 8px;border-radius:9px;border:1px solid;text-align:left;position:relative;overflow:hidden;background:rgba(255,255,255,0.02)}',
+      '.hud-trio{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:12px 14px}',
+      '.hud-trio-cell{padding:9px 7px;border-radius:9px;border:1px solid;text-align:left;position:relative;overflow:hidden;background:rgba(255,255,255,0.02);min-width:0}',
       '.hud-trio-cell .top{position:absolute;top:0;left:0;right:0;height:2px}',
-      '.hud-trio-cell .lbl{font-size:8px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;margin-bottom:5px;opacity:.85}',
-      '.hud-trio-cell .v{font-size:18px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap}',
+      // v5.189: lbl con letter-spacing reducido + nowrap + ellipsis para que
+      // "Hábitos hoy" / "Racha actual" no se desborden de la celda estrecha
+      '.hud-trio-cell .lbl{font-size:7.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin-bottom:5px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
+      // v5.189: valor con tamaño reducido + ellipsis (valores grandes como "1,234")
+      '.hud-trio-cell .v{font-size:16px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}',
       // racha fires
       '.hud-fires-row{display:flex;align-items:center;gap:10px;padding:11px 16px 14px;border-top:1px solid rgba(255,255,255,0.06);background:rgba(251,146,60,0.05)}',
       '.hud-fires-row > i.lead{font-size:15px;color:#FB923C;filter:drop-shadow(0 0 5px #FB923C)}',
