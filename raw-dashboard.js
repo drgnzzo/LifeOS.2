@@ -763,3 +763,364 @@ function renderPatrimonio(data, containerId){
   html+='</div>';
   body.innerHTML=html;
 }
+// ══════════════════════════════════════════════════════════════════
+//  FIJOS — VISTA EXPANDIDA (mockup v5.193)
+//  Rediseño de la card expandida de Fijos. Consume api.getGastos()
+//  (data.grupos) y, si existen, los campos nuevos del backend; si no,
+//  los deriva. NO reemplaza renderAnualidad (usado en vista normal).
+//
+//  ─── CONTRATO DE DATOS (lo que el GAS deberia entregar) ───
+//  data.grupos[i] = {
+//    concepto:  string                       // ya existe
+//    estado:    string  (opcional)           // NUEVO. Se normaliza:
+//               "activo"|"pendiente"|"inactivo"|"cancelado"
+//               (acepta sinonimos/acentos/mayus). Si falta -> derivado.
+//    items[j] = { clave:mes, monto:number, pagado:"Sí"/"No" }  // ya existe
+//  }
+//  Todo lo demas (total mensual, servicios activos, variacion,
+//  barras apiladas, tendencia) se DERIVA de lo anterior.
+// ══════════════════════════════════════════════════════════════════
+
+// Normaliza el estado a una de 4 claves canonicas. Acepta sinonimos.
+function _fijosNormEstado(raw){
+  if(raw===null||raw===undefined||raw==='') return null;
+  var s=String(raw).toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  if(/activ|cobr|vigent|si\b/.test(s)) return 'activo';
+  if(/pend|proxim|por cobrar/.test(s)) return 'pendiente';
+  if(/inactiv|pausad|stop|baja/.test(s)) return 'inactivo';
+  if(/cancel|elimin/.test(s)) return 'cancelado';
+  return null;
+}
+
+// Config visual por estado.
+var _FIJOS_ESTADOS={
+  activo:    {lbl:'Activo',    color:'#4ADE80', dot:'fa-circle'},
+  pendiente: {lbl:'Pendiente', color:'#F59E0B', dot:'fa-clock'},
+  inactivo:  {lbl:'Inactivo',  color:'#94A3B8', dot:'fa-circle'},
+  cancelado: {lbl:'Cancelado', color:'#EF4444', dot:'fa-ban'}
+};
+
+// Deriva el estado de un grupo cuando el backend no lo da:
+//  - tiene monto en el mes actual y esta pagado -> activo
+//  - tiene monto en el mes actual sin pagar     -> pendiente
+//  - no tiene monto en ningun mes               -> inactivo
+function _fijosEstadoDerivado(g){
+  var mesActIdx=new Date().getMonth();
+  var MIDX={enero:0,febrero:1,marzo:2,abril:3,mayo:4,junio:5,
+    julio:6,agosto:7,septiembre:8,octubre:9,noviembre:10,diciembre:11};
+  var itemMesAct=null, tieneAlgunMonto=false;
+  (g.items||[]).forEach(function(it){
+    if(it.monto!==null&&it.monto!==undefined&&it.monto!==0) tieneAlgunMonto=true;
+    var cl=(it.clave||'').toLowerCase();
+    var m=Object.keys(MIDX).find(function(k){return cl.indexOf(k)>=0;});
+    if(m&&MIDX[m]===mesActIdx) itemMesAct=it;
+  });
+  var pag=itemMesAct&&(itemMesAct.pagado==='Sí'||itemMesAct.pagado==='Si'||itemMesAct.pagado==='sí');
+  if(itemMesAct&&itemMesAct.monto){ return pag?'activo':'pendiente'; }
+  if(tieneAlgunMonto) return 'activo';
+  return 'inactivo';
+}
+
+// Icono FontAwesome sugerido por concepto (heuristico, decorativo).
+function _fijosIcono(concepto){
+  var c=(concepto||'').toLowerCase();
+  if(/renta|casa|hogar/.test(c)) return 'fa-house';
+  if(/cfe|luz|electric/.test(c)) return 'fa-bolt';
+  if(/gas/.test(c)) return 'fa-fire';
+  if(/telcel|movil|cel|telefon/.test(c)) return 'fa-tower-cell';
+  if(/izzi|internet|wifi|totalplay|megacable/.test(c)) return 'fa-wifi';
+  if(/spotify|musica/.test(c)) return 'fa-music';
+  if(/icloud|drive|nube|storage/.test(c)) return 'fa-cloud';
+  if(/netflix|hbo|disney|prime|stream/.test(c)) return 'fa-film';
+  if(/gym|gimnasio/.test(c)) return 'fa-dumbbell';
+  if(/seguro|1917/.test(c)) return 'fa-shield-halved';
+  if(/agua/.test(c)) return 'fa-droplet';
+  return 'fa-circle-dot';
+}
+
+function renderFijosExpandido(data, containerId){
+  var body=document.getElementById(containerId||'hud-fijos-tabla');
+  if(!body) return;
+  if(!data||!data.ok||!data.grupos||!data.grupos.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(220,224,235,.4);font-size:12px">Sin datos de gastos fijos</div>';
+    return;
+  }
+  var FC='#67E8F9'; // acento del panel Fijos
+  var grupos=data.grupos;
+  var claves=[];
+  grupos.forEach(function(g){(g.items||[]).forEach(function(it){
+    if(claves.indexOf(it.clave)<0) claves.push(it.clave);
+  });});
+  var mesActual=MESES_ES[new Date().getMonth()];
+  var fmt=function(v){
+    if(v===null||v===undefined) return '—';
+    return '$ '+Math.abs(v).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  };
+
+  // ── Resolver estado por grupo (backend o derivado) ──
+  grupos.forEach(function(g){
+    g._estado=_fijosNormEstado(g.estado)||_fijosEstadoDerivado(g);
+  });
+
+  // ── Metricas del panel de analisis (derivadas) ──
+  var idxMesAct=claves.findIndex(function(c){return c.toUpperCase()===mesActual.toUpperCase();});
+  if(idxMesAct<0) idxMesAct=claves.length-1;
+  function totalMes(ci){
+    if(ci<0) return 0;
+    var clave=claves[ci]; var t=0;
+    grupos.forEach(function(g){
+      var it=(g.items||[]).find(function(x){return x.clave===clave;});
+      if(it&&it.monto) t+=Math.abs(it.monto);
+    });
+    return t;
+  }
+  var totalActual=totalMes(idxMesAct);
+  var totalPrev=totalMes(idxMesAct-1);
+  var nActivos=grupos.filter(function(g){return g._estado==='activo';}).length;
+  var variacion=totalPrev>0?((totalActual-totalPrev)/totalPrev*100):0;
+  var varColor=variacion>0?'#EF4444':variacion<0?'#4ADE80':'#94A3B8';
+  var varSigno=variacion>0?'+':'';
+
+  // ── CSS de la vista (scoped con prefijo .fjx-) ──
+  var css='<style>'+
+    '.fjx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:Manrope,-apple-system,sans-serif}'+
+    '.fjx-main{flex:1.35;min-width:0;display:flex;flex-direction:column}'+
+    '.fjx-side{flex:0.95;min-width:0;display:flex;flex-direction:column;gap:14px}'+
+    '.fjx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:10px}'+
+    '.fjx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
+    '.fjx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
+      'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
+      'border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap;text-align:center}'+
+    '.fjx-tbl th:first-child,.fjx-tbl th:nth-child(2){text-align:left}'+
+    '.fjx-tbl td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);'+
+      'white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}'+
+    '.fjx-tbl tr:hover td{background:rgba(255,255,255,.02)}'+
+    '.fjx-concepto{display:flex;align-items:center;gap:9px;text-align:left;font-weight:700;color:#fff;font-size:12.5px}'+
+    '.fjx-concepto i{width:26px;height:26px;display:flex;align-items:center;justify-content:center;'+
+      'border-radius:7px;background:rgba(255,255,255,.05);font-size:11px;flex-shrink:0;color:'+FC+'}'+
+    '.fjx-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;'+
+      'font-size:9.5px;font-weight:800;letter-spacing:.03em;border:1px solid}'+
+    '.fjx-badge i{font-size:6px}'+
+    '.fjx-mes-amt{font-weight:700;font-size:11.5px}'+
+    '.fjx-check{font-size:13px}'+
+    '.fjx-dash{color:rgba(220,224,235,.25)}'+
+    '.fjx-tot-row td{background:rgba(103,232,249,.06);border-top:2px solid rgba(103,232,249,.25);'+
+      'font-weight:800;border-bottom:none}'+
+    '.fjx-tot-row td:first-child{text-align:left;font-size:9px;letter-spacing:.10em;'+
+      'text-transform:uppercase;color:'+FC+'}'+
+    '.fjx-tot-amt{color:'+FC+';font-size:11.5px}'+
+    '.fjx-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:10px;padding:13px 14px}'+
+    '.fjx-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}'+
+    '.fjx-stat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:10px;padding:12px 11px;display:flex;flex-direction:column;gap:5px}'+
+    '.fjx-stat-top{display:flex;align-items:center;gap:7px}'+
+    '.fjx-stat-ico{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;'+
+      'justify-content:center;font-size:10px;flex-shrink:0}'+
+    '.fjx-stat-lbl{font-size:7.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.5);line-height:1.3}'+
+    '.fjx-stat-v{font-size:19px;font-weight:800;font-family:JetBrains Mono,monospace;line-height:1}'+
+    '.fjx-stat-sub{font-size:9px;color:rgba(220,224,235,.45);font-weight:600}'+
+    '.fjx-sec-t{font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.65);margin-bottom:10px}'+
+    '.fjx-leg{display:flex;flex-wrap:wrap;gap:8px 12px;margin-top:10px}'+
+    '.fjx-leg-it{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600;'+
+      'color:rgba(220,224,235,.7)}'+
+    '.fjx-leg-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0}'+
+    '.fjx-foot{font-size:10px;color:rgba(220,224,235,.4);padding:10px 2px 0;font-weight:600}'+
+  '</style>';
+
+  // ── Tabla principal ──
+  var thead='<tr><th>Concepto</th><th>Estado</th>'+
+    claves.map(function(c){
+      var esA=c.toUpperCase()===mesActual.toUpperCase();
+      return '<th'+(esA?' style="color:'+FC+'"':'')+'>'+c+'</th>';
+    }).join('')+'</tr>';
+
+  var tbody=grupos.map(function(g){
+    var est=_FIJOS_ESTADOS[g._estado]||_FIJOS_ESTADOS.inactivo;
+    var apagado=(g._estado==='inactivo'||g._estado==='cancelado');
+    var badge='<span class="fjx-badge" style="color:'+est.color+';border-color:'+est.color+'40;'+
+      'background:'+est.color+'14"><i class="fas '+est.dot+'"></i>'+est.lbl+'</span>';
+    var celdas=claves.map(function(clave){
+      var it=(g.items||[]).find(function(x){return x.clave===clave;});
+      if(!it||it.monto===null||it.monto===undefined){
+        return '<td><span class="fjx-dash">—</span></td>';
+      }
+      var pag=(it.pagado==='Sí'||it.pagado==='Si'||it.pagado==='sí');
+      var mesIdx=claves.indexOf(clave);
+      // Mes futuro: muestra monto tenue. Mes <= actual: check o reloj.
+      if(mesIdx>idxMesAct){
+        return '<td><span class="fjx-dash">—</span></td>';
+      }
+      if(g._estado==='pendiente'&&mesIdx===idxMesAct){
+        return '<td><i class="fas fa-clock fjx-check" style="color:#F59E0B"></i></td>';
+      }
+      if(it.monto&&pag){
+        return '<td><i class="fas fa-circle-check fjx-check" style="color:#4ADE80"></i></td>';
+      }
+      if(it.monto&&!pag){
+        return '<td><span class="fjx-mes-amt" style="color:#F59E0B">'+fmt(it.monto)+'</span></td>';
+      }
+      return '<td><span class="fjx-dash">—</span></td>';
+    }).join('');
+    // Primera celda de monto = mes actual con su valor visible
+    var itAct=(g.items||[]).find(function(x){return x.clave&&x.clave.toUpperCase()===mesActual.toUpperCase();});
+    var montoActual=itAct&&itAct.monto?fmt(itAct.monto):'—';
+    return '<tr style="opacity:'+(apagado?'.5':'1')+'">'+
+      '<td><div class="fjx-concepto"><i class="fas '+_fijosIcono(g.concepto)+'"></i>'+g.concepto+'</div></td>'+
+      '<td style="text-align:left">'+badge+'</td>'+
+      celdas+'</tr>';
+  }).join('');
+
+  // Fila de totales
+  var totRow='<tr class="fjx-tot-row"><td>Totales</td><td></td>'+
+    claves.map(function(c,ci){
+      var t=totalMes(ci);
+      return '<td><span class="fjx-tot-amt">'+(t>0?fmt(t):'—')+'</span></td>';
+    }).join('')+'</tr>';
+
+  var tablaHTML='<div class="fjx-tbl-wrap"><table class="fjx-tbl">'+
+    '<thead>'+thead+'</thead><tbody>'+tbody+totRow+'</tbody></table></div>';
+
+  // ── Panel de analisis (derecha) ──
+  var statsHTML='<div class="fjx-stats">'+
+    '<div class="fjx-stat">'+
+      '<div class="fjx-stat-top">'+
+        '<div class="fjx-stat-ico" style="background:'+FC+'1e;color:'+FC+'"><i class="fas fa-coins"></i></div>'+
+        '<div class="fjx-stat-lbl">Total fijo<br>mensual</div>'+
+      '</div>'+
+      '<div class="fjx-stat-v" style="color:'+FC+'">'+fmt(totalActual)+'</div>'+
+      '<div class="fjx-stat-sub">en '+mesActual+'</div>'+
+    '</div>'+
+    '<div class="fjx-stat">'+
+      '<div class="fjx-stat-top">'+
+        '<div class="fjx-stat-ico" style="background:#3B82F61e;color:#60A5FA"><i class="fas fa-list-check"></i></div>'+
+        '<div class="fjx-stat-lbl">Servicios<br>activos</div>'+
+      '</div>'+
+      '<div class="fjx-stat-v" style="color:#60A5FA">'+nActivos+' <span style="font-size:12px;opacity:.4">/ '+grupos.length+'</span></div>'+
+      '<div class="fjx-stat-sub">'+Math.round(nActivos/grupos.length*100)+'% del total</div>'+
+    '</div>'+
+    '<div class="fjx-stat">'+
+      '<div class="fjx-stat-top">'+
+        '<div class="fjx-stat-ico" style="background:'+varColor+'1e;color:'+varColor+'"><i class="fas fa-arrow-trend-up"></i></div>'+
+        '<div class="fjx-stat-lbl">Variación<br>mensual</div>'+
+      '</div>'+
+      '<div class="fjx-stat-v" style="color:'+varColor+'">'+varSigno+variacion.toFixed(1)+'%</div>'+
+      '<div class="fjx-stat-sub">vs. mes anterior</div>'+
+    '</div>'+
+  '</div>';
+
+  // Contenedores de graficas (Chart.js los llena en hydrate)
+  var graficasHTML=
+    '<div class="fjx-card">'+
+      '<div class="fjx-sec-t">Composición mensual por categoría</div>'+
+      '<div style="height:200px"><canvas id="fjx-bars-canvas"></canvas></div>'+
+      '<div class="fjx-leg" id="fjx-bars-leg"></div>'+
+    '</div>'+
+    '<div class="fjx-card">'+
+      '<div class="fjx-sec-t">Tendencia total ('+claves.length+' meses)</div>'+
+      '<div style="height:120px"><canvas id="fjx-trend-canvas"></canvas></div>'+
+    '</div>';
+
+  body.innerHTML=css+
+    '<div class="fjx">'+
+      '<div class="fjx-main">'+
+        tablaHTML+
+        '<div class="fjx-foot">Activo (se cobra) · Pendiente (próximo cobro) · '+
+          'Inactivo (pausado) · Cancelado</div>'+
+      '</div>'+
+      '<div class="fjx-side">'+
+        statsHTML+
+        graficasHTML+
+      '</div>'+
+    '</div>';
+
+  // Guardar contexto para que las graficas se pinten en hydrate
+  window._fjxCtx={grupos:grupos,claves:claves,FC:FC};
+}
+
+// Pinta las dos graficas Chart.js de la vista expandida de Fijos.
+function renderFijosGraficas(){
+  var ctx=window._fjxCtx;
+  if(!ctx||!window.Chart) return;
+  var grupos=ctx.grupos, claves=ctx.claves, FC=ctx.FC;
+  var PAL=['#34D399','#3B82F6','#8B5CF6','#EF4444','#F59E0B','#EC4899',
+           '#06B6D4','#FB923C','#A78BFA','#FACC15','#4ADE80','#67E8F9'];
+
+  // ── Barras apiladas: cada servicio = una serie ──
+  var bc=document.getElementById('fjx-bars-canvas');
+  if(bc){
+    var dsets=grupos.map(function(g,i){
+      var color=PAL[i%PAL.length];
+      return {
+        label:g.concepto,
+        data:claves.map(function(clave){
+          var it=(g.items||[]).find(function(x){return x.clave===clave;});
+          return it&&it.monto?Math.abs(it.monto):0;
+        }),
+        backgroundColor:color,
+        borderRadius:2,
+        stack:'fijos'
+      };
+    });
+    if(window._fjxBarsChart){try{window._fjxBarsChart.destroy();}catch(e){}}
+    window._fjxBarsChart=new Chart(bc,{
+      type:'bar',
+      data:{labels:claves.map(function(c){return c.slice(0,3);}),datasets:dsets},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'rgba(15,23,42,.95)',borderColor:'rgba(103,232,249,.3)',
+            borderWidth:1,titleColor:'#fff',bodyColor:'#94A3B8',padding:9,
+            callbacks:{label:function(c){return ' '+c.dataset.label+': $ '+
+              Math.abs(c.raw).toLocaleString('es-MX',{minimumFractionDigits:2});}}}},
+        scales:{x:{stacked:true,grid:{display:false},
+            ticks:{color:'#64748B',font:{size:9}}},
+          y:{stacked:true,grid:{color:'rgba(255,255,255,.05)'},
+            ticks:{color:'#64748B',font:{size:9},
+              callback:function(v){return '$'+(v/1000).toFixed(0)+'k';}}}}}
+    });
+    var leg=document.getElementById('fjx-bars-leg');
+    if(leg){
+      leg.innerHTML=grupos.map(function(g,i){
+        var color=PAL[i%PAL.length];
+        return '<div class="fjx-leg-it"><div class="fjx-leg-dot" style="background:'+color+'"></div>'+g.concepto+'</div>';
+      }).join('');
+    }
+  }
+
+  // ── Tendencia: total mensual ──
+  var tc=document.getElementById('fjx-trend-canvas');
+  if(tc){
+    var totales=claves.map(function(clave){
+      var t=0;
+      grupos.forEach(function(g){
+        var it=(g.items||[]).find(function(x){return x.clave===clave;});
+        if(it&&it.monto) t+=Math.abs(it.monto);
+      });
+      return t;
+    });
+    if(window._fjxTrendChart){try{window._fjxTrendChart.destroy();}catch(e){}}
+    window._fjxTrendChart=new Chart(tc,{
+      type:'line',
+      data:{labels:claves.map(function(c){return c.slice(0,3);}),
+        datasets:[{data:totales,borderColor:FC,borderWidth:2,
+          pointRadius:3,pointHoverRadius:5,pointBackgroundColor:FC,
+          fill:true,backgroundColor:'rgba(103,232,249,.08)',tension:.35}]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false},
+          tooltip:{backgroundColor:'rgba(15,23,42,.95)',borderColor:'rgba(103,232,249,.3)',
+            borderWidth:1,titleColor:'#fff',bodyColor:'#94A3B8',padding:9,
+            callbacks:{label:function(c){return ' Total: $ '+
+              Math.abs(c.raw).toLocaleString('es-MX',{minimumFractionDigits:2});}}}},
+        scales:{x:{grid:{display:false},ticks:{color:'#64748B',font:{size:9}}},
+          y:{grid:{color:'rgba(255,255,255,.05)'},
+            ticks:{color:'#64748B',font:{size:9},
+              callback:function(v){return '$'+(v/1000).toFixed(0)+'k';}}}}}
+    });
+  }
+}
+
+window.renderFijosExpandido=renderFijosExpandido;
+window.renderFijosGraficas=renderFijosGraficas;

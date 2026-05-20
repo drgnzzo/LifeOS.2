@@ -1,34 +1,20 @@
-/* RAW Entry — Overlay v.5.192
-   AUDITORIA completa de textos en cards compactas y expandidas.
+/* RAW Entry — Overlay v.5.193
+   REDISEÑO card expandida de FIJOS (mockup).
 
-   ── Auditoria v5.192 ──
-   Revision regla por regla de todo el CSS HUD. Resultado:
+   ── Cambio v5.193 ──
+   La vista expandida de Fijos ahora usa renderFijosExpandido()
+   (en raw-dashboard.js) en lugar de renderAnualidad. Diseño nuevo:
+   tabla con columna ESTADO (badges), checks por mes, fila de
+   totales, panel de analisis lateral (3 stat-cards) y 2 graficas
+   Chart.js (barras apiladas por servicio + tendencia mensual).
 
-   COMPACTO — corregido en esta version:
-     · .hud-card-l   → letter-spacing .14em→.05em + nowrap
-                       ("MISION DIARIA","NIVEL SIGUIENTE" sin apretar)
-     · .hud-card-sub → fuente 10.5px→9.5px
-                       ("Completa 3 habitos hoy","Recompensas
-                        desbloqueadas" caben completos)
+   Los campos que el backend aun no entrega (estado de 4 valores)
+   se DERIVAN en el front; cuando el GAS los provea, se usan tal
+   cual sin tocar codigo. renderAnualidad NO se modifico (sigue en
+   uso por la vista no-expandida).
 
-   COMPACTO — ya correcto (v5.189-191), sin cambios:
-     · .hud-h-t, .hud-hero-v, .hud-hero-lbl, .hud-trio-cell,
-       .hud-cta .lbl, .hud-need-l, .hud-row-l, .hud-mas-l,
-       .hud-mini-row — todos caben o truncan texto variable
-       de forma controlada.
-
-   EXPANDIDO — auditado, sin cambios necesarios:
-     · Titulos de seccion no llevan nowrap → si no caben bajan de
-       linea naturalmente (hay ancho de sobra en el panel central).
-     · Tablas (.tbl) usan nowrap correctamente + overflow-x:auto.
-     · Unico ellipsis (subtexto de apartado: banco·categoria·meta)
-       es truncado controlado e intencional para texto variable.
-
-   ── Heredado v5.191 ──
-   El titulo del header manda sobre el sparkline (flex-shrink:0).
-
-   ── Heredado v5.190 ──
-   Reduccion de tamaño/letter-spacing para que los textos quepan.
+   ── Heredado v5.192 ──
+   Auditoria completa de textos en cards compactas/expandidas.
 
    ── FIX clicks rotos en +Nueva — causa raíz definitiva (heredado v5.189) ──
 
@@ -4813,26 +4799,31 @@ function _crearDialOverlay(){
     },
     // ── FIJOS ──
     'hud-fijos': {
+      // v5.193: vista expandida rediseñada. renderFijosExpandido pinta
+      // tabla + analisis + contenedores de grafica en un solo contenedor.
       html: function(){
-        return ''+
-          // v5.149: sin overflow:auto en tabla — la card crece dinámica
-          '<div style="display:flex;gap:14px;align-items:stretch;min-height:400px">'+
-            '<div id="hud-fijos-tabla" style="flex:1.1;min-width:0;display:flex;align-items:flex-start"></div>'+
-            '<div id="hud-fijos-grafica" style="flex:0.9;min-width:0;display:flex;flex-direction:column;min-height:300px;justify-content:flex-start">'+
-              '<div id="graf-fijos-loading-hud-fijos-tabla" style="text-align:center;padding:24px;color:rgba(220,224,235,0.40)">Cargando gráfica…</div>'+
-              '<canvas id="graf-fijos-canvas-hud-fijos-tabla" style="display:none;min-height:280px"></canvas>'+
-              '<div id="graf-fijos-leyenda-hud-fijos-tabla" style="display:flex;flex-wrap:wrap;gap:6px;padding:8px 0"></div>'+
-            '</div>'+
-          '</div>';
+        return '<div id="hud-fijos-tabla" style="width:100%;min-width:0"></div>';
       },
       hydrate: function(){
-        if(typeof renderAnualidad === 'function' && window._fijosAnualidadData){
-          renderAnualidad(window._fijosAnualidadData, 'hud-fijos-tabla');
+        function _pintar(d){
+          window._fijosAnualidadData = d;
+          if(typeof renderFijosExpandido === 'function'){
+            renderFijosExpandido(d, 'hud-fijos-tabla');
+            // Las graficas necesitan Chart.js; cargarlo si falta.
+            function _graf(){ if(typeof renderFijosGraficas==='function') renderFijosGraficas(); }
+            if(window.Chart){ setTimeout(_graf, 60); }
+            else {
+              var s=document.createElement('script');
+              s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+              s.onload=function(){ setTimeout(_graf, 80); };
+              document.head.appendChild(s);
+            }
+          }
+        }
+        if(window._fijosAnualidadData){
+          _pintar(window._fijosAnualidadData);
         } else if(typeof api !== 'undefined' && api.getGastos){
-          api.getGastos().then(function(d){
-            window._fijosAnualidadData = d;
-            renderAnualidad(d, 'hud-fijos-tabla');
-          }).catch(function(){});
+          api.getGastos().then(_pintar).catch(function(){});
         } else {
           var el = document.getElementById('hud-fijos-tabla');
           if(el) el.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(220,224,235,0.40)">Sin datos</div>';
