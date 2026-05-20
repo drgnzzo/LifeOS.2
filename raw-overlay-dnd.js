@@ -1,4 +1,11 @@
-/* RAW Entry — Overlay Drag & Drop v.5.197
+/* RAW Entry — Overlay Drag & Drop v.5.199
+   v5.199 — REESCRITURA del drop: ahora es INTERCAMBIO PURO. Al soltar
+   una card sobre otra, ambas permutan posicion fisica (top/left/width)
+   y estado logico (_side/_order). Soltar en slot vacio = la card toma
+   la posicion del slot. YA NO se llama _reposicionarHUD al soltar — el
+   recalculador gigante era lo que colapsaba el layout (v5.193-198
+   fueron intentos de parcharlo). Sin recalculo = no puede romperse.
+   ── Heredado v5.197
    FIX v5.197: hook de _reposicionarHUD ELIMINADO (congelaba referencia
    vieja sin lock → layout roto al soltar). buildGhostSlots se invoca
    ahora desde el reposicionador via _overlayDnd.rebuild.
@@ -428,70 +435,91 @@
       document.body.style.cursor = '';
       hideDropIndicator();
 
-      // NO limpiamos transform aún — eso causa un "salto visual" donde el
-      // panel regresa a su pos vieja y luego _reposicionarHUD lo mueve a la
-      // nueva. En su lugar: detectar zona, aplicar cambios, limpiar transform
-      // junto con el reposicionamiento (que da la posición final correcta).
+      // ══════════════════════════════════════════════════════════════
+      //  v5.199 — REESCRITURA: drag & drop por INTERCAMBIO PURO.
+      //
+      //  El sistema viejo, al soltar, llamaba _reposicionarHUD() — el
+      //  recalculador gigante de TODO el layout (4 columnas, geometría
+      //  del dial, anchos dinámicos, alturas medidas). Eso colapsaba el
+      //  layout una y otra vez (v5.193-198 fueron intentos de parchar
+      //  ese recalculador).
+      //
+      //  Enfoque nuevo: al soltar la card A sobre la card B, las dos
+      //  simplemente INTERCAMBIAN su posición física (top/left/width) y
+      //  su estado lógico (_side/_order). Las posiciones ya están bien
+      //  en pantalla — solo se permutan. NO se recalcula nada. NO se
+      //  llama _reposicionarHUD. Imposible que el layout colapse.
+      //
+      //  Soltar en un slot vacío: la card se MUEVE a la posición física
+      //  del slot (el slot ocupa un hueco con top/left/width conocidos).
+      // ══════════════════════════════════════════════════════════════
 
-      // Para detectZoneAt necesitamos quitar el transform temporalmente,
-      // porque getBoundingClientRect del panel arrastrado incluye el offset
-      // de translate y podría devolverse a sí mismo como hover (aunque está
-      // excluido del bucle de panels, sus bounds podrían afectar el detect
-      // de slots si se solapan).
+      // Quitar transform temporalmente para detectar la zona destino sin
+      // que los bounds desplazados del panel arrastrado interfieran.
       var savedTransform = panelEl.style.transform;
       panelEl.style.transform = '';
       var hover = detectZoneAt(e.clientX, e.clientY);
-      panelEl.style.transform = savedTransform;
+      panelEl.style.transform = '';
 
-      if(hover){
-        if(hover.type === 'slot'){
-          moveToSlot(panelEl, hover.el);
-        } else if(hover.type === 'panel'){
-          // Si zona destino distinta, cambiar side primero
-          if(hover.side !== panelEl._side){
-            var dragHp = window._hudPanels.find(function(hp){ return hp.el === panelEl; });
-            if(dragHp){
-              var oldSide = dragHp.el._side;
-              dragHp.el._side = hover.side;
-              var oldZone = window._hudPanels.filter(function(hp){ return hp.el._side === oldSide; });
-              oldZone.sort(function(a,b){ return a.el._order - b.el._order; });
-              oldZone.forEach(function(hp, idx){ hp.el._order = idx; });
-            }
-          }
-          var target = findDropTarget(hover.side, e.clientY);
-          applyReorder(hover.side, panelEl, target.insertAt);
-        }
+      // Lee la posición física real de un elemento (la que está pintada).
+      function _pos(el){
+        return {
+          top:   el.style.top,
+          left:  el.style.left,
+          width: el.style.width
+        };
+      }
+      function _aplicarPos(el, p){
+        el.style.top   = p.top;
+        el.style.left  = p.left;
+        el.style.width = p.width;
       }
 
-      // GARANTÍA DE CONSISTENCIA: normalizar TODOS los orders de TODAS las
-      // zonas después del cambio. Esto elimina cualquier colisión de _order
-      // (dos paneles con mismo side+order) o hueco que pueda haber quedado
-      // por mutaciones intermedias.
-      _normalizarOrders();
+      if(hover && hover.type === 'panel' && hover.el !== panelEl){
+        // ── INTERCAMBIO con otra card ──
+        var otroEl = hover.el;
+        var dragHp = window._hudPanels.find(function(hp){ return hp.el === panelEl; });
+        var otroHp = window._hudPanels.find(function(hp){ return hp.el === otroEl; });
+        if(dragHp && otroHp){
+          // Permutar posición física.
+          var posDrag = _pos(panelEl);
+          var posOtro = _pos(otroEl);
+          _aplicarPos(panelEl, posOtro);
+          _aplicarPos(otroEl,  posDrag);
+          // Permutar estado lógico (_side/_order) para que persista.
+          var sD = dragHp.el._side,  oD = dragHp.el._order;
+          dragHp.el._side  = otroHp.el._side;
+          dragHp.el._order = otroHp.el._order;
+          otroHp.el._side  = sD;
+          otroHp.el._order = oD;
+        }
+      } else if(hover && hover.type === 'slot'){
+        // ── MOVER a un slot vacío ──
+        // El slot tiene posición física propia (left/top/width en su style).
+        var dragHp2 = window._hudPanels.find(function(hp){ return hp.el === panelEl; });
+        var slotEl  = hover.el;
+        if(dragHp2){
+          panelEl.style.top   = slotEl.style.top;
+          panelEl.style.left  = slotEl.style.left;
+          panelEl.style.width = slotEl.style.width;
+          // Estado lógico: la card pasa a la zona del slot, al final de ella.
+          var newSide = slotEl.dataset.side;
+          if(newSide){
+            var cuantos = window._hudPanels.filter(function(hp){
+              return hp.el !== panelEl && hp.el._side === newSide;
+            }).length;
+            dragHp2.el._side  = newSide;
+            dragHp2.el._order = cuantos; // al final de la zona nueva
+          }
+        }
+      }
+      // Si no hubo hover válido: la card simplemente vuelve a su sitio
+      // (su top/left/width nunca se tocaron, solo se limpió el transform).
 
       clearGhostSlots();
-
-      // ─── FIX v5.193+v5.195: "layout se desconfigura al soltar" ───
-      // _reposicionarHUD mide scrollHeight de cada panel para apilarlos. Si
-      // el panel arrastrado conserva transform o el width/height de su
-      // columna ANTERIOR, se mide mal → toda la columna se apila mal.
-      // Limpiar TODAS las dimensiones inline del panel movido para que
-      // _reposicionarHUD lo mida desde cero. positionCol reasigna después.
-      panelEl.style.transform = '';
-      panelEl.style.width     = '';
-      panelEl.style.height    = '';
-      panelEl.style.maxHeight = '';
-      panelEl.style.overflowY = '';
-      panelEl.style.left      = '';
-      panelEl.style.top       = '';
-
-      // v5.195: reposicionar de forma SÍNCRONA. _reposicionarHUD ya fuerza
-      // reflow internamente al leer scrollHeight, así que no hace falta
-      // esperar un frame; hacerlo asíncrono dejaba una ventana donde el
-      // layout se veía roto. Llamada directa = aterrizaje inmediato.
-      if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
       saveLayout();
-      buildGhostSlots();
+      // Reconstruir slots vacíos sin recalcular el layout completo.
+      requestAnimationFrame(function(){ buildGhostSlots(); });
 
       _state.dragEl = null;
       _state.dragSide = null;
