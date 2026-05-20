@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.179
+/* RAW Entry — Overlay v.5.180
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -884,7 +884,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(175, Math.min(275, Math.floor((W * H) / 6400)));  // v5.179: +25% estrellas
+      var nStars = Math.max(263, Math.min(413, Math.floor((W * H) / 4267)));  // v5.180: +50% estrellas
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
         var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
@@ -1492,7 +1492,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildDust(){
       dust = [];
-      var n = Math.floor((W * H) / 4400);  // v5.177: +25% densidad de polvo cósmico
+      var n = Math.floor((W * H) / 2933);  // v5.180: +50% densidad de polvo cósmico
       for(var i = 0; i < n; i++){
         // Polvo en coordenadas polares (también orbita lentamente)
         var r = 40 + Math.random() * (MAX_R - 40);
