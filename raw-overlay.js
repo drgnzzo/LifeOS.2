@@ -1,24 +1,34 @@
-/* RAW Entry — Overlay v.5.191
-   FIX titulos de header que seguian cortados (PATRIM…, NECESI…, etc.)
+/* RAW Entry — Overlay v.5.192
+   AUDITORIA completa de textos en cards compactas y expandidas.
 
-   ── Bug v5.190 ──
-   Los headers CON sparkline aun truncaban el titulo: el sparkline tenia
-   width:48px;flex-shrink:0 (rigido) y el titulo flex:1 no tenia a donde
-   crecer → ellipsis lo cortaba. FIJOS (sin sparkline) si se veia bien.
+   ── Auditoria v5.192 ──
+   Revision regla por regla de todo el CSS HUD. Resultado:
 
-   ── Fix v5.191 ──
-   Invertir prioridad de ancho en el header:
-     · .hud-h-t      → flex:0 1 auto; flex-shrink:0; SIN ellipsis.
-                       El titulo nunca se corta y nunca salta a 2 lineas.
-     · .hud-h-spark  → flex:0 1 48px; min-width:0. El sparkline CEDE el
-                       espacio: se encoge cuando el titulo lo necesita.
-     · .hud-h        → flex-wrap:nowrap (header siempre en 1 fila).
-     · .hud-hero-lbl → +nowrap (no rompe a 2 lineas; "EXCEDENTE DEL MES").
-     · .hud-trio-cell .lbl → 7.5px→7px ("RACHA ACTUAL" cabe completo).
+   COMPACTO — corregido en esta version:
+     · .hud-card-l   → letter-spacing .14em→.05em + nowrap
+                       ("MISION DIARIA","NIVEL SIGUIENTE" sin apretar)
+     · .hud-card-sub → fuente 10.5px→9.5px
+                       ("Completa 3 habitos hoy","Recompensas
+                        desbloqueadas" caben completos)
+
+   COMPACTO — ya correcto (v5.189-191), sin cambios:
+     · .hud-h-t, .hud-hero-v, .hud-hero-lbl, .hud-trio-cell,
+       .hud-cta .lbl, .hud-need-l, .hud-row-l, .hud-mas-l,
+       .hud-mini-row — todos caben o truncan texto variable
+       de forma controlada.
+
+   EXPANDIDO — auditado, sin cambios necesarios:
+     · Titulos de seccion no llevan nowrap → si no caben bajan de
+       linea naturalmente (hay ancho de sobra en el panel central).
+     · Tablas (.tbl) usan nowrap correctamente + overflow-x:auto.
+     · Unico ellipsis (subtexto de apartado: banco·categoria·meta)
+       es truncado controlado e intencional para texto variable.
+
+   ── Heredado v5.191 ──
+   El titulo del header manda sobre el sparkline (flex-shrink:0).
 
    ── Heredado v5.190 ──
-   Reduccion de tamaño/letter-spacing en hud-h-t, hud-hero-v,
-   hud-trio-cell, hud-cta para que los textos quepan.
+   Reduccion de tamaño/letter-spacing para que los textos quepan.
 
    ── FIX clicks rotos en +Nueva — causa raíz definitiva (heredado v5.189) ──
 
@@ -2716,9 +2726,14 @@ function _crearDialOverlay(){
       '.hud-card-ico i{font-size:14px}',
       '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}',
       '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:6px}',
-      '.hud-card-l{font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}',
+      // v5.192: letter-spacing .14->.05em + nowrap. "NIVEL SIGUIENTE" /
+      // "MISION DIARIA" caben sin apretar y nunca rompen a 2 lineas.
+      '.hud-card-l{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}',
       '.hud-card-r{font-size:10.5px;font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap}',
-      '.hud-card-sub{font-size:10.5px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      // v5.192: fuente 10.5->9.5px para que subtitulos largos
+      // ("Completa 3 habitos hoy", "Recompensas desbloqueadas") quepan
+      // completos en la card. Ellipsis se conserva como red de seguridad.
+      '.hud-card-sub{font-size:9.5px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
       '.hud-card-bar{height:5px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 2px rgba(0,0,0,0.40)}',
       '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease;min-width:1px}',
       '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace;white-space:nowrap}',
