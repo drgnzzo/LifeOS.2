@@ -1,5 +1,19 @@
-/* RAW Entry — Overlay v.5.203
-   ORDEN en el fondo del overlay (menos caótico).
+/* RAW Entry — Overlay v.5.204
+   WARP — agujero negro que respira (lento y orgánico).
+
+   ── Cambios v5.204 ──
+   El warp de v5.203 jalaba todo al centro, muy rápido y muy fuerte.
+   Ahora:
+   · CICLO RESPIRATORIO (~52s): fase de JALAR (espiral hacia el
+     centro) ↔ fase de EXPULSAR (las saca hacia afuera). Transición
+     con seno = sin saltos.
+   · Órbita siempre presente — las partículas GIRAN mientras entran
+     o salen, no caen en línea recta. Espiral real.
+   · Atracción MUY suavizada (fuerza base 8-22 vs. 14-104 antes) y
+     giro más lento. Todo orgánico, sin succión violenta.
+
+   ── Heredado v5.203 ──
+   ORDEN en el fondo del overlay (halos quietos, anillos alineados).
 
    ── Cambios v5.203 ──
    · HALOS lejanos: quietos y sutiles — brillo FIJO por halo, sin
@@ -1443,55 +1457,83 @@ function _crearDialOverlay(){
       };
     }
 
-    // v5.203 — DISCO DE ACRECIÓN: las partículas espiralan SIEMPRE hacia
-    // el centro (sin ciclo de expansión). Aceleran y brillan al acercarse,
-    // cruzan el horizonte de eventos y son "tragadas" → renacen lejos.
-    // Un agujero negro de verdad: flujo constante hacia adentro.
+    // v5.204 — AGUJERO NEGRO QUE RESPIRA. Ciclo lento (~52s):
+    //  · fase JALAR    → las partículas espiralan hacia el centro
+    //  · fase EXPULSAR → el agujero "exhala" y las saca hacia afuera
+    // Todo LENTO y orbitando: la órbita (giro) está siempre presente,
+    // la componente radial (entrar/salir) es suave y cíclica. Ni la
+    // succión violenta de v5.203 ni el campo quieto. Orgánico.
+    var _warpCycleT = 0;
     function drawWarp(dt){
       var diag = Math.hypot(W/2, H/2);
-      var eventHorizon = DIAL_R * 0.62;  // borde del agujero negro
+      var eventHorizon = DIAL_R * 0.62;
+
+      // ── CICLO RESPIRATORIO ──
+      // breath: +1 = jalando al máximo · −1 = expulsando al máximo.
+      // Transición con seno → sin saltos. Ciclo largo = cambio lento.
+      _warpCycleT += dt;
+      var CYCLE = 52;  // segundos por ciclo completo (jalar + expulsar)
+      var breath = Math.sin((_warpCycleT / CYCLE) * Math.PI * 2);
 
       for(var i = 0; i < warpParticles.length; i++){
         var w = warpParticles[i];
 
-        // ── ROTACIÓN: kepleriana — más rápido cuanto más cerca ──
-        // Todas giran en la MISMA dirección (horario) → orden.
+        // ── ÓRBITA: siempre presente, misma dirección, LENTA ──
+        // Más rápido cerca del centro pero suave (kepleriano amortiguado).
         var safeR = Math.max(eventHorizon, w.r);
-        var angVel = (70 / Math.pow(safeR, 0.95)) * 0.5;
+        var angVel = (40 / Math.pow(safeR, 0.85)) * 0.42;  // v5.204: giro lento
         w.theta += angVel * dt;
-        w.phase += dt * 1.5;
+        w.phase += dt * 1.2;
 
-        // ── CAÍDA HACIA EL CENTRO: constante, acelera cerca ──
-        // La velocidad de caída crece a medida que se acerca (gravedad).
-        var prox = 1 - Math.min(1, w.r / diag);          // 0 lejos, 1 centro
-        var fallSpeed = (14 + prox * prox * 90) * w.fallRate;
-        w.r -= fallSpeed * dt;
+        // ── RADIAL: jalar / expulsar, LENTO y suave ──
+        var prox = 1 - Math.min(1, w.r / diag);   // 0 lejos, 1 centro
+        // Fuerza base muy suave. breath>0 jala (radialVel negativo),
+        // breath<0 expulsa (radialVel positivo).
+        // La atracción crece un poco cerca del centro, la expansión
+        // crece un poco lejos — pero todo MUY moderado.
+        var pullStrength = 8 + prox * 14;          // suave (antes 14+90)
+        var pushStrength = 8 + (1 - prox) * 12;
+        var radialVel;
+        if(breath > 0){
+          radialVel = -pullStrength * breath * w.fallRate;
+        } else {
+          radialVel = pushStrength * (-breath) * w.fallRate;
+        }
+        w.r += radialVel * dt;
 
-        // ── ABSORCIÓN: cruza el horizonte → tragada, renace lejos ──
+        // ── LÍMITES: tragada al centro / no salirse del todo ──
         if(w.r <= eventHorizon){
-          w.r = diag * (0.70 + Math.random() * 0.45);
-          w.theta = Math.random() * Math.PI * 2;
-          w.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-          w._reborn = 0;  // fade-in al renacer
+          // Solo es "tragada" si está en fase de jalar; si está
+          // expulsando, simplemente rebota suave hacia afuera.
+          if(breath > 0){
+            w.r = diag * (0.72 + Math.random() * 0.40);
+            w.theta = Math.random() * Math.PI * 2;
+            w.color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+            w._reborn = 0;
+          } else {
+            w.r = eventHorizon + 2;
+          }
+        } else if(w.r > diag + 70){
+          w.r = diag + 70;
         }
         if(w._reborn < 1){
-          w._reborn = Math.min(1, w._reborn + dt * 1.2);
+          w._reborn = Math.min(1, w._reborn + dt * 1.0);
         }
 
         // ── RENDER ──
         var px = CX + Math.cos(w.theta) * w.r;
         var py = CY + Math.sin(w.theta) * w.r;
         var twinkle = 0.7 + 0.3 * Math.sin(w.phase);
-        // Cerca del horizonte: último destello brillante antes de caer.
         var nearHorizon = Math.max(0, 1 - (w.r - eventHorizon) / (DIAL_R * 1.0));
-        var alpha = (0.16 + prox * 0.5) * twinkle * w._reborn;
-        if(nearHorizon > 0) alpha *= (1 + nearHorizon * 1.1);
-        var radius = w.size * (0.7 + prox * 0.8) * (1 + nearHorizon * 0.7);
-        // Blueshift cerca del centro (calentamiento del disco).
+        // Brillo modulado por la fase: un poco más vivo al jalar.
+        var cycleGlow = 0.82 + 0.18 * Math.abs(breath);
+        var alpha = (0.16 + prox * 0.46) * twinkle * w._reborn * cycleGlow;
+        if(nearHorizon > 0) alpha *= (1 + nearHorizon * 0.9);
+        var radius = w.size * (0.7 + prox * 0.7) * (1 + nearHorizon * 0.6);
         var col = prox > 0.7 ? '#E0F2FE' : w.color;
         pctx.fillStyle = col + Math.floor(Math.max(0, Math.min(1, alpha)) * 220).toString(16).padStart(2, '0');
         pctx.shadowColor = col;
-        pctx.shadowBlur = 2 + prox * 10 + nearHorizon * 12;
+        pctx.shadowBlur = 2 + prox * 9 + nearHorizon * 10;
         pctx.beginPath();
         pctx.arc(px, py, radius, 0, Math.PI * 2);
         pctx.fill();
