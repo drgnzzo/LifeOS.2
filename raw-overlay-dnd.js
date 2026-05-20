@@ -1,4 +1,8 @@
-/* RAW Entry — Overlay Drag & Drop v.5.195
+/* RAW Entry — Overlay Drag & Drop v.5.197
+   FIX v5.197: hook de _reposicionarHUD ELIMINADO (congelaba referencia
+   vieja sin lock → layout roto al soltar). buildGhostSlots se invoca
+   ahora desde el reposicionador via _overlayDnd.rebuild.
+   ── Heredado v5.195
 
    ── FIX v5.195: "el layout se desconfigura al soltar un panel" ──
    El fix de fondo va en raw-overlay.js (_reposicionarHUD limpia
@@ -533,20 +537,14 @@
       requestAnimationFrame(buildGhostSlots);
     });
 
-    // Hook _reposicionarHUD para que rebuild slots cada vez que se reposiciona
-    if(typeof window._reposicionarHUD === 'function' && !window._reposicionarHUD._dndHooked){
-      var origRepos = window._reposicionarHUD;
-      window._reposicionarHUD = function(){
-        var r = origRepos.apply(this, arguments);
-        // Esperar al next frame para que las posiciones estén aplicadas
-        requestAnimationFrame(function(){
-          // Solo rebuild si no estamos en mitad de un drag
-          if(!_state.dragEl) buildGhostSlots();
-        });
-        return r;
-      };
-      window._reposicionarHUD._dndHooked = true;
-    }
+    // v5.197: hook ELIMINADO. Antes envolvíamos window._reposicionarHUD
+    // capturando su referencia en 'origRepos'. Pero el polling de init
+    // podía capturar esa referencia ANTES de que raw-overlay.js asignara
+    // su versión final (con el lock de reentrada) → el DnD llamaba una
+    // versión vieja sin lock → layout roto al soltar (confirmado en
+    // runtime). Ya no se hookea: buildGhostSlots se invoca explícitamente
+    // donde hace falta (onUp ya lo hace tras _reposicionarHUD; el resize
+    // y abrirDial también). No envolver = no congelar referencias viejas.
 
     // Nota: el listener de resize/zoom lo maneja raw-overlay.js (con
     // _resetDuroLayout + _reposicionarHUD). Aquí solo escuchamos para
@@ -618,7 +616,9 @@
 
   // Debug global
   window._overlayDnd = {
-    rebuild: buildGhostSlots,
+    // v5.197: rebuild seguro — no reconstruye si hay un drag en curso
+    // (los slots se reconstruyen solos al terminar el drop, en onUp).
+    rebuild: function(){ if(!_state.dragEl) buildGhostSlots(); },
     buildGhostSlots: buildGhostSlots,
     clear: clearGhostSlots,
     clearGhostSlots: clearGhostSlots,

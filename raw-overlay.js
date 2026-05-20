@@ -1,4 +1,9 @@
-/* RAW Entry — Overlay v.5.196
+/* RAW Entry — Overlay v.5.197
+   FIX v5.197: lock de reentrada GLOBAL (window._reposLock) + el DnD ya
+   no hookea _reposicionarHUD. El hook congelaba una referencia vieja
+   sin lock (confirmado en runtime: LOCK AUSENTE). Ahora el lock es
+   global y el reposicionador avisa al DnD via _overlayDnd.rebuild.
+   ── Heredado v5.196
    FIX DEFINITIVO "layout se desconfigura al soltar un panel".
 
    ── Causa raíz (confirmada con diagnóstico en runtime) ──
@@ -3339,29 +3344,27 @@ function _crearDialOverlay(){
   window._calcDialSize = _calcDialSize;
 
   // ── Reposicionar HUD ──
-  // ─── FIX v5.196: lock de reentrada (causa raíz del "layout roto al
-  //     soltar un panel") ───
-  // _reposicionarHUD posiciona las 4 columnas en secuencia, cada una
-  // midiendo scrollHeight (lo que fuerza reflow). Si una SEGUNDA llamada
-  // entra mientras la primera aún no termina (cosa que pasa al soltar un
-  // panel: onUp llama _reposicionarHUD, el hook del DnD agenda trabajo,
-  // y otros callers se solapan), las dos pasadas se pisan: la columna A
-  // se coloca con un estado y la C con otro → columnas a distinta altura.
-  // El lock hace que las llamadas reentrantes se ignoren, y agenda UNA
-  // sola re-ejecución limpia al final si hubo intentos durante el lock.
-  var _reposEnCurso = false;
-  var _reposPendiente = false;
+  // ─── FIX v5.197: lock de reentrada GLOBAL ───
+  // v5.196 puso el lock en variables locales (closure). Pero el DnD
+  // captura una REFERENCIA de window._reposicionarHUD por polling, y la
+  // congela en 'origRepos'. Si la captura antes de que el wrapper quede
+  // asignado, su referencia salta el lock (confirmado en runtime:
+  // toString() del reposicionador no contenía '_reposEnCurso').
+  // SOLUCIÓN: el lock vive en window._reposLock — una variable GLOBAL que
+  // cualquier referencia (vieja, nueva, hookeada) comparte. Imposible
+  // saltarlo sin importar quién llame.
   function _reposicionarHUD(){
-    if(_reposEnCurso){ _reposPendiente = true; return; }
-    _reposEnCurso = true;
+    if(window._reposLock){ window._reposPend = true; return; }
+    window._reposLock = true;
     try {
       _reposicionarHUD_impl();
     } finally {
-      _reposEnCurso = false;
-      if(_reposPendiente){
-        _reposPendiente = false;
-        // Re-ejecutar una vez en frío para asentar el layout final.
-        requestAnimationFrame(function(){ _reposicionarHUD(); });
+      window._reposLock = false;
+      if(window._reposPend){
+        window._reposPend = false;
+        requestAnimationFrame(function(){
+          if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
+        });
       }
     }
   }
@@ -4064,6 +4067,13 @@ function _crearDialOverlay(){
         '</div>';
       });
       stopsEl.innerHTML = html;
+    }
+
+    // v5.197: en vez de que el DnD hookee esta función (lo que congelaba
+    // referencias viejas), es el reposicionador quien avisa al DnD que
+    // reconstruya sus slots vacíos. El DnD expone _overlayDnd.rebuild.
+    if(window._overlayDnd && typeof window._overlayDnd.rebuild === 'function'){
+      requestAnimationFrame(function(){ window._overlayDnd.rebuild(); });
     }
   }
   window._reposicionarHUD = _reposicionarHUD;
