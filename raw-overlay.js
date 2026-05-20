@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.177
+/* RAW Entry — Overlay v.5.178
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -730,12 +730,13 @@ function _crearDialOverlay(){
     'border-radius:50%',
     'pointer-events:none',
     'z-index:0',
-    'backdrop-filter:blur(12px) saturate(110%)',
-    '-webkit-backdrop-filter:blur(12px) saturate(110%)',
-    // Mask radial: full opaque en el centro, fade hacia el borde
-    // para que la transición a "sin blur" sea gradual y no se note el corte
-    '-webkit-mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 78%)',
-    'mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 78%)',
+    // v5.178: blur más intenso + fondo oscuro semi-opaco para tapar más
+    'backdrop-filter:blur(24px) saturate(120%) brightness(0.85)',
+    '-webkit-backdrop-filter:blur(24px) saturate(120%) brightness(0.85)',
+    'background:radial-gradient(circle at 50% 50%, rgba(8,6,18,0.55) 0%, rgba(8,6,18,0.40) 45%, rgba(8,6,18,0.0) 78%)',
+    // Mask radial: opaque en el centro, fade hacia el borde
+    '-webkit-mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 82%)',
+    'mask:radial-gradient(circle at 50% 50%, rgba(0,0,0,1) 55%, rgba(0,0,0,0) 82%)',
   ].join(';');
   _dialOverlay.appendChild(_dialBlurDisc);
 
