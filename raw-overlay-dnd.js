@@ -1,7 +1,22 @@
-/* RAW Entry — Overlay Drag & Drop v.5.142
+/* RAW Entry — Overlay Drag & Drop v.5.193
 
-   Cambios desde v5.087:
-   - FIX BUG "layout se rompe al soltar una card". Causa raíz: 3 bugs
+   ── FIX v5.193: "el layout se desconfigura al soltar un panel" ──
+   CAUSA RAÍZ (definitiva): al soltar, onUp actualizaba bien _side/_order
+   en memoria, pero limpiaba SOLO el transform del panel antes de llamar
+   _reposicionarHUD. El panel movido conservaba el width/height inline de
+   su columna ANTERIOR. _reposicionarHUD mide scrollHeight para apilar los
+   paneles → con un width equivocado, la altura medida salía mal → toda la
+   columna se apilaba con posiciones incorrectas. Recargar lo "arreglaba"
+   porque restoreLayout + _reposicionarHUD corrían en frío, sin estilos
+   residuales.
+   FIX: en onUp, antes de reposicionar, se limpian TODAS las dimensiones
+   inline del panel movido (transform, width, height, maxHeight, overflowY,
+   left, top). Además _reposicionarHUD se invoca en el requestAnimationFrame
+   siguiente — no de forma síncrona — para que el navegador aplique primero
+   la limpieza de estilos y las alturas se midan reales.
+
+   ── Heredado v5.142 ──
+   FIX BUG "layout se rompe al soltar una card". Causa raíz: 3 bugs
      combinados en persistencia y reordenamiento:
      1. saveLayout iteraba en orden de declaración de _hudPanels en lugar
         de ordenar por _order. Resultado: el array guardado quedaba
@@ -457,13 +472,31 @@
 
       clearGhostSlots();
 
-      // Ahora sí limpiamos transform — _reposicionarHUD aplicará la posición
-      // nueva (left/top) y el panel "aterriza" directamente sin saltar.
+      // ─── FIX v5.193: causa raíz del "layout se desconfigura al soltar" ───
+      // _reposicionarHUD mide scrollHeight de cada panel para apilarlos. Si
+      // el panel arrastrado conserva el transform Y el width/height de su
+      // columna ANTERIOR, se mide con un ancho equivocado → su alto sale mal
+      // → toda la columna se apila con posiciones incorrectas.
+      // Solución: limpiar transform + TODAS las dimensiones inline del panel
+      // movido, para que _reposicionarHUD lo mida desde cero con el ancho de
+      // su columna nueva. positionCol reasigna width/left/top después.
       panelEl.style.transform = '';
+      panelEl.style.width     = '';
+      panelEl.style.height    = '';
+      panelEl.style.maxHeight = '';
+      panelEl.style.overflowY = '';
+      panelEl.style.left      = '';
+      panelEl.style.top       = '';
 
-      if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
+      // Reposicionar en el SIGUIENTE frame: así el navegador aplica primero
+      // la limpieza de estilos de arriba y _reposicionarHUD mide alturas
+      // reales y correctas. Llamarlo de forma síncrona aquí mediría el panel
+      // a mitad de transición.
       saveLayout();
-      requestAnimationFrame(function(){ buildGhostSlots(); });
+      requestAnimationFrame(function(){
+        if(typeof window._reposicionarHUD === 'function') window._reposicionarHUD();
+        requestAnimationFrame(function(){ buildGhostSlots(); });
+      });
 
       _state.dragEl = null;
       _state.dragSide = null;
