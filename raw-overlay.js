@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.5.184
+/* RAW Entry — Overlay v.5.185
    FIX clicks rotos en +Nueva — causa raíz definitiva.
 
    ── Bug ──
@@ -1090,7 +1090,7 @@ function _crearDialOverlay(){
       warpParticles = [];
       // El warp ahora abarca TODA la interfaz — partículas distribuidas
       // por todo el viewport, no solo cerca del dial.
-      var nWarp = 220;
+      var nWarp = 600;  // v5.185: warp masivo
       var diag = Math.hypot(W/2, H/2);
       for(var i = 0; i < nWarp; i++){
         warpParticles.push(spawnWarpParticle(diag));
@@ -1122,7 +1122,7 @@ function _crearDialOverlay(){
       // ── CICLO CÓSMICO: big crunch ↔ big bang ──
       // Periodo total ~24s: 12s contrayéndose, 12s expandiéndose.
       cosmicCycleTime += dt;
-      var CYCLE = 24;
+      var CYCLE = 40;  // v5.185: ciclo más lento
       var halfCycle = CYCLE / 2;
       var tInCycle = cosmicCycleTime % CYCLE;
       // cosmicForce: -1 = contracción máxima (hacia el centro)
@@ -1141,7 +1141,7 @@ function _crearDialOverlay(){
         // ω = K / r^1.5 (tercera ley de Kepler: T² ∝ r³ → ω ∝ r^-1.5)
         // Reducimos el factor cerca del centro para que sea "más lento en el warp"
         var safeR = Math.max(eventHorizon, w.r);
-        var angVel = (90 / Math.pow(safeR, 1.05)) * 0.5;  // v5.184: más lento
+        var angVel = (90 / Math.pow(safeR, 1.05)) * 0.3;  // v5.185: aún más lento
         w.theta += angVel * dt;
         w.phase += dt * 1.5;
 
@@ -1155,10 +1155,10 @@ function _crearDialOverlay(){
         var radialVel;
         if(force > 0){
           // Contracción: cae hacia el centro, acelera cerca (gravedad)
-          radialVel = -(gravityPull + 20) * force;
+          radialVel = -(gravityPull + 12) * force * 0.6;  // v5.185: más lento
         } else {
           // Expansión: sale hacia afuera, acelera lejos
-          radialVel = (expansionPush + 20) * (-force);
+          radialVel = (expansionPush + 12) * (-force) * 0.6;  // v5.185: más lento
         }
         w.r += radialVel * dt;
 
@@ -1190,23 +1190,7 @@ function _crearDialOverlay(){
         pctx.fill();
       }
       pctx.shadowBlur = 0;
-
-      // ── PHOTON RING (horizonte de eventos) ──
-      // Pulsa más fuerte en el momento de máxima contracción
-      var crunchIntensity = Math.max(0, force); // 0..1, máximo en el crunch
-      var ringPulse = 0.5 + 0.5 * Math.sin(globalT * 1.5) + crunchIntensity * 0.4;
-      var photonGrad = pctx.createRadialGradient(
-        CX, CY, eventHorizon * 0.5,
-        CX, CY, eventHorizon * 2.0
-      );
-      photonGrad.addColorStop(0, 'rgba(224,242,254,0)');
-      photonGrad.addColorStop(0.55, 'rgba(167,139,250,' + (0.10 * ringPulse).toFixed(3) + ')');
-      photonGrad.addColorStop(0.82, 'rgba(103,232,249,' + (0.16 * ringPulse).toFixed(3) + ')');
-      photonGrad.addColorStop(1, 'rgba(224,242,254,0)');
-      pctx.fillStyle = photonGrad;
-      pctx.beginPath();
-      pctx.arc(CX, CY, eventHorizon * 2.0, 0, Math.PI * 2);
-      pctx.fill();
+      // v5.185: photon ring eliminado (el halo del centro molestaba)
     }
 
     function drawSpirals(dt){
