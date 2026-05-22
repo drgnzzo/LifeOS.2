@@ -1719,7 +1719,10 @@ document.addEventListener('DOMContentLoaded', function(){
 
       function chkItem(fila, tipo, done){
         var c = CAT[tipo];
-        // Recuperar fecha guardada localmente para este check
+        // v5.209: la fecha de completado YA se muestra después del texto
+        // del concepto (en itemList). Antes chkItem también la metía DENTRO
+        // del círculo (texto de 5px embutido) — se veía amontonada sobre la
+        // esfera. El círculo ahora lleva solo el check; nada de fecha aquí.
         var fechaLocal = '';
         try {
           fechaLocal = localStorage.getItem('actItemDate:'+tipo+':'+fila) || '';
@@ -1730,9 +1733,8 @@ document.addEventListener('DOMContentLoaded', function(){
           'border:1.5px solid '+(done?c.color:'#26304A')+';'+
           'background:'+(done?c.color:'transparent')+';'+
           'box-shadow:'+(done?'0 0 8px '+c.glow:'none')+';'+
-          'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0">'+
-          (done?'<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none;line-height:1"></i>':'')+
-          (done&&fechaLocal?'<span style="font-size:5px;color:rgba(255,255,255,0.85);pointer-events:none;line-height:1;font-weight:700;margin-top:1px">'+fechaLocal+'</span>':'')+
+          'display:flex;align-items:center;justify-content:center">'+
+          (done?'<i class="fas fa-check" style="font-size:10px;color:#fff;pointer-events:none;line-height:1"></i>':'')+
         '</div>';
       }
 
@@ -2012,6 +2014,16 @@ document.addEventListener('DOMContentLoaded', function(){
               ' / '+
               ((tipo==='personal'?totales.personal:tipo==='electronics'?totales.electronics:tipo==='libro'?totales.libro:tipo==='movie'?totales.movie:totales.norut))+
             '</span>'+
+            // v5.209: botón "limpiar TODA la columna" — solo en Personal y
+            // Electronics (las que tienen checks de días). Limpia todos los
+            // checks de todas las filas de golpe.
+            ((tipo==='personal'||tipo==='electronics')
+              ? '<button class="_act-clear-all" data-tipo="'+tipo+'" title="Limpiar todos los checks de esta columna" '+
+                'style="margin-left:8px;background:transparent;border:1px solid rgba(239,68,68,0.35);'+
+                'color:#EF4444;border-radius:6px;width:24px;height:24px;cursor:pointer;flex-shrink:0;'+
+                'display:flex;align-items:center;justify-content:center;font-size:10px">'+
+                '<i class="fas fa-trash-can" style="pointer-events:none"></i></button>'
+              : '')+
           '</div>'+
           // ── filterBar FIJA, fuera del scroll ──
           filterBar(tipo)+
@@ -2132,6 +2144,39 @@ document.addEventListener('DOMContentLoaded', function(){
           return;
         }
 
+        // ── v5.209: Botón limpiar TODA la columna (Personal/Electronics) ──
+        var clrAll = e.target.closest('._act-clear-all');
+        if(clrAll){
+          var tipoCA = clrAll.dataset.tipo;
+          var d2CA   = window._actData; if(!d2CA) return;
+          var arrCA  = tipoCA==='personal'?d2CA.habitosPersonal:d2CA.habitosElectronics;
+          if(!arrCA || !arrCA.length) return;
+          var diasCA = (CAT[tipoCA].dias||[]);
+          // Contar cuántos checks hay para el mensaje de confirmación.
+          var totalChecks = 0;
+          arrCA.forEach(function(h){
+            diasCA.forEach(function(dia){ if(h.checks && h.checks[dia]) totalChecks++; });
+          });
+          if(totalChecks === 0) return;
+          if(!confirm('¿Limpiar TODOS los checks de la columna '+CAT[tipoCA].label+'? ('+totalChecks+' checks). Esta acción no se puede deshacer.')) return;
+          // Limpiar en datos + API, fila por fila / día por día.
+          arrCA.forEach(function(h){
+            diasCA.forEach(function(dia){
+              if(h.checks && h.checks[dia]){
+                if(typeof api!=='undefined') api.setActivityCheck(tipoCA, h.fila, dia, false);
+                h.checks[dia] = false;
+              }
+            });
+          });
+          // Re-render visual del inner de esa columna.
+          var panelCA = clrAll.closest('[data-panel-tipo]');
+          if(panelCA){
+            var innerCA = panelCA.querySelector('[data-panel-inner]');
+            if(innerCA) innerCA.innerHTML = habTable(arrCA, tipoCA);
+          }
+          return;
+        }
+
         // ── Botón limpiar fila completa (Personal/Electronics) ──
         var clr = e.target.closest('._act-clear-row');
         if(clr && !clr.disabled){
@@ -2242,11 +2287,11 @@ document.addEventListener('DOMContentLoaded', function(){
           it.style.borderColor = nowDone?cat.color:'#26304A';
           it.style.background  = nowDone?cat.color:'transparent';
           it.style.boxShadow   = nowDone?'0 0 8px '+cat.glow:'none';
-          it.style.flexDirection='column';
+          // v5.209: el círculo lleva SOLO el check. La fecha se muestra
+          // después del texto del concepto (en el span de info), no aquí.
           if(nowDone){
             it.setAttribute('title', fechaStr);
-            it.innerHTML = '<i class="fas fa-check" style="font-size:9px;color:#fff;pointer-events:none;line-height:1"></i>'+
-              '<span style="font-size:5px;color:rgba(255,255,255,0.85);pointer-events:none;line-height:1;font-weight:700;margin-top:1px">'+fechaStr+'</span>';
+            it.innerHTML = '<i class="fas fa-check" style="font-size:10px;color:#fff;pointer-events:none;line-height:1"></i>';
           } else {
             it.removeAttribute('title');
             it.innerHTML = '';
