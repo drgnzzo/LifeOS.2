@@ -1,4 +1,11 @@
-/* RAW Entry — Overlay v.5.207
+/* RAW Entry — Overlay v.5.208
+   FIX Variables expandido vacio. Causa: datosMes se llena en una
+   variable local de raw-core via onDatosMes, pero el hydrate del
+   overlay leia window.datosMes — no era la misma. Ademas el fallback
+   llamaba api.getDatosMes() que no se invoca en el flujo normal.
+   FIX: onDatosMes ahora expone window.datosMes; el hydrate lo lee y
+   usa getAll como fallback (getAll si trae d.datosMes).
+   ── Heredado v5.207
    FIX solapamiento de cards laterales al expandir un panel. El ancho
    del panel central (centerW) no reservaba un GAP de separacion con
    las columnas → en pantallas medianas el panel central se encimaba
@@ -5295,12 +5302,20 @@ function _crearDialOverlay(){
         }
         // v5.206: usar la global datosMes SOLO si ya tiene meses cargados
         // (al inicio es {meses:[],grupos:{}} — vacía). Si no, pedir al API.
-        if(typeof datosMes !== 'undefined' && datosMes && datosMes.meses && datosMes.meses.length){
-          _pintar(datosMes);
-        } else if(typeof api !== 'undefined' && api.getDatosMes){
+        // v5.208: leer window.datosMes (lo expone onDatosMes). Si ya
+        // tiene meses, pintar directo.
+        var _dm = (typeof window.datosMes !== 'undefined') ? window.datosMes
+                : (typeof datosMes !== 'undefined' ? datosMes : null);
+        if(_dm && _dm.meses && _dm.meses.length){
+          _pintar(_dm);
+        } else if(typeof api !== 'undefined' && api.getAll){
+          // v5.208: fallback vía getAll (getDatosMes no se invoca en el
+          // flujo normal; getAll sí, y trae d.datosMes).
           var el1 = document.getElementById('hud-var-tabla');
           if(el1) el1.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">Cargando…</div>';
-          api.getDatosMes().then(_pintar).catch(function(){
+          api.getAll().then(function(d){
+            _pintar((d && d.datosMes) ? d.datosMes : d);
+          }).catch(function(){
             var el2 = document.getElementById('hud-var-tabla');
             if(el2) el2.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(220,224,235,0.40);font-size:12px">No se pudieron cargar los datos</div>';
           });

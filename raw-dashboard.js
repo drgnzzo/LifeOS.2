@@ -293,7 +293,16 @@ function renderAnualidad(data, containerId){
 // ══════════════════════════════════════════
 //  GASTOS POR MES
 // ══════════════════════════════════════════
-function onDatosMes(data){datosMes=data;renderGastos();initGraficas(data);}
+function onDatosMes(data){
+  datosMes=data;
+  // v5.208: exponer en window. El hydrate de la card expandida de
+  // Variables (en raw-overlay.js) lee window.datosMes; sin esto, la
+  // asignación a la variable local 'datosMes' de raw-core no se veía
+  // desde el overlay y la card salía vacía.
+  window.datosMes=data;
+  renderGastos();
+  initGraficas(data);
+}
 function renderGastos(containerId){
   const body=document.getElementById(containerId||'anualidad-body');
   const data=datosMes;
@@ -1124,3 +1133,312 @@ function renderFijosGraficas(){
 
 window.renderFijosExpandido=renderFijosExpandido;
 window.renderFijosGraficas=renderFijosGraficas;
+
+// ══════════════════════════════════════════════════════════════════
+//  VARIABLES — VISTA EXPANDIDA (mockup v5.200)
+//  Rediseño de la card expandida de Variables. Consume datosMes
+//  (meses[] + grupos[mes][] con {ente, monto}). NO reemplaza
+//  renderGastos (usado en la vista no-expandida).
+//
+//  ─── CONTRATO DE DATOS (lo que el GAS deberia entregar) ───
+//  datosMes = {
+//    meses: ["Enero","Febrero",...]              // ya existe
+//    grupos: { "Enero": [ {ente:string, monto:number}, ... ], ... }
+//  }
+//  Campos NUEVOS opcionales por ente (si el GAS los provee se usan,
+//  si no se derivan):
+//    - categoria: string  // agrupacion del ente; si falta = el ente
+//    - icono: string      // clase FontAwesome; si falta = heuristica
+//  Stat-cards (gasto total, mayor aumento, tendencia, mayor categoria)
+//  se DERIVAN de meses+grupos.
+//
+//  REGLAS DE NEGOCIO (de LifeOS):
+//   - Inicio, Final, Rectificacion, Bancos: se EXCLUYEN de los
+//     calculos de stats (no son gasto real).
+//   - BW: siempre ingreso.
+// ══════════════════════════════════════════════════════════════════
+
+// Entes que no cuentan como gasto variable real.
+var _VAR_EXCLUIR=['inicio','final','rectificacion','rectificación','bancos'];
+function _varEsExcluido(ente){
+  var e=String(ente||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+  return _VAR_EXCLUIR.indexOf(e)>=0;
+}
+function _varEsIngreso(ente){
+  return String(ente||'').toUpperCase()==='BW';
+}
+
+// Icono FontAwesome por ente (heuristico, decorativo).
+function _varIcono(ente){
+  var c=(ente||'').toLowerCase();
+  if(/inicio/.test(c)) return 'fa-flag';
+  if(/final/.test(c)) return 'fa-flag-checkered';
+  if(/^bw$/.test(c)) return 'fa-money-bill-trend-up';
+  if(/foodies|comida|rest/.test(c)) return 'fa-utensils';
+  if(/blue|agua/.test(c)) return 'fa-droplet';
+  if(/espiritu|espíritu/.test(c)) return 'fa-heart';
+  if(/ciencia/.test(c)) return 'fa-flask';
+  if(/aseo|limpieza/.test(c)) return 'fa-broom';
+  if(/suscrip/.test(c)) return 'fa-credit-card';
+  if(/servicio/.test(c)) return 'fa-wrench';
+  if(/^p$/.test(c)) return 'fa-user';
+  if(/^m$/.test(c)) return 'fa-m';
+  return 'fa-circle-dot';
+}
+
+// Paleta por ente — consistente con GRAF_COLORS donde existe.
+function _varColor(ente, idx){
+  if(typeof GRAF_COLORS!=='undefined' && GRAF_COLORS[ente]) return GRAF_COLORS[ente].line;
+  var PAL=['#3B82F6','#06B6D4','#8B5CF6','#F59E0B','#4ADE80','#EF4444',
+           '#EC4899','#FB923C','#A78BFA','#34D399','#67E8F9','#FBBF24'];
+  return PAL[idx%PAL.length];
+}
+
+function renderVariablesExpandido(data, containerId){
+  var body=document.getElementById(containerId||'hud-var-tabla');
+  if(!body) return;
+  if(!data||!data.meses||!data.meses.length){
+    body.innerHTML='<div style="padding:40px;text-align:center;color:rgba(220,224,235,.4);font-size:12px">Sin datos de movimientos variables</div>';
+    return;
+  }
+  var VC='#A5B4FC'; // acento del panel Variables
+  var meses=data.meses;
+  var mesActual=MESES_ES[new Date().getMonth()];
+  var fmt=function(v){
+    if(v===null||v===undefined) return '—';
+    return (v<0?'− ':'')+'$ '+Math.abs(v).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+  };
+
+  // Lista de entes (en orden de aparicion) + indice mes→ente→monto.
+  var entes=[];
+  var idx={};
+  meses.forEach(function(mes){
+    idx[mes]={};
+    (data.grupos[mes]||[]).forEach(function(e){
+      if(entes.indexOf(e.ente)<0) entes.push(e.ente);
+      idx[mes][e.ente]=e.monto;
+    });
+  });
+
+  // ── Metricas derivadas (excluyendo Inicio/Final/Rect/Bancos) ──
+  var idxMesAct=meses.findIndex(function(m){return m.toUpperCase()===mesActual.toUpperCase();});
+  if(idxMesAct<0) idxMesAct=meses.length-1;
+  function gastoMes(mi){
+    if(mi<0||mi>=meses.length) return 0;
+    var mes=meses[mi], t=0;
+    entes.forEach(function(ente){
+      if(_varEsExcluido(ente)||_varEsIngreso(ente)) return;
+      var v=idx[mes][ente];
+      if(typeof v==='number') t+=Math.abs(v);
+    });
+    return t;
+  }
+  // Gasto total del rango visible.
+  var gastoTotal=0;
+  meses.forEach(function(_,mi){ gastoTotal+=gastoMes(mi); });
+  // Mayor aumento mes a mes (por ente).
+  var mayorAumento={ente:'—',delta:0,de:'',a:''};
+  for(var mi=1; mi<meses.length; mi++){
+    entes.forEach(function(ente){
+      if(_varEsExcluido(ente)) return;
+      var prev=idx[meses[mi-1]][ente], cur=idx[meses[mi]][ente];
+      if(typeof prev==='number'&&typeof cur==='number'){
+        var d=Math.abs(cur)-Math.abs(prev);
+        if(d>mayorAumento.delta){
+          mayorAumento={ente:ente,delta:d,de:meses[mi-1],a:meses[mi]};
+        }
+      }
+    });
+  }
+  // Tendencia del mes actual vs anterior.
+  var gAct=gastoMes(idxMesAct), gPrev=gastoMes(idxMesAct-1);
+  var tendDelta=gAct-gPrev;
+  // Mayor categoria (ente con mayor gasto acumulado).
+  var acumPorEnte={};
+  entes.forEach(function(ente){
+    if(_varEsExcluido(ente)||_varEsIngreso(ente)) return;
+    var t=0;
+    meses.forEach(function(mes){
+      var v=idx[mes][ente];
+      if(typeof v==='number') t+=Math.abs(v);
+    });
+    acumPorEnte[ente]=t;
+  });
+  var mayorCat={ente:'—',total:0};
+  Object.keys(acumPorEnte).forEach(function(ente){
+    if(acumPorEnte[ente]>mayorCat.total) mayorCat={ente:ente,total:acumPorEnte[ente]};
+  });
+
+  // ── CSS scoped (.vrx-) ──
+  var css='<style>'+
+    '.vrx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:Manrope,-apple-system,sans-serif}'+
+    '.vrx-main{flex:1.2;min-width:0;display:flex;flex-direction:column}'+
+    '.vrx-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}'+
+    '.vrx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:10px}'+
+    '.vrx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
+    '.vrx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
+      'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
+      'border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap;text-align:center}'+
+    '.vrx-tbl th:first-child{text-align:left}'+
+    '.vrx-tbl td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);'+
+      'white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:11.5px}'+
+    '.vrx-tbl td:first-child{text-align:left}'+
+    '.vrx-tbl tr:hover td{background:rgba(255,255,255,.02)}'+
+    '.vrx-ente{display:flex;align-items:center;gap:9px;font-weight:700;color:#fff;font-size:12.5px}'+
+    '.vrx-ente i{width:24px;height:24px;display:flex;align-items:center;justify-content:center;'+
+      'border-radius:6px;background:rgba(255,255,255,.05);font-size:10px;flex-shrink:0}'+
+    '.vrx-th-act{color:'+VC+'!important}'+
+    '.vrx-pos{color:#4ADE80}.vrx-neg{color:#EF4444}.vrx-zero{color:rgba(220,224,235,.3)}'+
+    '.vrx-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}'+
+    '.vrx-stat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:10px;padding:12px 12px;display:flex;flex-direction:column;gap:5px}'+
+    '.vrx-stat-lbl{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.5)}'+
+    '.vrx-stat-v{font-size:18px;font-weight:800;font-family:JetBrains Mono,monospace;line-height:1}'+
+    '.vrx-stat-sub{font-size:9px;color:rgba(220,224,235,.45);font-weight:600}'+
+    '.vrx-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
+      'border-radius:10px;padding:13px 14px}'+
+    '.vrx-sec-t{font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;'+
+      'color:rgba(220,224,235,.65);margin-bottom:10px}'+
+    '.vrx-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}'+
+    '.vrx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;'+
+      'font-size:10px;font-weight:700;border:1px solid}'+
+    '.vrx-chip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}'+
+    '.vrx-foot{font-size:10px;color:rgba(220,224,235,.4);padding:10px 2px 0;font-weight:600}'+
+  '</style>';
+
+  // ── Tabla principal ──
+  var thead='<tr><th>Concepto</th>'+
+    meses.map(function(m){
+      var esA=m.toUpperCase()===mesActual.toUpperCase();
+      return '<th'+(esA?' class="vrx-th-act"':'')+'>'+m+'</th>';
+    }).join('')+'</tr>';
+
+  var tbody=entes.map(function(ente,ei){
+    var celdas=meses.map(function(mes){
+      var v=idx[mes][ente];
+      if(v===null||v===undefined) return '<td><span class="vrx-zero">—</span></td>';
+      var cls=v>0?'vrx-pos':v<0?'vrx-neg':'vrx-zero';
+      return '<td><span class="'+cls+'">'+fmt(v)+'</span></td>';
+    }).join('');
+    return '<tr>'+
+      '<td><div class="vrx-ente"><i class="fas '+_varIcono(ente)+'" style="color:'+_varColor(ente,ei)+'"></i>'+ente+'</div></td>'+
+      celdas+'</tr>';
+  }).join('');
+
+  var tablaHTML='<div class="vrx-tbl-wrap"><table class="vrx-tbl">'+
+    '<thead>'+thead+'</thead><tbody>'+tbody+'</tbody></table></div>';
+
+  // ── Stat-cards ──
+  var tendColor=tendDelta>0?'#EF4444':tendDelta<0?'#4ADE80':'#94A3B8';
+  var tendSigno=tendDelta>0?'▲':tendDelta<0?'▼':'—';
+  var statsHTML='<div class="vrx-stats">'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Gasto total ('+meses.length+' meses)</div>'+
+      '<div class="vrx-stat-v" style="color:#EF4444">'+fmt(gastoTotal)+'</div>'+
+      '<div class="vrx-stat-sub">'+meses[0]+' – '+meses[meses.length-1]+'</div>'+
+    '</div>'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Mayor aumento</div>'+
+      '<div class="vrx-stat-v" style="color:#F59E0B">'+(mayorAumento.delta>0?'+ '+fmt(mayorAumento.delta).replace('− ',''):'—')+'</div>'+
+      '<div class="vrx-stat-sub">'+mayorAumento.ente+(mayorAumento.de?' ('+mayorAumento.de.slice(0,3)+'→'+mayorAumento.a.slice(0,3)+')':'')+'</div>'+
+    '</div>'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Tendencia ('+mesActual.slice(0,3)+')</div>'+
+      '<div class="vrx-stat-v" style="color:'+tendColor+'">'+tendSigno+' '+fmt(Math.abs(tendDelta)).replace('− ','')+'</div>'+
+      '<div class="vrx-stat-sub">vs. mes anterior</div>'+
+    '</div>'+
+    '<div class="vrx-stat">'+
+      '<div class="vrx-stat-lbl">Mayor categoría</div>'+
+      '<div class="vrx-stat-v" style="color:'+VC+'">'+mayorCat.ente+'</div>'+
+      '<div class="vrx-stat-sub">'+fmt(mayorCat.total)+'</div>'+
+    '</div>'+
+  '</div>';
+
+  // ── Chips de categorias (entes) ──
+  var chipsHTML='<div class="vrx-card">'+
+    '<div class="vrx-sec-t">Categorías</div>'+
+    '<div class="vrx-chips">'+
+      entes.map(function(ente,ei){
+        var color=_varColor(ente,ei);
+        var ico=_varEsExcluido(ente)?' <i class="fas fa-eye-slash" style="font-size:7px;opacity:.6"></i>':'';
+        return '<span class="vrx-chip" style="color:'+color+';border-color:'+color+'44;background:'+color+'12">'+
+          '<span class="vrx-chip-dot" style="background:'+color+'"></span>'+ente+ico+'</span>';
+      }).join('')+
+    '</div>'+
+  '</div>';
+
+  // ── Grafica de tendencia ──
+  var graficaHTML='<div class="vrx-card">'+
+    '<div class="vrx-sec-t">Tendencia de gasto</div>'+
+    '<div style="height:210px"><canvas id="vrx-trend-canvas"></canvas></div>'+
+  '</div>';
+
+  body.innerHTML=css+
+    '<div class="vrx">'+
+      '<div class="vrx-main">'+
+        tablaHTML+
+        '<div class="vrx-foot">Inicio · Final · Rectificación · Bancos se excluyen de los cálculos. BW es ingreso.</div>'+
+      '</div>'+
+      '<div class="vrx-side">'+
+        statsHTML+
+        graficaHTML+
+        chipsHTML+
+      '</div>'+
+    '</div>';
+
+  window._vrxCtx={meses:meses,entes:entes,idx:idx,VC:VC};
+}
+
+// Pinta la grafica de tendencia de Variables (Chart.js, lineas por ente).
+function renderVariablesGrafica(){
+  var ctx=window._vrxCtx;
+  if(!ctx||!window.Chart) return;
+  var meses=ctx.meses, entes=ctx.entes, idx=ctx.idx;
+  var tc=document.getElementById('vrx-trend-canvas');
+  if(!tc) return;
+
+  // Una linea por ente (excluye Inicio/Final para no aplastar la escala).
+  var dsets=entes.filter(function(e){
+    return !_varEsExcluido(e);
+  }).map(function(ente,i){
+    var color=_varColor(ente,i);
+    return {
+      label:ente,
+      data:meses.map(function(mes){
+        var v=idx[mes][ente];
+        return (typeof v==='number')?Math.abs(v):null;
+      }),
+      borderColor:color,
+      backgroundColor:color,
+      borderWidth:_varEsIngreso(ente)?2.5:1.5,
+      pointRadius:3,
+      pointHoverRadius:5,
+      fill:false,
+      tension:.3,
+      spanGaps:true
+    };
+  });
+
+  if(window._vrxTrendChart){try{window._vrxTrendChart.destroy();}catch(e){}}
+  window._vrxTrendChart=new Chart(tc,{
+    type:'line',
+    data:{labels:meses.map(function(m){return m.slice(0,3);}),datasets:dsets},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},
+        tooltip:{backgroundColor:'rgba(15,23,42,.95)',borderColor:'rgba(165,180,252,.3)',
+          borderWidth:1,titleColor:'#fff',bodyColor:'#94A3B8',padding:9,
+          callbacks:{label:function(c){
+            if(c.raw===null||c.raw===undefined) return null;
+            return ' '+c.dataset.label+': $ '+Math.abs(c.raw).toLocaleString('es-MX',{minimumFractionDigits:2});
+          }}}},
+      scales:{x:{grid:{display:false},ticks:{color:'#64748B',font:{size:9}}},
+        y:{grid:{color:'rgba(255,255,255,.05)'},
+          ticks:{color:'#64748B',font:{size:9},
+            callback:function(v){return '$'+(v/1000).toFixed(0)+'k';}}}}}
+  });
+}
+
+window.renderVariablesExpandido=renderVariablesExpandido;
+window.renderVariablesGrafica=renderVariablesGrafica;
