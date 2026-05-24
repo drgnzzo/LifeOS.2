@@ -816,7 +816,8 @@ function _lgrCardClick(l){
 
   if(_lgrIsDone(l)){
     if(!l.fila){ return; }
-    if(!confirm('\u00bfDesmarcar "'+(l.concepto||l.id||'este logro')+'"?')) return;
+    // v5.215: confirmación al desmarcar eliminada — el desmarcado es
+    // reversible (basta volver a marcar), no necesita confirmación.
     // Feedback visual inmediato
     l.completado='No';
     _lgrCalcularNivel(_lgr.items);
@@ -998,7 +999,7 @@ function escH(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;'
 function _lgrRevertirDesdeSidebar(fila){
   var l = _lgr.items.find(function(it){ return it.fila===fila; });
   if(!l) return;
-  if(!confirm('\u00bfDesmarcar "'+(l.concepto||'este logro')+'"?')) return;
+  // v5.215: confirmación al desmarcar eliminada (desmarcado reversible).
   l.completado='No';
   _lgrCalcularNivel(_lgr.items);
   _lgrPintarGrid(); _lgrPintarSidebar(); _lgrPintarHeader();

@@ -1,4 +1,15 @@
-/* RAW Entry — Overlay v.5.212
+/* RAW Entry — Overlay v.5.214
+   OPTIMIZACIÓN de rendimiento del fondo (sin perder nada visible).
+   · drawStars: shadowBlur (la operación más cara del canvas) ahora
+     solo en hubs/estrellas grandes. Las ~580 pequeñas se dibujan
+     como círculo plano. El glow de una estrella diminuta es
+     invisible igual.
+   · drawWarp: glow solo en partículas cercanas al centro / horizonte;
+     las lejanas (la mayoría) sin shadowBlur.
+   · Cap de FPS a 40 (antes 60) — fluido a la vista, 1/3 menos de
+     trabajo. dt se acumula igual: misma velocidad real.
+   · Frame saltado cuando document.hidden (pestaña en segundo plano).
+   ── Heredado v5.212
    FIX "Invalid Date" en la card expandida de Bitacora (Pensamientos,
    Salud, Entrenamiento). Causa: new Date(it.fecha).toLocaleDateString()
    directo — si it.fecha no era parseable, salia literalmente "Invalid
@@ -1572,8 +1583,15 @@ function _crearDialOverlay(){
         var radius = w.size * (0.7 + prox * 0.7) * (1 + nearHorizon * 0.6);
         var col = prox > 0.7 ? '#E0F2FE' : w.color;
         pctx.fillStyle = col + Math.floor(Math.max(0, Math.min(1, alpha)) * 220).toString(16).padStart(2, '0');
-        pctx.shadowColor = col;
-        pctx.shadowBlur = 2 + prox * 9 + nearHorizon * 10;
+        // v5.214 — OPTIMIZACIÓN: glow solo en partículas que de verdad lo
+        // lucen — las cercanas al centro (prox alto) o entrando al
+        // horizonte. Las lejanas, que son la mayoría, van sin shadowBlur.
+        if(prox > 0.45 || nearHorizon > 0){
+          pctx.shadowColor = col;
+          pctx.shadowBlur = 2 + prox * 9 + nearHorizon * 10;
+        } else {
+          pctx.shadowBlur = 0;
+        }
         pctx.beginPath();
         pctx.arc(px, py, radius, 0, Math.PI * 2);
         pctx.fill();
@@ -1689,8 +1707,18 @@ function _crearDialOverlay(){
         var alpha = lifeAlpha * (0.5 + twinkle * 0.45) * neb;
         s._cachedX = p.x; s._cachedY = p.y;
         pctx.fillStyle = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
-        pctx.shadowColor = s.color;
-        pctx.shadowBlur = (s.isHub ? 8 : 4) + twinkle * (s.isHub ? 16 : 8);
+        // v5.214 — OPTIMIZACIÓN: shadowBlur es la operación más cara del
+        // canvas. Antes se aplicaba a las ~580 estrellas cada frame. El
+        // glow de una estrella diminuta es invisible de todas formas, así
+        // que ahora SOLO los hubs y las estrellas grandes llevan glow; las
+        // pequeñas se dibujan como círculo plano (baratísimo). Visualmente
+        // casi idéntico, coste muy inferior.
+        if(s.isHub || s.baseSize > 1.4){
+          pctx.shadowColor = s.color;
+          pctx.shadowBlur = (s.isHub ? 8 : 4) + twinkle * (s.isHub ? 16 : 6);
+        } else {
+          pctx.shadowBlur = 0;
+        }
         pctx.beginPath();
         pctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
         pctx.fill();
@@ -2394,8 +2422,24 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     //  FRAME PRINCIPAL
     // ══════════════════════════════════════════════════════════════════
+    // v5.214 — cap de FPS. El loop corría a 60fps; para un fondo
+    // decorativo, ~40fps se ve igual de fluido y es 1/3 menos de trabajo.
+    // dt se acumula igual, así que la animación va a la misma velocidad
+    // real — solo se dibujan menos frames.
+    var _minFrameMs = 1000 / 40;
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
+      // v5.214: si la pestaña está oculta, no dibujar — solo reprogramar.
+      if(document.hidden){
+        lastT = t;
+        animId = requestAnimationFrame(frame);
+        return;
+      }
+      // Si no ha pasado el intervalo mínimo, saltar este frame.
+      if(lastT && (t - lastT) < _minFrameMs){
+        animId = requestAnimationFrame(frame);
+        return;
+      }
       lastT = t;
       if(!pctx){ animId = requestAnimationFrame(frame); return; }
       pctx.clearRect(0, 0, W, H);
