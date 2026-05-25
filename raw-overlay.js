@@ -1,4 +1,15 @@
-/* RAW Entry — Overlay v.5.216
+/* RAW Entry — Overlay v.5.217
+   OPTIMIZACIÓN del arranque del fondo del overlay.
+   · CONSTRUCCIÓN DIFERIDA: start() ya no corre los 10 build*()
+     síncronos antes del primer frame (eso atascaba el arranque unos
+     segundos). Ahora arranca YA con estrellas + dial, y construye el
+     resto (nebulosa, constelaciones, warp...) escalonado, un paso por
+     frame. El overlay anima fluido desde el frame 1.
+   · NEBULOSA a media resolución (1/4 de píxeles): la capa más cara de
+     construir. Es difusa, escalarla es invisible.
+   · DETECCIÓN de dispositivo modesto (pocos núcleos / poca RAM): baja
+     densidad de estrellas, constelaciones y warp automáticamente.
+   ── Heredado v5.216
    Añadido botón "Sheet" al topBar del overlay (renglón de stats, junto
    a Créditos). Abre el Google Sheet directamente en pestaña nueva,
    fuera de la web, vía irASheet() de raw-core.js (con URL de fallback).
@@ -1049,11 +1060,18 @@ function _crearDialOverlay(){
     var _nebCanvas = null;       // canvas offscreen con la nebulosa pintada
     var _nebDriftX = 0, _nebDriftY = 0;
 
+    // v5.217: la nebulosa es difusa y borrosa — construirla a MEDIA
+    // resolución (1/4 de los píxeles) es invisible al ojo pero 4x más
+    // barato. drawNebulaLayer la escala de vuelta al pintar.
+    var _NEB_SCALE = 0.5;
     function buildNebulaLayer(){
       _nebCanvas = document.createElement('canvas');
-      _nebCanvas.width  = W;
-      _nebCanvas.height = H;
+      _nebCanvas.width  = Math.max(1, Math.round(W * _NEB_SCALE));
+      _nebCanvas.height = Math.max(1, Math.round(H * _NEB_SCALE));
       var nc = _nebCanvas.getContext('2d');
+      // Escalar el contexto para que el código de dibujo siga usando
+      // coordenadas W/H normales sin cambios.
+      nc.scale(_NEB_SCALE, _NEB_SCALE);
 
       // Colores de nebulosa — morados/azules/cian como el mockup objetivo.
       var NEB_COLORS = [
@@ -1125,7 +1143,9 @@ function _crearDialOverlay(){
       pctx.save();
       pctx.globalCompositeOperation = 'lighter';
       pctx.globalAlpha = 0.9;
-      pctx.drawImage(_nebCanvas, _nebDriftX, _nebDriftY);
+      // v5.217: el canvas está a media resolución — escalarlo a tamaño
+      // completo al pintar. drawImage con dimensiones destino lo estira.
+      pctx.drawImage(_nebCanvas, _nebDriftX, _nebDriftY, W, H);
       pctx.restore();
     }
 
@@ -1283,7 +1303,8 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(368, Math.min(580, Math.floor((W * H) / 3050)));  // v5.201: +40% estrellas (campo más denso, como el mockup)
+      var nStars = Math.max(368, Math.min(580, Math.floor((W * H) / 3050)));
+      if(_lowEndDevice) nStars = Math.floor(nStars * 0.55); // v5.217: menos estrellas en equipos modestos
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
         var r = 30 + (MAX_R - 30) * Math.pow(u, 0.7);
@@ -1308,7 +1329,7 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildConstellations(){
       constellations = [];
-      var nConst = 13;  // v5.201: más constelaciones (como el mockup)
+      var nConst = _lowEndDevice ? 7 : 13;  // v5.217: menos constelaciones en equipos modestos
       for(var c = 0; c < nConst; c++){
         // Centro del grupo en órbita
         var cR = 200 + Math.random() * (MAX_R - 250);
@@ -1486,7 +1507,7 @@ function _crearDialOverlay(){
       warpParticles = [];
       // v5.203: disco de acreción — menos partículas (no hace falta llenar
       // toda la pantalla; el flujo hacia el centro es lo que importa).
-      var nWarp = 340;
+      var nWarp = _lowEndDevice ? 170 : 340; // v5.217: menos partículas de warp en equipos modestos
       var diag = Math.hypot(W/2, H/2);
       for(var i = 0; i < nWarp; i++){
         warpParticles.push(spawnWarpParticle(diag));
@@ -2595,35 +2616,64 @@ function _crearDialOverlay(){
       animId = requestAnimationFrame(frame);
     }
 
+    // v5.217 — detección de dispositivo modesto. Si el equipo tiene
+    // pocos núcleos, se baja densidad de partículas para que vaya fluido
+    // en celulares de gama media. Una PC potente nunca entra aquí.
+    var _lowEndDevice = (function(){
+      try {
+        var cores = navigator.hardwareConcurrency || 8;
+        var mem   = navigator.deviceMemory || 8;
+        return cores <= 4 || mem <= 4;
+      } catch(e){ return false; }
+    })();
+    window._ovLowEnd = _lowEndDevice;
+
+    // v5.217 — CONSTRUCCIÓN DIFERIDA. Antes start() corría los 10
+    // build*() síncronos antes del primer frame → el overlay se atascaba
+    // unos segundos al abrir. Ahora arranca YA con lo esencial (estrellas
+    // + dial) y construye el resto repartido en los siguientes frames.
+    // Las funciones draw*() ya comprueban si su array está vacío, así que
+    // una capa aún no construida simplemente no se dibuja todavía.
     function start(){
       resize();
-      initNebula();
-      buildNebulaLayer();   // v5.201: capa de nebulosa visible offscreen
-      buildFarHalos();      // v5.201: halos lejanos
-      buildDialRings();     // v5.201: anillos concéntricos del dial
-      buildRays();
+      // ── Esencial: se construye YA (barato, y es lo que más se nota) ──
       buildStars();
-      buildConstellations();
-      buildSpirals();
-      buildDust();          // v5.169
-      // v5.187: buildOrbitRings desactivado
-      buildWarp();          // v5.181
-      synapses = [];
-      pulses = [];
-      vortices = [];
-      lorenzTrails = [];
-      meteors = [];         // v5.169
-      interMesh = [];       // v5.171
-      mandalas = [];        // v5.171
+      buildDialRings();
+      // ── Listas vacías ──
+      synapses = []; pulses = []; vortices = [];
+      lorenzTrails = []; meteors = [];
+      interMesh = []; mandalas = [];
+      farHalos = []; constellations = []; spirals = [];
+      dust = []; rays = []; warpParticles = [];
+      _nebCanvas = null;
       globalT = 0;
       galaxyRotation = 0;
-      // Pre-spawn algunas cosas
-      // v5.177: pre-spawn Lorenz desactivado
-      for(var i = 0; i < 3; i++) spawnPulse();
-      for(var i = 0; i < 2; i++) spawnMeteor();   // v5.169
       lastT = 0;
+
+      // ── Arrancar la animación INMEDIATAMENTE ──
       if(animId) cancelAnimationFrame(animId);
       animId = requestAnimationFrame(frame);
+
+      // ── Capas pesadas: escalonadas en frames sucesivos, no bloquean ──
+      var _buildQueue = [
+        function(){ initNebula(); },
+        function(){ buildNebulaLayer(); },     // la más cara — sola en su slot
+        function(){ buildRays(); buildFarHalos(); },
+        function(){ buildConstellations(); },
+        function(){ buildSpirals(); buildDust(); },
+        function(){ buildWarp(); },
+        function(){ for(var i=0;i<3;i++) spawnPulse();
+                    for(var j=0;j<2;j++) spawnMeteor(); },
+      ];
+      var _qi = 0;
+      function _runQueue(){
+        if(_qi >= _buildQueue.length) return;
+        _buildQueue[_qi]();
+        _qi++;
+        // Un paso por frame: reparte el costo, el arranque no se atasca.
+        requestAnimationFrame(_runQueue);
+      }
+      requestAnimationFrame(_runQueue);
     }
 
     function stop(){
