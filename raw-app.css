@@ -3251,3 +3251,36 @@ html:not(.mob) .board-face:not(.anverso){
 html.niv-2 #dial-overlay{
   z-index:1 !important;
 }
+
+/* ── v7.064 — ARRANQUE FLUIDO EN WEB ──
+   Las cards .hud-pnl nacen invisibles. raw-loading.js agrega la clase
+   .hud-listo al <html> cuando los datos terminan de cargar (api.getAll
+   resolvió). En ese momento las cards aparecen con una CASCADA suave:
+   cada card con un retraso de 80ms × su orden visual. La cascada se
+   siente orquestada en vez de un pop masivo.
+   Móvil no se toca — sus cards ya son shells vacíos (v7.060). */
+html:not(.mob):not(.hud-listo) .hud-pnl{
+  opacity:0 !important;
+  pointer-events:none !important;
+  transform:scale(.985) translateY(6px);
+}
+html:not(.mob).hud-listo .hud-pnl{
+  transition:opacity .55s cubic-bezier(.22,1,.36,1),
+             transform .65s cubic-bezier(.22,1,.36,1) !important;
+  opacity:1;
+  pointer-events:auto;
+  transform:none;
+}
+/* Cascada: cada card con su retraso. nth-child ordena visualmente
+   por orden de aparición en el DOM, que coincide con el orden de
+   creación en raw-overlay (USER, SIM, STATS, PATRIMONIO, ...). */
+html:not(.mob).hud-listo .hud-pnl:nth-child(1) { transition-delay:.00s, .00s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(2) { transition-delay:.06s, .06s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(3) { transition-delay:.12s, .12s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(4) { transition-delay:.18s, .18s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(5) { transition-delay:.24s, .24s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(6) { transition-delay:.30s, .30s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(7) { transition-delay:.36s, .36s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(8) { transition-delay:.42s, .42s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(9) { transition-delay:.48s, .48s; }
+html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s; }
