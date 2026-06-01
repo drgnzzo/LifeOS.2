@@ -1044,13 +1044,20 @@ html.mob .hero-tabs{
   display:flex !important;
   align-items:stretch;
   gap:5px !important;
-  padding:5px 10px 8px !important;
+  /* v7.061 — padding lateral mayor para que las pestañas de los extremos
+     no se vean cortadas (en iPhone, "Home" salía partida a la mitad
+     en la pantalla). El scroll horizontal sigue habilitado. */
+  padding:5px 16px 8px !important;
   overflow-x:auto !important;
   scroll-snap-type:x proximity;
   -webkit-overflow-scrolling:touch;
   background:#020810 !important;
   border-top:1px solid rgba(255,255,255,0.05) !important;
   position:relative;
+  /* v7.061 — máscara de fade en los bordes que indica que se puede
+     hacer scroll horizontal sin un scrollbar visible. */
+  -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+          mask-image:linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
 }
 html.mob .hero-tabs::-webkit-scrollbar{display:none}
 html.mob .hud-tab{
