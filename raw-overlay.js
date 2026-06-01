@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.042
+/* RAW Entry — Overlay v.7.060
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.066 — REGRESO A HOME MÁS SUAVE Y CALMADO                      ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -3003,6 +3003,27 @@ function _crearDialOverlay(){
   // ── Crear panel flotante ──
   // accentColor: hex (#22C55E). glowColor: rgba string (compat).
   function _mkFloatPanel(id, accentColor, glowColor){
+    // v7.060 — En móvil las cards HUD no se usan (el Home móvil va por
+    // carrusel de .section). Pero el código siguiente las referencia
+    // (asignaciones ._side, ._order, _hudPanels, listeners). Para no
+    // romper nada, devolvemos un SHELL mínimo: un <div> con el id puesto,
+    // sin contenido, sin estilos pesados, sin SVG corners, sin clases
+    // costosas. Las variables _pUser, _pSim, etc. siguen existiendo, el
+    // código de configuración no se rompe, pero el DOM se ahorra ~14
+    // estructuras pesadas en cada arranque móvil.
+    if(window.innerWidth < 900){
+      var shell = document.createElement('div');
+      shell.id = id;
+      shell.style.display = 'none';   // no ocupar espacio, no pintar
+      // Hijo placeholder con el id que esperan las llamadas posteriores
+      // (renderActivity, renderPatrimonio, etc. hacen
+      // getElementById(id + '-inner') y escriben innerHTML; si no
+      // existe, fallan silenciosos sin romper).
+      var inner = document.createElement('div');
+      inner.id = id + '-inner';
+      shell.appendChild(inner);
+      return shell;
+    }
     // Computar versiones rgba del accent (hex → rgba con alpha variable)
     function _ax(a){
       var h = accentColor.replace('#','');
@@ -3606,7 +3627,9 @@ function _crearDialOverlay(){
   if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
 
   // Listeners de los tabs
-  document.getElementById('hud-megatabs').addEventListener('click', function(e){
+  // v7.060 — en móvil hud-megatabs no existe (las cards son shells vacíos)
+  var _megaTabs = document.getElementById('hud-megatabs');
+  if(_megaTabs) _megaTabs.addEventListener('click', function(e){
     var tab = e.target.closest('.hud-megatab');
     if(!tab) return;
     var id = tab.dataset.tabId;
@@ -3944,6 +3967,10 @@ function _crearDialOverlay(){
   // cualquier referencia (vieja, nueva, hookeada) comparte. Imposible
   // saltarlo sin importar quién llame.
   function _reposicionarHUD(){
+    // v7.060 — En móvil las cards HUD son shells vacíos con display:none.
+    // No tiene sentido reposicionarlos. Salir temprano evita el costo
+    // del cálculo y de eventuales bucles de medición en cada resize.
+    if(window.innerWidth < 900) return;
     if(window._reposLock){ window._reposPend = true; return; }
     window._reposLock = true;
     try {
