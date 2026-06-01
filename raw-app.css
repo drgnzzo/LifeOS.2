@@ -1043,37 +1043,39 @@ html.mob .hero-sim-lv{font-size:7.5px !important}
 html.mob .hero-tabs{
   display:flex !important;
   align-items:stretch;
-  gap:5px !important;
-  /* v7.061 — padding lateral mayor para que las pestañas de los extremos
-     no se vean cortadas (en iPhone, "Home" salía partida a la mitad
-     en la pantalla). El scroll horizontal sigue habilitado. */
-  padding:5px 16px 8px !important;
-  overflow-x:auto !important;
-  scroll-snap-type:x proximity;
-  -webkit-overflow-scrolling:touch;
+  /* v7.062 — Sin scroll horizontal. Las 8 pestañas caben porque ahora
+     son solo ICONOS (texto oculto). El texto solo aparece debajo del
+     icono activo. Es el patrón de las apps móviles serias (Apple
+     Health, Instagram). Espacio limpio, navegación clara. */
+  gap:2px !important;
+  padding:5px 6px 8px !important;
+  overflow:hidden !important;
   background:#020810 !important;
   border-top:1px solid rgba(255,255,255,0.05) !important;
   position:relative;
-  /* v7.061 — máscara de fade en los bordes que indica que se puede
-     hacer scroll horizontal sin un scrollbar visible. */
-  -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
-          mask-image:linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 16px), transparent 100%);
+  justify-content:space-between;
 }
 html.mob .hero-tabs::-webkit-scrollbar{display:none}
 html.mob .hud-tab{
-  flex:0 0 auto;
-  min-width:60px;
-  padding:8px 10px !important;
-  scroll-snap-align:center;
+  flex:1 1 0;            /* repartir ancho disponible entre las 8 */
+  min-width:0;
+  padding:6px 2px !important;
   border:1px solid rgba(255,255,255,0.06) !important;
   border-bottom-width:1px !important;
-  font-size:7.5px !important;letter-spacing:.06em !important;
-  gap:4px !important;
-  opacity:.7;
+  letter-spacing:.04em !important;
+  gap:2px !important;
+  opacity:.55;
   transition:opacity .18s,transform .18s,background .16s,border-color .16s;
 }
-html.mob .hud-tab i{font-size:15px !important}
-html.mob .hud-tab span{font-size:7.5px !important}
+html.mob .hud-tab i{font-size:16px !important}
+/* v7.062 — texto oculto por defecto. Solo aparece en la pestaña activa. */
+html.mob .hud-tab span{display:none !important}
+html.mob .hud-tab.active span{
+  display:block !important;
+  font-size:7px !important;
+  letter-spacing:.05em !important;
+  margin-top:2px;
+}
 /* Segmento activo — más grande y resaltado, estilo selector de rocola */
 html.mob .hud-tab.active{
   opacity:1;
@@ -1235,7 +1237,11 @@ html.mob #dial-overlay{align-items:center !important;padding:0 !important}
 html.mob #dial-overlay > [id^="hud-"]{
   display:none !important;
 }
-html.mob #dial-particles{ display:none !important; }
+/* v7.062 — antes esta regla ocultaba el canvas cósmico en móvil por
+   rendimiento. Ahora con las cards HUD ya no montadas (v7.060) y el
+   modo bajo agresivo aplicado en móvil (v7.061), el motor sí puede
+   correr en el teléfono. Si vuelve a fundir el iPhone, restaurar:
+   html.mob #dial-particles { display:none !important; } */
 html.mob #dial-ambient{ opacity:.35 !important; animation:none !important; }
 /* El dial canvas sí se ve — es el centro de la app. Es el <canvas>
    hijo directo del overlay que NO tiene id (el de partículas sí lo
