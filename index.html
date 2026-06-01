@@ -5,6 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>LifeOS</title>
 
+  <!-- ── v7.055 — PWA (instalable, theme color, iconos, manifest) ── -->
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#020810">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="LifeOS">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
   <!-- BLOQUEO RENDER: negro absoluto antes de que el browser pinte cualquier cosa -->
   <style id="render-block">
     html, body { background: #020810 !important; }
@@ -36,7 +46,7 @@
         <div class="hero-icon"><i class="fas fa-diamond"></i></div>
         <div class="hero-brand-txt">
           <div class="hero-title">Life<span>OS</span></div>
-          <div class="hero-sub">v.7.054 · Sheets</div>
+          <div class="hero-sub">v.7.060 · Sheets</div>
         </div>
       </div>
     </div>
@@ -649,13 +659,24 @@
 </div>
 
 <script src="raw-core.js?v=6072"></script>
-<script src="raw-overlay.js?v=7042"></script>
+<script src="raw-overlay.js?v=7060"></script>
 <script src="raw-overlay-dnd.js?v=6011"></script>
 <script src="raw-dashboard.js?v=6040"></script>
 <script src="raw-logros.js?v=6068"></script>
 <script src="raw-bitacora.js?v=5189"></script>
 <script src="raw-carousel.js?v=6030"></script>
 <script src="raw-notas.js?v=7020"></script>
-<script src="raw-niveles.js?v=7054"></script>
+<script src="raw-niveles.js?v=7055"></script>
+
+<!-- ── v7.055 — Registrar el service worker (PWA instalable) ── -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(err){
+        console.warn('SW falló al registrar:', err);
+      });
+    });
+  }
+</script>
 </body>
 </html>
