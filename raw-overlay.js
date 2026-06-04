@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.065
+/* RAW Entry — Overlay v.7.067
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.066 — REGRESO A HOME MÁS SUAVE Y CALMADO                      ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1006,7 +1006,7 @@ function _crearDialOverlay(){
     //  El dial queda visualmente ENCIMA del canvas (z-index 0).
     //  Por eso los rayos pueden partir del centro absoluto sin problema.
     // ══════════════════════════════════════════════════════════════════
-    var pctx, lastT = 0, animId = null;
+    var pctx, lastT = 0, animId = null, _frameCounter = 0;
     var W = 0, H = 0, CX = 0, CY = 0, DIAL_R = 0, MAX_R = 0;
     var PALETTE = ['#A78BFA', '#22D3EE', '#4ADE80', '#C4B5FD', '#67E8F9', '#86EFAC'];
     var PHI = (1 + Math.sqrt(5)) / 2;
@@ -1365,7 +1365,10 @@ function _crearDialOverlay(){
     // ══════════════════════════════════════════════════════════════════
     function buildStars(){
       stars = [];
-      var nStars = Math.max(368, Math.min(580, Math.floor((W * H) / 3050)));
+      // v7.066 — recorte agresivo: techo 460 (era 580), piso 280 (era 368).
+      // El ojo no distingue 580 vs 460 estrellas en un fondo, pero el costo
+      // de cada estrella en cada frame es real. ~20% menos costo.
+      var nStars = Math.max(280, Math.min(460, Math.floor((W * H) / 3800)));
       if(_lowEndDevice) nStars = Math.floor(nStars * 0.55); // v5.217: menos estrellas en equipos modestos
       for(var i = 0; i < nStars; i++){
         var u = Math.random();
@@ -1726,16 +1729,24 @@ function _crearDialOverlay(){
         var pulse = (Math.sin(ray.lifePhase) + 1) / 2;
         var alpha = 0.30 + pulse * 0.45;
 
+        // v7.067 OPT — cachear trig del ángulo y del perpendicular.
+        // Antes se llamaban Math.cos/Math.sin 6 veces por rayo por
+        // frame. Ahora 4. Pequeño pero suma con 14 rayos × 30fps.
+        var cosT = Math.cos(ray.theta);
+        var sinT = Math.sin(ray.theta);
+        var perpAng = ray.theta + Math.PI / 2;
+        var cosP = Math.cos(perpAng);
+        var sinP = Math.sin(perpAng);
+
         // v5.171: rayLen MÁS ALLÁ de MAX_R para que se pierdan en el horizonte
         var rayLen = (MAX_R + 200) * ray.length + 150;
-        var endX = CX + Math.cos(ray.theta) * rayLen;
-        var endY = CY + Math.sin(ray.theta) * rayLen;
+        var endX = CX + cosT * rayLen;
+        var endY = CY + sinT * rayLen;
         // Control point: curvado perpendicularmente
         var midR = rayLen * 0.5;
-        var perpAng = ray.theta + Math.PI / 2;
         var bend = ray.curvature * rayLen * 0.3;
-        var cpx = CX + Math.cos(ray.theta) * midR + Math.cos(perpAng) * bend;
-        var cpy = CY + Math.sin(ray.theta) * midR + Math.sin(perpAng) * bend;
+        var cpx = CX + cosT * midR + cosP * bend;
+        var cpy = CY + sinT * midR + sinP * bend;
         // Cachear para pulsos
         ray._a = { x: CX, y: CY };
         ray._b = { x: endX, y: endY };
@@ -1744,6 +1755,8 @@ function _crearDialOverlay(){
         // v5.174: GRADIENTE biselado — el rayo es tenue cerca del centro
         // (debajo del dial) y se intensifica al salir del radio del dial.
         // El dial visualmente "domina" su zona.
+        // (v7.067 intentó cachear gradientes pero rompió visualmente
+        // porque los endpoints rotan cada frame. Revertido a recrearlos.)
         var grad = pctx.createLinearGradient(CX, CY, endX, endY);
         var fadeFrac = (DIAL_R + 30) / rayLen;       // hasta qué fracción del rayo es "interior"
         fadeFrac = Math.max(0.05, Math.min(0.6, fadeFrac));
@@ -1805,10 +1818,14 @@ function _crearDialOverlay(){
         if(lifeAlpha <= 0){ s._cachedX = null; continue; }
         var twinkle = (Math.sin(s.phase) + 1) / 2;
         var rad = s.baseSize * (0.7 + twinkle * 0.7) * (s.isHub ? 1.5 : 1);
-        var p = polar2cart(s.r, s.theta);
-        var neb = nebulaIntensityAt(p.x, p.y);
+        // v7.067 OPT — polar2cart inlinado para evitar crear un objeto
+        // {x,y} por estrella por frame (580 × 30fps = 17400 obj/seg
+        // que iban al GC). Las coordenadas van directamente en pX, pY.
+        var pX = CX + Math.cos(s.theta) * s.r;
+        var pY = CY + Math.sin(s.theta) * s.r;
+        var neb = nebulaIntensityAt(pX, pY);
         var alpha = lifeAlpha * (0.5 + twinkle * 0.45) * neb;
-        s._cachedX = p.x; s._cachedY = p.y;
+        s._cachedX = pX; s._cachedY = pY;
         var colHex = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
 
         if(warp > 0.04){
@@ -1829,7 +1846,7 @@ function _crearDialOverlay(){
             pctx.shadowBlur = 0;
           }
           pctx.beginPath();
-          pctx.moveTo(p.x, p.y);
+          pctx.moveTo(pX, pY);
           pctx.lineTo(x2, y2);
           pctx.stroke();
         } else {
@@ -1847,7 +1864,7 @@ function _crearDialOverlay(){
             pctx.shadowBlur = 0;
           }
           pctx.beginPath();
-          pctx.arc(p.x, p.y, rad, 0, Math.PI * 2);
+          pctx.arc(pX, pY, rad, 0, Math.PI * 2);
           pctx.fill();
         }
       }
@@ -2180,13 +2197,16 @@ function _crearDialOverlay(){
         d.phase += d.twinkleSpeed * dt;
         var twk = (Math.sin(d.phase) + 1) / 2;
         var alpha = 0.18 + twk * 0.30;
-        var p = polar2cart(d.r, d.theta);
+        // v7.067 OPT — polar2cart inlinado (130 partículas × 30fps =
+        // 3900 obj/seg menos al GC)
+        var dX = CX + Math.cos(d.theta) * d.r;
+        var dY = CY + Math.sin(d.theta) * d.r;
         // Modular por nebulosa
-        var neb = nebulaIntensityAt(p.x, p.y);
+        var neb = nebulaIntensityAt(dX, dY);
         alpha *= neb;
         pctx.fillStyle = d.color + Math.floor(alpha * 200).toString(16).padStart(2, '0');
         pctx.beginPath();
-        pctx.arc(p.x, p.y, d.baseSize * (0.7 + twk * 0.5), 0, Math.PI * 2);
+        pctx.arc(dX, dY, d.baseSize * (0.7 + twk * 0.5), 0, Math.PI * 2);
         pctx.fill();
       }
     }
@@ -2554,11 +2574,26 @@ function _crearDialOverlay(){
     // decorativo, ~40fps se ve igual de fluido y es 1/3 menos de trabajo.
     // dt se acumula igual, así que la animación va a la misma velocidad
     // real — solo se dibujan menos frames.
-    var _minFrameMs = 1000 / 40;
+    // v7.066 — cap bajado de 40 a 30 fps. Para un fondo decorativo,
+    // 30fps es perfectamente fluido (el cine es 24fps). Bajar de 40 a
+    // 30 es 25% menos frames pintados. Visualmente indetectable.
+    var _minFrameMs = 1000 / 30;
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       // v5.214: si la pestaña está oculta, no dibujar — solo reprogramar.
       if(document.hidden){
+        lastT = t;
+        animId = requestAnimationFrame(frame);
+        return;
+      }
+      // v7.066 — Pausa adicional cuando la ventana NO tiene foco (la PWA
+      // perdió foco aunque siga "visible" para el navegador). Esto evita
+      // que LifeOS siga consumiendo CPU cuando estás usando YouTube u
+      // otra app encima. document.hasFocus() es más estricto que
+      // document.hidden: hidden solo se activa con minimizado/pestaña
+      // oculta, hasFocus se activa también cuando la ventana sigue
+      // visible pero no es la activa.
+      if(!document.hasFocus()){
         lastT = t;
         animId = requestAnimationFrame(frame);
         return;
@@ -2595,7 +2630,15 @@ function _crearDialOverlay(){
       updateNebula(dt);
 
       // 1b) v5.201: NEBULOSA VISIBLE — capa offscreen al fondo de todo.
-      drawNebulaLayer(dt);
+      // v7.067 OPT — actualizar solo cada 2 frames (15fps efectivo).
+      // La nebulosa se mueve muy lento; nadie nota la diferencia entre
+      // 30 y 15 fps en ella. Ahorra ~3-5% del costo total por frame.
+      // Pinta en frames impares (1,3,5...) para que el primer frame
+      // ya tenga nebulosa visible (sin parpadeo inicial).
+      _frameCounter++;
+      if(_frameCounter % 2 === 1){
+        drawNebulaLayer(dt * 2);  // dt ajustado para mantener velocidad real
+      }
 
       // 2) Polvo cósmico (capa más al fondo)
       drawDust(dt);
