@@ -1,4 +1,4 @@
-/* LifeOS — Service Worker v.7.055
+/* LifeOS — Service Worker v.7.070
    PWA mínimo y honesto.
    · Cachea la "concha" de la app (shell): HTML, CSS, JS, iconos.
    · No cachea llamadas a la API (Apps Script) — esas siempre van a la
@@ -9,7 +9,7 @@
    · Cuando subas una versión nueva del SW, incrementa CACHE_NAME
      (cambiando el número) para que se invaliden los archivos viejos.
 */
-const CACHE_NAME = 'lifeos-v7-069';
+const CACHE_NAME = 'lifeos-v7-070';
 const SHELL = [
   '/LifeOS/',
   '/LifeOS/index.html',
