@@ -1,5 +1,11 @@
 // ============================================================
-//  LifeOS — Code.gs  v.5.008
+//  LifeOS — Code.gs  v.5.009
+//  v5.009: FIX recursión infinita en _memoSS() de v5.008.
+//          Mi script de sustitución reemplazó accidentalmente
+//          SpreadsheetApp.getActiveSpreadsheet() DENTRO de la propia
+//          _memoSS() — generando _memoSS llamándose a sí misma
+//          ("Maximum call stack size exceeded"). Restaurada la
+//          llamada original directa dentro del helper.
 //  v5.008: MEMOIZACIÓN POR REQUEST. Las sub-funciones de getAll
 //          (16 fns) ya no abren el Spreadsheet/hojas 40+ veces.
 //          _memoSS() y _memoSheet() guardan referencias durante el
@@ -1533,10 +1539,10 @@ function _memoSheetClear() {
 // directamente como antes (compatibilidad total).
 function _memoSS() {
   if (_memoCache_ === null) {
-    return _memoSS();
+    return SpreadsheetApp.getActiveSpreadsheet();
   }
   if (_memoCache_.ss === null) {
-    _memoCache_.ss = _memoSS();
+    _memoCache_.ss = SpreadsheetApp.getActiveSpreadsheet();
   }
   return _memoCache_.ss;
 }
