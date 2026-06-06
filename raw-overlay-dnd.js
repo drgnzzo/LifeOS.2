@@ -243,80 +243,14 @@
   }
 
   function buildGhostSlots(){
+    // v7.069 — DESACTIVADO COMPLETAMENTE.
+    // Los ghost slots vacíos compiten visualmente con el dial y el
+    // cosmos. El usuario los quiere fuera permanentemente. La lógica
+    // de DnD sigue funcionando (las cards se pueden seguir arrastrando
+    // entre sus posiciones reales), pero no se pintan más placeholders
+    // donde "podrían" ir cards. Si en el futuro se necesita el código
+    // original, está en git history (v7.066 y anteriores).
     clearGhostSlots();
-    if(!window._hudPanels) return;
-    // v6.011: el dial-overlay ahora SIEMPRE existe en el DOM (es
-    // persistente desde v6.000). Su mera presencia ya NO indica que el
-    // overlay esté visible — antes la guarda dependía de getElementById
-    // ('dial-overlay'), que ahora siempre da true, dejando la guarda
-    // neutralizada y los slots colándose detrás de Logros/Activity/etc.
-    // raw-overlay.js v6.011 expone window._dialVisible: esa es ahora la
-    // única señal válida. Si el overlay no está visible, no hay slots.
-    if(!window._dialVisible) return;
-    if(window._hudExpanded) return;
-    // Mientras la cascada de apertura está en curso, NO mostrar slots vacíos.
-    // Se construirán al final cuando _hudCascadaEnCurso pase a false.
-    if(window._hudCascadaEnCurso) return;
-
-    function lastPanelInfo(side){
-      var ps = window._hudPanels.filter(function(hp){ return hp.el._side === side; });
-      if(!ps.length) return null;
-      ps.sort(function(a,b){ return a.el._order - b.el._order; });
-      var last = ps[ps.length-1].el;
-      var rect = last.getBoundingClientRect();
-      return { rect: rect, count: ps.length, lastEl: last };
-    }
-
-    // Para columnas vacías (sin paneles), necesitamos calcular su posición
-    // usando los datos de _reposicionarHUD (colA_X, colB_X, colC_X, colD_X)
-    // que se guardan en window._hudColPositions.
-    function emptyColInfo(side){
-      var cp = window._hudColPositions;
-      if(!cp) return null;
-      var x = cp[side+'_X'], w = cp.COL_W, topY = cp.colTopY;
-      if(x === undefined || w === undefined || topY === undefined) return null;
-      // Simular rect del último panel en y=topY-gap-slotH (para que el primer slot quede en topY)
-      // gap=22 (sync con _reposicionarHUD), slotH=110 → top = topY - 22 - 110 = topY - 132
-      return {
-        rect: { left:x, right:x+w, top:topY-132, bottom:topY-22, width:w, height:110 },
-        count: 0,
-        lastEl: null
-      };
-    }
-
-    // Slots laterales 4 columnas
-    ['left-1','left-2','right-1','right-2'].forEach(function(side){
-      var info = lastPanelInfo(side) || emptyColInfo(side);
-      if(!info) return;
-      var needed = SLOTS_CONFIG[side] - info.count;
-      if(needed <= 0) return;
-      var slotH = 110;
-      var gap   = 22;  // mismo GAP que _reposicionarHUD (v5.104)
-      var w     = info.rect.width;
-      var x     = info.rect.left;
-      var y     = info.rect.bottom + gap;
-      var trackEl = document.getElementById('hud-track');
-      var maxBottom = trackEl ? (trackEl.getBoundingClientRect().top - gap) : (window.innerHeight - 40);
-      for(var i=0; i<needed; i++){
-        if(y + slotH > maxBottom) break;
-        var slot = document.createElement('div');
-        slot.className = 'hud-empty-slot';
-        slot.dataset.side = side;
-        slot.dataset.slotIndex = String(info.count + i);
-        slot.style.left   = x + 'px';
-        slot.style.top    = y + 'px';
-        slot.style.width  = w + 'px';
-        slot.style.height = slotH + 'px';
-        slot.innerHTML = '<div class="hud-empty-slot-inner">'+
-          '<i class="fas fa-circle-plus"></i>'+
-          '<span>Slot vacío</span>'+
-        '</div>';
-        document.body.appendChild(slot);
-        _ghostSlots.push(slot);
-        y += slotH + gap;
-        (function(s){ requestAnimationFrame(function(){ s.classList.add('visible'); }); })(slot);
-      }
-    });
   }
 
   // ═══ Drop indicator ═══
