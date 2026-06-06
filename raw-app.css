@@ -1,7 +1,17 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.072
+   RAW Entry — Estilos v.5.073
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
+
+   Cambios v5.073:
+   - FIX z-index .popup-overlay: 800 → 9500. El popup CONCEPTO
+     aparecía DETRÁS del form +Nueva (entrada-dropdown z:9000)
+     porque su z-index quedaba 8200 capas por debajo. Ahora
+     queda sobre el form (9000) y sobre el carrusel móvil (9300),
+     pero debajo del tooltip (9999) y del hero/topbar (10000).
+     No se tocan .panel-overlay ni #popup-entrada — esos no
+     fueron reportados; si dan el mismo problema se arreglan
+     uno a la vez.
 
    Cambios v5.072:
    - Eliminadas variables locales duplicadas; ahora vienen de raw-tokens.css
@@ -699,7 +709,7 @@ html,body{
 /* ═══════════════════════════════════════════
    POPUPS & MODALES
 ═══════════════════════════════════════════ */
-.popup-overlay{position:fixed;inset:0;background:rgba(0,2,8,.7);backdrop-filter:blur(16px);z-index:800;display:none;align-items:center;justify-content:center}
+.popup-overlay{position:fixed;inset:0;background:rgba(0,2,8,.7);backdrop-filter:blur(16px);z-index:9500;display:none;align-items:center;justify-content:center} /* v5.073: 800→9500 para quedar sobre entrada-dropdown (9000) */
 .popup-overlay.show{display:flex}
 .popup-sheet{
   background:var(--hud-form-bg);
