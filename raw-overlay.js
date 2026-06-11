@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.074
+/* RAW Entry — Overlay v.7.077
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -2931,6 +2931,27 @@ function _crearDialOverlay(){
 
     window._particlesStart = start;
     window._particlesStop  = stop;
+
+    // v7.077 — ARRANQUE GARANTIZADO DEL COSMOS.
+    // El ÚNICO punto que arrancaba el fondo era abrirDial(); si el
+    // usuario tocaba una pestaña del panel ANTES de que el overlay
+    // abriera, el cosmos no se construía NUNCA — y la subida 2→1
+    // evita abrirDial a propósito (para no re-disparar la cascada),
+    // así que tampoco lo arrancaba. Sin cosmos: sin fondo, sin blur
+    // (no hay nada que difuminar) y sin warp en las transiciones.
+    // El cosmos es el fondo universal de TODOS los niveles y su
+    // frame-loop ya se pausa solo en niv-2 / sin foco / oculto, así
+    // que arrancarlo siempre no cuesta CPU extra dentro de secciones.
+    function _arranqueGarantizado(){
+      setTimeout(function(){
+        if(!window._particlesRunning) start();
+      }, 900);   // tras el arranque normal (abrirDial lo hace a los 200ms)
+    }
+    if(document.readyState === 'loading'){
+      document.addEventListener('DOMContentLoaded', _arranqueGarantizado);
+    } else {
+      _arranqueGarantizado();
+    }
 
     window.addEventListener('resize', function(){
       if(_particlesCanvas.offsetParent !== null){

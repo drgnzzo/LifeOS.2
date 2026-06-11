@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.076  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.077  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -923,6 +923,14 @@
     if(!esEscritorio()) return;
     if(document.hidden) return;
     if(_bloqueado) return;   // v7.075 — jamás interferir con una transición en curso
+
+    // v7.077 — el cosmos es el fondo de TODOS los niveles. Si por
+    // cualquier camino no está corriendo (p.ej. pestaña tocada antes
+    // de que abrirDial arrancara), arrancarlo. Su frame-loop se pausa
+    // solo en niv-2, así que esto nunca agrega CPU dentro de secciones.
+    if(typeof window._particlesStart === 'function' && !window._particlesRunning){
+      window._particlesStart();
+    }
 
     // (a) Sincronizar la clase de profundidad con la realidad.
     var real = nivelReal();
