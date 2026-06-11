@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.078
+/* RAW Entry — Overlay v.7.079
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -7829,6 +7829,63 @@ function abrirDial(){
   // v6.050: btn-nueva-entrada fue retirado en v6.010 (el formulario RAW
   // se abre desde el centro del dial). Ya no hay botón que marcar.
 }
+
+// v7.079 — REANUDAR EL DIAL SIN CASCADA (subida 2→1 del sistema de
+// niveles). cerrarDial deja: overlay padre con opacity:0 + display:none,
+// breath loop cancelado, dial canvas y aro en opacity:0. abrirDial lo
+// revierte pero re-dispara la cascada COMPLETA (por eso la subida la
+// evita). Esta función revierte SOLO lo que cerrarDial rompió, al
+// instante, sin animación de arranque. La llama _encenderOverlayInstant.
+window._dialReanudar = function(){
+  try {
+    if(window._hudCascadaEnCurso) return;   // jamás pisar una cascada viva
+    if(_dialOverlay){
+      _dialOverlay.style.transition = 'none';
+      _dialOverlay.style.display = '';
+      _dialOverlay.style.opacity = '1';
+      _dialOverlay.style.pointerEvents = 'none';   // como lo deja abrirDial
+      requestAnimationFrame(function(){ _dialOverlay.style.transition = ''; });
+    }
+    _dialVisible = true; window._dialVisible = true;
+    if(_dialCanvas){
+      _dialCanvas.style.transition = 'none';
+      _dialCanvas.style.opacity = '1';
+      requestAnimationFrame(function(){ _dialCanvas.style.transition = ''; });
+    }
+    var _ringR = document.getElementById('dial-ring-breath');
+    if(_ringR){
+      _ringR.style.transition = 'none';
+      _ringR.style.opacity = '1';
+      requestAnimationFrame(function(){ _ringR.style.transition = ''; });
+    }
+    if(window._hudPanels){
+      window._hudPanels.forEach(function(hp){
+        if(hp.el) hp.el.classList.add('hud-breathing');
+      });
+    }
+    // Revivir el breath loop que cerrarDial canceló (mismos frenos v7.071).
+    if(!_dialBreathRAF){
+      (function _breathLoop(ts){
+        ts = ts || performance.now();
+        if(document.hidden || !document.hasFocus()){
+          _dialBreathLastT = 0;
+          _dialBreathRAF = requestAnimationFrame(_breathLoop);
+          return;
+        }
+        if(_dialBreathLastT && (ts - _dialBreathLastT) < 33){
+          _dialBreathRAF = requestAnimationFrame(_breathLoop);
+          return;
+        }
+        var _dtF = _dialBreathLastT ? Math.min(4, (ts - _dialBreathLastT) / 16.67) : 1;
+        _dialBreathLastT = ts;
+        _dialBreathT += _dtF;
+        _dialDraw();
+        _dialBreathRAF = requestAnimationFrame(_breathLoop);
+      })();
+    }
+    try { _dialDraw(); } catch(e){}
+  } catch(e){}
+};
 
 function cerrarDial(){
   if(!_dialOverlay){ _dialVisible=false; window._dialVisible=false; return; }

@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.078  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.079  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -242,6 +242,10 @@
     });
     window._dialVisible = true;
     window._hudCascadaEnCurso = false;
+    // v7.079 — cerrarDial deja el OVERLAY PADRE en display:none +
+    // opacity:0 y cancela el breath loop del dial; restaurar hijos no
+    // basta. _dialReanudar (raw-overlay) revierte exactamente eso.
+    if(typeof window._dialReanudar === 'function') window._dialReanudar();
   }
 
   function mostrarSeccionN2(){
