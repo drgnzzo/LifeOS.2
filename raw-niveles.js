@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.079  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.080  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -221,7 +221,7 @@
           child.style.visibility = '';
         }
       });
-      ov.style.pointerEvents = '';
+      ov.style.pointerEvents = 'none';   // v7.080 — abrirDial deja el overlay en 'none' A PROPÓSITO (no atrapa clics; sus hijos sí). Restaurar '' activaba el clic-en-fondo que cierra el dial sin retorno.
     }
     // Restaurar las cards HUD.
     document.querySelectorAll('.hud-pnl').forEach(function(p){
@@ -977,10 +977,9 @@
           if(child.id === 'dial-particles') return;
           heal(child);
         });
-        if(ov.style.pointerEvents === 'none'){
-          ov.style.pointerEvents = '';
-          window._dialVisible = true;
-        }
+        // v7.080 — bloque de restauración de pointerEvents ELIMINADO:
+        // 'none' es el estado correcto del overlay abierto (abrirDial).
+        // Forzar '' hacía que tocar el fondo cerrara el dial sin retorno.
       }
     } else if(real === 2 && ov){
       // v7.076 — SOLO apagar si una sección está REALMENTE visible en

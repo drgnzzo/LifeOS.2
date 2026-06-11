@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.6.072
+/* RAW Entry — Core v.6.073
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -522,6 +522,46 @@ function upM(){
 // ══════════════════════════════════════════
 //  SALDO
 // ══════════════════════════════════════════
+// v6.073 — COMPUERTA DE ARRANQUE (fix de los 20-54s de carga).
+// Apps Script ENCOLA EN SERIE las peticiones del mismo usuario: las
+// ~8 llamadas GET del arranque (necesidades, revision, nutricion,
+// flujo, saldo, notas...) se formaban delante o alrededor de getAll
+// y la app no pintaba nada hasta que toda la fila avanzara (20s+).
+// Esta compuerta difiere TODAS las lecturas secundarias hasta que la
+// PRIMERA getAll resuelva: el arranque es getAll solo (~2s con cache
+// caliente), las cards pintan, y el resto llena sus paneles despues,
+// progresivamente. Las ESCRITURAS no se difieren. Salvavidas: la
+// compuerta se abre sola a los 12s pase lo que pase.
+(function(){
+  var DIFERIR = ['getNecesidades','getRevision','getNutricion','getFlujoPorMes',
+                 'getNotas','getScoreVida','getSaldoDia','getPensamientos',
+                 'getRelaciones','getSalud','getPatrimonio','getApartados',
+                 'getFinancieroAvanzado','getActivityCheck','getLogros',
+                 'getFijos','getGastos','getDatosMes','getEntrenamiento',
+                 'getMetasNutricion','getEventuales','getAhorro','getEfectivo',
+                 'getInversion'];
+  var _gateAbierta = false;
+  var _gateRes;
+  var _gate = new Promise(function(res){ _gateRes = res; });
+  function abrirGate(){ if(!_gateAbierta){ _gateAbierta = true; _gateRes(); } }
+  var origGetAll = api.getAll;
+  api.getAll = function(){
+    var p = origGetAll.apply(this, arguments);
+    if(p && typeof p.then === 'function') p.then(abrirGate, abrirGate);
+    return p;
+  };
+  setTimeout(abrirGate, 12000);   // salvavidas
+  DIFERIR.forEach(function(fn){
+    var orig = api[fn];
+    if(typeof orig !== 'function') return;
+    api[fn] = function(){
+      var args = arguments, self = this;
+      if(_gateAbierta) return orig.apply(self, args);
+      return _gate.then(function(){ return orig.apply(self, args); });
+    };
+  });
+})();
+
 function consultarSaldo(){
   const fechaEl=document.getElementById('saldo-fecha');
   const f=fechaEl?fechaEl.value:'';
