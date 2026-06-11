@@ -1,4 +1,4 @@
-/* RAW Entry — Dashboard v.6.042
+/* RAW Entry — Dashboard v.6.043
    ╔══════════════════════════════════════════════════════════════════╗
    ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -411,7 +411,6 @@ function refreshTodo(){
   // dentro del Promise.all GATEANDO todo el render: las cards no se
   // pintaban hasta que el saldo respondiera. Ahora corre en paralelo
   // sin bloquear nada — el saldo aparece cuando llegue.
-  consultarSaldo();
   api.getAll().then((d)=>{
     if(d&&d.catalogos)onCats(d.catalogos);
     if(d&&d.apartados)renderApartados(d.apartados);
@@ -438,7 +437,13 @@ function refreshTodo(){
     else api.getSalud().then(renderSalud).catch(()=>{});
     if(d&&d.patrimonio){window._patrimonioData=d.patrimonio;renderPatrimonio(d.patrimonio);}
     else api.getPatrimonio().then(function(p){window._patrimonioData=p;renderPatrimonio(p);}).catch(()=>{});
-    if(typeof cargarScore==='function')cargarScore();
+    // v6.043 — score y saldo de hoy también viajan en getAll (v5.012).
+    if(d&&d.scoreVida){try{_scoreData=d.scoreVida;renderScore(d.scoreVida);}catch(e){if(typeof cargarScore==='function')cargarScore();}}
+    else if(typeof cargarScore==='function')cargarScore();
+    if(d&&d.saldoHoy&&d.saldoHoy.display!==undefined){
+      var _sEl=document.getElementById('saldo-val');
+      if(_sEl){_sEl.textContent=d.saldoHoy.display;_sEl.className='saldo-val '+(d.saldoHoy.valor>0?'pos':d.saldoHoy.valor<0?'neg':'');}
+    } else { consultarSaldo(); }
     cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
     renderSimsPanel();
     // v6.040: refrescar los paneles HUD del overlay (espejos del dial)

@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.077  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.078  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -919,6 +919,7 @@
      en nivel 0 y solo toca elementos con la firma exacta del apagado
      instantáneo de N2: opacity:'0' + visibility:'hidden' inline).
   ════════════════════════════════════════════════════════════════ */
+  var _watchT0 = Date.now();   // v7.078 — gracia post-load para el heal
   setInterval(function(){
     if(!esEscritorio()) return;
     if(document.hidden) return;
@@ -949,15 +950,17 @@
     // pestaña que se saltó el flujo), apagarlo.
     var ov = document.getElementById('dial-overlay');
     if(real <= 1 && !window._hudCascadaEnCurso){
-      // v7.076 — heal ampliado: basta opacity:'0' inline (con o sin
-      // visibility) para ser candidato, pero solo se repara si LLEVA
-      // DOS ticks seguidos así (>600ms) — las animaciones legítimas
-      // (fades de v6, <600ms) nunca persisten dos ticks.
+      // v7.078 — heal con 5 ticks de persistencia (3s) + 12s de gracia
+      // tras el load. El heal de 2 ticks mataba los fades LEGÍTIMOS de
+      // la cascada de apertura (~2.5s) → el dial entraba "de golpe".
+      // Ninguna animación legítima persiste 3 segundos en opacity:0.
+      if(Date.now() - _watchT0 < 12000) return;
       var heal = function(el){
         var invisible = (el.style.opacity === '0');
         if(!invisible){ el._healPend = 0; return; }
-        if(!el._healPend){ el._healPend = 1; return; }   // 1er tick: marcar
-        el._healPend = 0;                                 // 2o tick: reparar
+        el._healPend = (el._healPend || 0) + 1;
+        if(el._healPend < 5) return;
+        el._healPend = 0;
         el.style.transition = 'none';
         el.style.opacity = '';
         el.style.visibility = '';

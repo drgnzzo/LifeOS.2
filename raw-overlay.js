@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.077
+/* RAW Entry — Overlay v.7.078
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1147,7 +1147,7 @@ function _crearDialOverlay(){
       _nebCanvas = document.createElement('canvas');
       _nebCanvas.width  = Math.max(1, Math.round(W * _NEB_SCALE));
       _nebCanvas.height = Math.max(1, Math.round(H * _NEB_SCALE));
-      var nc = _nebCanvas.getContext('2d');
+      var nc = _nebCanvas.getContext('2d', { willReadFrequently: true });
       // Escalar el contexto para que el código de dibujo siga usando
       // coordenadas W/H normales sin cambios.
       nc.scale(_NEB_SCALE, _NEB_SCALE);
@@ -2845,6 +2845,25 @@ function _crearDialOverlay(){
       }
 
       resize();
+      // v7.078 — EL CANVAS DEL COSMOS SE MUDA A <body> (z:0).
+      // Vivía DENTRO de #dial-overlay; al entrar a una sección,
+      // _osMostrar llama cerrarDial() que esconde el overlay completo
+      // — y con él, el fondo cósmico. El CSS html.niv-2 #dial-particles
+      // {blur(12px)} prueba que el diseño siempre quiso el cosmos
+      // visible en TODOS los niveles. En body z:0 (canvas z:0, dial
+      // z:5 — el lenguaje original), ningún show/hide del overlay
+      // vuelve a matarlo. El blur por nivel aplica por id, intacto.
+      try {
+        if(_particlesCanvas.parentNode !== document.body){
+          _particlesCanvas.style.position = 'fixed';
+          _particlesCanvas.style.inset = '0';
+          _particlesCanvas.style.zIndex = '0';
+          _particlesCanvas.style.pointerEvents = 'none';
+          document.body.insertBefore(_particlesCanvas, document.body.firstChild);
+          var _ovBg = document.getElementById('dial-overlay');
+          if(_ovBg) _ovBg.style.background = 'transparent';
+        }
+      } catch(e){}
       // ── Esencial: se construye YA (barato, y es lo que más se nota) ──
       buildStars();
       buildDialRings();
@@ -2954,7 +2973,7 @@ function _crearDialOverlay(){
     }
 
     window.addEventListener('resize', function(){
-      if(_particlesCanvas.offsetParent !== null){
+      if(_particlesCanvas.isConnected){   // v7.078: offsetParent es null en position:fixed
         resize();
         initNebula();
         buildNebulaLayer();   // v5.201: re-render nebulosa al nuevo tamaño
