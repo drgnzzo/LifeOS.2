@@ -1,6 +1,6 @@
-/* RAW Entry — Sistema de Niveles v.7.072  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.075  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
-   ║ v7.072 — WATCHDOG DE PROFUNDIDAD (FIX blur pegado + Home vacío)  ║
+   ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
    Bug 1: el blur de niveles (clases niv-0/1/2 en <html>) se quedaba
    PEGADO al volver a Home. Causa: la transición por scroll sí llama
@@ -908,6 +908,7 @@
   setInterval(function(){
     if(!esEscritorio()) return;
     if(document.hidden) return;
+    if(_bloqueado) return;   // v7.075 — jamás interferir con una transición en curso
 
     // (a) Sincronizar la clase de profundidad con la realidad.
     var real = nivelReal();
@@ -918,9 +919,14 @@
       pintarBarra();
     }
 
-    // (b) Auto-reparación del Home vacío. Solo en superficie, nunca
-    // durante la cascada de aparición.
-    if(real === 0 && !window._hudCascadaEnCurso){
+    // (b) v7.075 — FONDO CORRECTO EN AMBOS SENTIDOS.
+    // Nivel 0 y 1: el overlay (dial, cards) debe estar ENCENDIDO —
+    // auto-reparar elementos con la firma del apagado N2.
+    // Nivel 2: el overlay debe estar APAGADO — si una sección está a
+    // pantalla completa y el overlay sigue visible (entrada por
+    // pestaña que se saltó el flujo), apagarlo.
+    var ov = document.getElementById('dial-overlay');
+    if(real <= 1 && !window._hudCascadaEnCurso){
       var heal = function(el){
         if(el.style.opacity === '0' && el.style.visibility === 'hidden'){
           el.style.transition = 'none';
@@ -931,7 +937,6 @@
         }
       };
       document.querySelectorAll('.hud-pnl').forEach(heal);
-      var ov = document.getElementById('dial-overlay');
       if(ov){
         Array.prototype.forEach.call(ov.children, function(child){
           if(child.id === 'dial-particles') return;
@@ -942,6 +947,18 @@
           ov.style.pointerEvents = '';
           window._dialVisible = true;
         }
+      }
+    } else if(real === 2 && ov){
+      // ¿Hay algún hijo del overlay todavía visible? (firma de que el
+      // apagado de N2 no corrió). Si sí → apagar con el flujo oficial.
+      var visible = false;
+      for(var vi = 0; vi < ov.children.length; vi++){
+        var ch = ov.children[vi];
+        if(ch.id === 'dial-particles') continue;
+        if(ch.style.opacity !== '0' || ch.style.visibility !== 'hidden'){ visible = true; break; }
+      }
+      if(visible && typeof _apagarOverlayInstant === 'function'){
+        _apagarOverlayInstant();
       }
     }
   }, 600);

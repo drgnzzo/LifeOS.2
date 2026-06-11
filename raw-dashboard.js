@@ -1,4 +1,4 @@
-/* RAW Entry — Dashboard v.6.040
+/* RAW Entry — Dashboard v.6.041
    ╔══════════════════════════════════════════════════════════════════╗
    ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -419,10 +419,19 @@ function refreshTodo(){
     if(d&&d.activityCheck){window._actData=d.activityCheck;}
     if(d&&d.nutricion)   { window._nutData=d.nutricion;        if(typeof renderNutricion==='function') renderNutricion(d.nutricion); }
     if(d&&d.entrenamiento){ window._entData=d.entrenamiento; }
-    api.getPensamientos().then(r=>{window._pensamientosData=r;renderPensamientos(r);renderSimsPanel();}).catch(()=>{});
-    api.getRelaciones().then(r=>{window._relacionesData=r;renderRelaciones(r);renderSimsPanel();}).catch(()=>{});
-    api.getSalud().then(renderSalud).catch(()=>{});
-    api.getPatrimonio().then(function(d){window._patrimonioData=d;renderPatrimonio(d);}).catch(()=>{});
+    // v6.041 — getAll YA trae pensamientos/relaciones/salud/patrimonio
+    // en su payload. Re-pedirlos eran 4 llamadas GAS extra (3-15s cada
+    // una, sin cache) que alargaban la carga total a ~25s. Se hidrata
+    // directo del payload; la llamada api queda solo como fallback si
+    // getAll no trajo la llave.
+    if(d&&d.pensamientos){window._pensamientosData=d.pensamientos;renderPensamientos(d.pensamientos);renderSimsPanel();}
+    else api.getPensamientos().then(r=>{window._pensamientosData=r;renderPensamientos(r);renderSimsPanel();}).catch(()=>{});
+    if(d&&d.relaciones){window._relacionesData=d.relaciones;renderRelaciones(d.relaciones);renderSimsPanel();}
+    else api.getRelaciones().then(r=>{window._relacionesData=r;renderRelaciones(r);renderSimsPanel();}).catch(()=>{});
+    if(d&&d.salud){try{renderSalud(d.salud);}catch(e){}}
+    else api.getSalud().then(renderSalud).catch(()=>{});
+    if(d&&d.patrimonio){window._patrimonioData=d.patrimonio;renderPatrimonio(d.patrimonio);}
+    else api.getPatrimonio().then(function(p){window._patrimonioData=p;renderPatrimonio(p);}).catch(()=>{});
     if(typeof cargarScore==='function')cargarScore();
     cargarRevision('mensual',new Date().getFullYear(),new Date().getMonth()+1,null);
     renderSimsPanel();
