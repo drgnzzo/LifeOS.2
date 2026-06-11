@@ -1,4 +1,21 @@
-/* RAW Entry — Sistema de Niveles v.7.055  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.072  (FASE 2 — inmersión)
+   ╔══════════════════════════════════════════════════════════════════╗
+   ║ v7.072 — WATCHDOG DE PROFUNDIDAD (FIX blur pegado + Home vacío)  ║
+   ╚══════════════════════════════════════════════════════════════════╝
+   Bug 1: el blur de niveles (clases niv-0/1/2 en <html>) se quedaba
+   PEGADO al volver a Home. Causa: la transición por scroll sí llama
+   aplicarProfundidad(), pero hay caminos que cambian el nivel sin
+   pasar por ahí (cerrar la card expandida con clic, botón HOME, el
+   wrapper de _osMostrar que fuerza nivel 1). El <html> se quedaba
+   con niv-1/niv-2 estando visualmente en nivel 0 → blur fijo.
+   Bug 2: al picar rápido entre pestañas, el Home quedaba vacío —
+   cards/dial con opacity:0 + visibility:hidden inline (residuo del
+   apagado instantáneo de nivel 2 cuyo backup capturó valores en
+   plena transición).
+   Fix: WATCHDOG cada 600ms (solo escritorio) que (a) sincroniza la
+   clase niv-X con nivelReal() — la fuente de verdad que ya existía —
+   y (b) en Home, restaura elementos con la firma exacta del apagado
+   N2. No toca transforms, ni _reposicionarHUD, ni el motor cósmico.
    ╔══════════════════════════════════════════════════════════════════╗
    ║ NAVEGACIÓN POR PROFUNDIDAD — los 3 niveles encadenados            ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -879,6 +896,55 @@
   } else {
     setTimeout(init, 1000);
   }
+
+  /* ════════════════════════════════════════════════════════════════
+     v7.072 — WATCHDOG DE PROFUNDIDAD
+     Cada 600ms (solo escritorio): sincroniza la clase niv-X del <html>
+     con el nivel real, y auto-repara cards invisibles en Home.
+     Costo: despreciable (una lectura de classList; el heal solo corre
+     en nivel 0 y solo toca elementos con la firma exacta del apagado
+     instantáneo de N2: opacity:'0' + visibility:'hidden' inline).
+  ════════════════════════════════════════════════════════════════ */
+  setInterval(function(){
+    if(!esEscritorio()) return;
+    if(document.hidden) return;
+
+    // (a) Sincronizar la clase de profundidad con la realidad.
+    var real = nivelReal();
+    var h = document.documentElement;
+    if(!h.classList.contains('niv-' + real)){
+      _nivel = real;
+      aplicarProfundidad(real);
+      pintarBarra();
+    }
+
+    // (b) Auto-reparación del Home vacío. Solo en superficie, nunca
+    // durante la cascada de aparición.
+    if(real === 0 && !window._hudCascadaEnCurso){
+      var heal = function(el){
+        if(el.style.opacity === '0' && el.style.visibility === 'hidden'){
+          el.style.transition = 'none';
+          el.style.opacity = '';
+          el.style.visibility = '';
+          el.style.pointerEvents = '';
+          requestAnimationFrame(function(){ el.style.transition = ''; });
+        }
+      };
+      document.querySelectorAll('.hud-pnl').forEach(heal);
+      var ov = document.getElementById('dial-overlay');
+      if(ov){
+        Array.prototype.forEach.call(ov.children, function(child){
+          if(child.id === 'dial-particles') return;
+          heal(child);
+        });
+        if(ov.style.pointerEvents === 'none' && window._dialVisible === false){
+          // el overlay quedó sin clics tras un N2 mal cerrado
+          ov.style.pointerEvents = '';
+          window._dialVisible = true;
+        }
+      }
+    }
+  }, 600);
 
   // API pública mínima (para depurar o para fases siguientes).
   window._niveles = {
