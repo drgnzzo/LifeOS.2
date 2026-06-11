@@ -1,7 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.073
+   RAW Entry — Estilos v.5.074
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
+
+   Cambios v5.074:
+   - Popups (.popup-box) alineados al lenguaje HUD: circuit bg,
+     breathing border, esquinas decorativas, search e items con
+     estilo de campo HUD. Aplica a CONCEPTO y popup-entrada.
 
    Cambios v5.073:
    - FIX z-index .popup-overlay: 800 → 9500. El popup CONCEPTO
@@ -3294,3 +3299,135 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(7) { transition-delay:.36s, .36s; }
 html:not(.mob).hud-listo .hud-pnl:nth-child(8) { transition-delay:.42s, .42s; }
 html:not(.mob).hud-listo .hud-pnl:nth-child(9) { transition-delay:.48s, .48s; }
 html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   v5.074 — POPUPS EN LENGUAJE HUD
+   El popup CONCEPTO (y todo .popup-box) se veía genérico: caja plana,
+   input blanco de stock, chips sin identidad. Este bloque lo alinea
+   al design system del dial usando los tokens de raw-tokens.css.
+   Overrides al final del archivo: ganan por orden de cascada sin
+   tocar las reglas originales.
+═══════════════════════════════════════════════════════════════════ */
+
+.popup-box{
+  --pc-accent:     var(--acc-violet);
+  --pc-glow:       var(--acc-violet-glow);
+  --pc-border-dim: rgba(139,92,246,.22);
+  --pc-border-mid: rgba(167,139,250,.45);
+  position:relative;
+  background:
+    linear-gradient(var(--hud-grid-color) 1px, transparent 1px),
+    linear-gradient(90deg, var(--hud-grid-color) 1px, transparent 1px),
+    var(--hud-form-bg);
+  background-size: var(--hud-grid-size) var(--hud-grid-size),
+                   var(--hud-grid-size) var(--hud-grid-size), auto;
+  border:1px solid var(--pc-border-dim);
+  animation: hudBreath var(--hud-breath-dur) var(--hud-breath-easing) infinite;
+}
+/* Esquinas decorativas (estilo dial) */
+.popup-box::before,
+.popup-box::after{
+  content:'';
+  position:absolute;
+  width:var(--hud-corner-size);
+  height:var(--hud-corner-size);
+  pointer-events:none;
+  z-index:2;
+  animation: hudCornerPulse var(--hud-breath-dur) var(--hud-breath-easing) infinite;
+}
+.popup-box::before{
+  top:0; left:0;
+  border-top:var(--hud-corner-thick) solid var(--pc-accent);
+  border-left:var(--hud-corner-thick) solid var(--pc-accent);
+}
+.popup-box::after{
+  bottom:0; right:0;
+  border-bottom:var(--hud-corner-thick) solid var(--pc-accent);
+  border-right:var(--hud-corner-thick) solid var(--pc-accent);
+  animation-delay: calc(var(--hud-breath-dur) / 2);
+}
+
+/* Header: título en mayúsculas con tracking + línea de acento pulsante */
+.popup-hdr{
+  position:relative;
+  border-bottom:1px solid rgba(139,92,246,.18);
+}
+.popup-hdr::after{
+  content:'';
+  position:absolute;
+  left:18px; bottom:-1px;
+  width:42px; height:1px;
+  background:var(--pc-accent);
+  animation: hudTopPulse var(--hud-pulse-dur) ease-in-out infinite;
+}
+.popup-title{
+  text-transform:uppercase;
+  letter-spacing:.14em;
+  font-size:11px;
+  font-weight:600;
+  color:var(--hud-text-mid);
+}
+.popup-close{
+  background:transparent;
+  border:1px solid var(--hud-border);
+  color:var(--hud-text-dim);
+  transition:border-color .2s, color .2s, box-shadow .2s;
+}
+.popup-close:hover{
+  border-color:var(--pc-border-mid);
+  color:var(--hud-text);
+  box-shadow:0 0 12px var(--pc-glow);
+}
+
+/* Search: campo HUD, no input de stock */
+.pop-search{
+  background:rgba(8,6,18,.85) !important;
+  border:1px solid var(--hud-border) !important;
+  border-radius:0 !important;
+  color:var(--hud-text) !important;
+  font-size:13px;
+  letter-spacing:.02em;
+  padding:10px 14px;
+  margin:12px 18px 4px;
+  outline:none;
+  transition:border-color .2s, box-shadow .2s;
+}
+.pop-search::placeholder{
+  color:var(--hud-text-faint);
+  text-transform:uppercase;
+  letter-spacing:.1em;
+  font-size:10px;
+}
+.pop-search:focus{
+  border-color:var(--pc-border-mid) !important;
+  box-shadow:0 0 0 1px var(--pc-border-dim), 0 0 18px var(--pc-glow);
+}
+
+/* Grupos alfabéticos: etiqueta con acento */
+.pop-grupo-lbl{
+  color:var(--pc-accent);
+  opacity:.55;
+  background:transparent;
+  letter-spacing:.18em;
+}
+
+/* Items: chips HUD */
+.pop-item{
+  background:rgba(10,7,22,.6);
+  border:1px solid var(--hud-border);
+  border-radius:0;
+  color:var(--hud-text-mid);
+  transition:border-color .15s, color .15s, box-shadow .15s, background .15s;
+}
+.pop-item:hover{
+  border-color:var(--pc-border-mid);
+  color:var(--hud-text);
+  background:rgba(18,12,36,.8);
+  box-shadow:0 0 10px var(--pc-glow);
+}
+.pop-item.on{
+  border-color:var(--pc-accent);
+  color:var(--hud-text);
+  background:rgba(139,92,246,.12);
+  box-shadow:0 0 0 1px var(--pc-border-dim), 0 0 14px var(--pc-glow);
+}

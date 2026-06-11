@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.071
+/* RAW Entry — Overlay v.7.073
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -2595,6 +2595,9 @@ function _crearDialOverlay(){
     // 30fps es perfectamente fluido (el cine es 24fps). Bajar de 40 a
     // 30 es 25% menos frames pintados. Visualmente indetectable.
     var _minFrameMs = 1000 / 30;
+    // v7.073 — cachés para abaratar cada frame:
+    var _haloRectT = 0, _haloRects = [];   // rects de cards (refresh máx. c/400ms)
+    var _vigCache  = null;                 // gradientes de viñeta (uno por tamaño)
     function frame(t){
       var dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 0.016;
       // v5.214: si la pestaña está oculta, no dibujar — solo reprogramar.
@@ -2721,23 +2724,37 @@ function _crearDialOverlay(){
       // "iluminadas" porque el halo se acumula con el additive blending.
       try {
         if(window._hudPanels){
+          // v7.073 — getBoundingClientRect fuerza un reflow del DOM. Leerlo
+          // por card y por frame eran ~420 reflows/seg (14 cards × 30fps).
+          // Ahora los rects se refrescan máx. cada 400ms: los halos son
+          // tenues (alpha ≤0.08) y las cards casi siempre están quietas,
+          // así que es visualmente idéntico.
+          var _hNow = performance.now();
+          if(_hNow - _haloRectT > 400){
+            _haloRectT = _hNow;
+            _haloRects.length = 0;
+            for(var hr = 0; hr < window._hudPanels.length; hr++){
+              var cEl = window._hudPanels[hr].el;
+              if(!cEl || !cEl.offsetParent){ _haloRects.push(null); continue; }
+              var rb = cEl.getBoundingClientRect();
+              var hu = cEl.style.getPropertyValue('--ac') || '#A78BFA';
+              if(hu.charAt(0) !== '#') hu = '#A78BFA';
+              _haloRects.push({ l: rb.left, t: rb.top, r: rb.right, b: rb.bottom, w: rb.width, h: rb.height, hue: hu });
+            }
+          }
           pctx.save();
           pctx.globalCompositeOperation = 'lighter';
-          for(var hp = 0; hp < window._hudPanels.length; hp++){
-            var card = window._hudPanels[hp].el;
-            if(!card || !card.offsetParent) continue;
-            var rect = card.getBoundingClientRect();
-            if(rect.width < 10 || rect.height < 10) continue;
+          for(var hp = 0; hp < _haloRects.length; hp++){
+            var rect = _haloRects[hp];
+            if(!rect) continue;
+            if(rect.w < 10 || rect.h < 10) continue;
             // Solo cards visibles
-            if(rect.bottom < 0 || rect.top > H) continue;
-            if(rect.right < 0 || rect.left > W) continue;
-            var cx = rect.left + rect.width / 2;
-            var cy = rect.top + rect.height / 2;
-            var radius = Math.max(rect.width, rect.height) * 0.7;
-            // Color: usar el accent de la card si está, sino violeta default
-            var hue = card.style.getPropertyValue('--ac') || '#A78BFA';
-            // Hex hue → simple RGB
-            if(hue.charAt(0) !== '#'){ hue = '#A78BFA'; }
+            if(rect.b < 0 || rect.t > H) continue;
+            if(rect.r < 0 || rect.l > W) continue;
+            var cx = rect.l + rect.w / 2;
+            var cy = rect.t + rect.h / 2;
+            var radius = Math.max(rect.w, rect.h) * 0.7;
+            var hue = rect.hue;
             // Glow modulado por el tiempo global (pulsa lento)
             var glowPulse = 0.55 + 0.45 * Math.sin(globalT * 0.7 + hp * 0.5);
             var alpha = 0.04 + glowPulse * 0.04;
@@ -2756,35 +2773,27 @@ function _crearDialOverlay(){
 
       // v5.171: Vignette suave en los bordes — todo se desvanece al
       // acercarse a los límites del viewport, así nada termina "cortado"
+      // v7.073 — los 4 gradientes de la viñeta solo dependen de W/H: se
+      // crean UNA vez por tamaño (antes se creaban 5 gradientes nuevos por
+      // frame, incluido uno muerto que nunca se usaba). Visual idéntico.
       var vignetteMargin = 80;
-      var grad = pctx.createLinearGradient(0, 0, 0, H);
-      // Compose using two passes: usar globalCompositeOperation 'destination-out'
+      if(!_vigCache || _vigCache.W !== W || _vigCache.H !== H){
+        var vTop = pctx.createLinearGradient(0, 0, 0, vignetteMargin);
+        vTop.addColorStop(0, 'rgba(0,0,0,1)'); vTop.addColorStop(1, 'rgba(0,0,0,0)');
+        var vBot = pctx.createLinearGradient(0, H - vignetteMargin, 0, H);
+        vBot.addColorStop(0, 'rgba(0,0,0,0)'); vBot.addColorStop(1, 'rgba(0,0,0,1)');
+        var vLeft = pctx.createLinearGradient(0, 0, vignetteMargin, 0);
+        vLeft.addColorStop(0, 'rgba(0,0,0,1)'); vLeft.addColorStop(1, 'rgba(0,0,0,0)');
+        var vRight = pctx.createLinearGradient(W - vignetteMargin, 0, W, 0);
+        vRight.addColorStop(0, 'rgba(0,0,0,0)'); vRight.addColorStop(1, 'rgba(0,0,0,1)');
+        _vigCache = { W: W, H: H, top: vTop, bot: vBot, left: vLeft, right: vRight };
+      }
       pctx.save();
       pctx.globalCompositeOperation = 'destination-out';
-      // Top fade
-      var topGrad = pctx.createLinearGradient(0, 0, 0, vignetteMargin);
-      topGrad.addColorStop(0, 'rgba(0,0,0,1)');
-      topGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      pctx.fillStyle = topGrad;
-      pctx.fillRect(0, 0, W, vignetteMargin);
-      // Bottom fade
-      var botGrad = pctx.createLinearGradient(0, H - vignetteMargin, 0, H);
-      botGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      botGrad.addColorStop(1, 'rgba(0,0,0,1)');
-      pctx.fillStyle = botGrad;
-      pctx.fillRect(0, H - vignetteMargin, W, vignetteMargin);
-      // Left fade
-      var leftGrad = pctx.createLinearGradient(0, 0, vignetteMargin, 0);
-      leftGrad.addColorStop(0, 'rgba(0,0,0,1)');
-      leftGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      pctx.fillStyle = leftGrad;
-      pctx.fillRect(0, 0, vignetteMargin, H);
-      // Right fade
-      var rightGrad = pctx.createLinearGradient(W - vignetteMargin, 0, W, 0);
-      rightGrad.addColorStop(0, 'rgba(0,0,0,0)');
-      rightGrad.addColorStop(1, 'rgba(0,0,0,1)');
-      pctx.fillStyle = rightGrad;
-      pctx.fillRect(W - vignetteMargin, 0, vignetteMargin, H);
+      pctx.fillStyle = _vigCache.top;   pctx.fillRect(0, 0, W, vignetteMargin);
+      pctx.fillStyle = _vigCache.bot;   pctx.fillRect(0, H - vignetteMargin, W, vignetteMargin);
+      pctx.fillStyle = _vigCache.left;  pctx.fillRect(0, 0, vignetteMargin, H);
+      pctx.fillStyle = _vigCache.right; pctx.fillRect(W - vignetteMargin, 0, vignetteMargin, H);
       pctx.restore();
 
       // Spawns periódicos
