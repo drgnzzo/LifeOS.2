@@ -1,4 +1,19 @@
-/* RAW Entry — Overlay v.7.069
+/* RAW Entry — Overlay v.7.071
+   ╔══════════════════════════════════════════════════════════════════╗
+   ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
+   ╚══════════════════════════════════════════════════════════════════╝
+   Los loops del dial (_breathLoop ×2 y _iniciarPulsoCentro) corrían
+   _dialDraw() a la velocidad NATIVA del monitor (60-144fps) sin pausa
+   por foco ni por pestaña oculta. _dialDraw usa shadowBlur en casi
+   todos sus trazos — la operación más cara de canvas (cada trazo con
+   sombra = un desenfoque gaussiano completo). Resultado: 130%+ de CPU
+   permanente, incluso con LifeOS en segundo plano.
+   Fix: los tres loops reciben los MISMOS frenos que el cosmos ya
+   tenía (v5.214/v7.066): pausa con document.hidden, pausa sin
+   document.hasFocus(), y cap a 30fps. El avance del contador usa
+   tiempo real normalizado, así la velocidad visual de la respiración
+   y el pulso queda IDÉNTICA (MAR-1: cero cambio estético).
+   _dialDraw NO se tocó.
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.066 — REGRESO A HOME MÁS SUAVE Y CALMADO                      ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -631,11 +646,13 @@ var _dialActiveSub = -1;
 var _dialVisible   = false;
 var _dialCentroHov  = false;
 var _dialPulseT     = 0;
+var _dialPulseLastT = 0;   // v7.071 — timestamp del último frame del pulso (cap 30fps)
 var _dialRAF        = null;
 var _subRingProg    = 0;
 var _subRingRAF     = null;
 var _subRingPrevSub = -1;
 var _dialBreathT    = 0;
+var _dialBreathLastT = 0;  // v7.071 — timestamp del último frame del breathing (cap 30fps)
 var _dialBreathRAF  = null;
 
 var _DC = {
@@ -6812,8 +6829,21 @@ function _animarSubRing(targetSub){
 
 function _iniciarPulsoCentro(){
   if(_dialRAF) return;
-  function loop(){
-    _dialPulseT++;
+  function loop(ts){
+    // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
+    ts = ts || performance.now();
+    if(document.hidden || !document.hasFocus()){
+      _dialPulseLastT = 0;
+      _dialRAF = requestAnimationFrame(loop);
+      return;
+    }
+    if(_dialPulseLastT && (ts - _dialPulseLastT) < 33){
+      _dialRAF = requestAnimationFrame(loop);
+      return;
+    }
+    var _dtF = _dialPulseLastT ? Math.min(4, (ts - _dialPulseLastT) / 16.67) : 1;
+    _dialPulseLastT = ts;
+    _dialPulseT += _dtF;
     _dialDraw();
     _dialRAF = requestAnimationFrame(loop);
   }
@@ -7303,8 +7333,21 @@ function abrirDial(){
   // ════════════════════════════════════════════════════════════════
   if(_dialYaInicializado){
     if(!_dialBreathRAF){
-      (function _breathLoop(){
-        _dialBreathT++;
+      (function _breathLoop(ts){
+        // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
+        ts = ts || performance.now();
+        if(document.hidden || !document.hasFocus()){
+          _dialBreathLastT = 0;
+          _dialBreathRAF = requestAnimationFrame(_breathLoop);
+          return;
+        }
+        if(_dialBreathLastT && (ts - _dialBreathLastT) < 33){
+          _dialBreathRAF = requestAnimationFrame(_breathLoop);
+          return;
+        }
+        var _dtF = _dialBreathLastT ? Math.min(4, (ts - _dialBreathLastT) / 16.67) : 1;
+        _dialBreathLastT = ts;
+        _dialBreathT += _dtF;
         _dialDraw();
         _dialBreathRAF = requestAnimationFrame(_breathLoop);
       })();
@@ -7437,8 +7480,21 @@ function abrirDial(){
   _dialYaInicializado = true;
 
   if(!_dialBreathRAF){
-    (function _breathLoop(){
-      _dialBreathT++;
+    (function _breathLoop(ts){
+      // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
+      ts = ts || performance.now();
+      if(document.hidden || !document.hasFocus()){
+        _dialBreathLastT = 0;
+        _dialBreathRAF = requestAnimationFrame(_breathLoop);
+        return;
+      }
+      if(_dialBreathLastT && (ts - _dialBreathLastT) < 33){
+        _dialBreathRAF = requestAnimationFrame(_breathLoop);
+        return;
+      }
+      var _dtF = _dialBreathLastT ? Math.min(4, (ts - _dialBreathLastT) / 16.67) : 1;
+      _dialBreathLastT = ts;
+      _dialBreathT += _dtF;
       _dialDraw();
       _dialBreathRAF = requestAnimationFrame(_breathLoop);
     })();
