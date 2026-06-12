@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.080
+/* RAW Entry — Overlay v.7.084
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -6635,12 +6635,9 @@ function _crearDialOverlay(){
     }
   };
 
-  // v7.080 — el clic en el FONDO del overlay (y Escape) cerraba el dial,
-  // herencia de v5/v6. En el paradigma v7 de niveles el dial es el ANCLA
-  // del Home y _osMostrar('home') ya no llama abrirDial — así que un clic
-  // accidental en el fondo lo desaparecía SIN RETORNO (ni HOME ni niveles
-  // lo traían de vuelta). En escritorio se desactiva el gesto; en móvil
-  // (carrusel, <900px) se conserva el comportamiento original.
+  // v7.084 — clic-fondo/Escape cierran el dial SOLO en movil (<900px).
+  // En escritorio el dial es el ancla del Home: cerrarlo por accidente
+  // lo desaparecia sin retorno.
   _dialOverlay.addEventListener('click',function(e){
     if(e.target===_dialOverlay && window.innerWidth < 900) cerrarDial();
   });

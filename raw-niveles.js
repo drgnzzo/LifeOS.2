@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.079  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.084  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -148,7 +148,9 @@
           ch.style.transform = '';
         });
       }
-      if(typeof window._reposicionarHUD === 'function'){
+      // v7.084 — solo reposicionar si NO hay card expandida: hacerlo
+      // en nivel 1 provocaba el crece-encoge-crece de la card.
+      if(!window._hudExpanded && typeof window._reposicionarHUD === 'function'){
         try { window._reposicionarHUD(); } catch(e){}
       }
     }, 1150);
@@ -237,7 +239,7 @@
           child.style.visibility = '';
         }
       });
-      ov.style.pointerEvents = '';
+      ov.style.pointerEvents = 'none';   // v7.084 — abrirDial deja el overlay en 'none' A PROPOSITO (no atrapa clics; sus hijos si). Restaurar '' activaba el clic-en-fondo que cierra el dial sin retorno.
     }
     // Restaurar las cards HUD.
     document.querySelectorAll('.hud-pnl').forEach(function(p){
@@ -419,6 +421,18 @@
   // Baja un nivel (más profundo).
   function bajarNivel(){
     if(_bloqueado) return;
+
+    // v7.084 — POPUP CONCEPTO huerfano: solo tiene sentido con el
+    // form RAW abierto. Si quedo con .show sin form (cambio de vista,
+    // cierre del form con popup abierto), cerrarlo.
+    var _popC = document.getElementById('popup-concepto');
+    if(_popC && _popC.classList.contains('show')){
+      var _dd = document.getElementById('entrada-dropdown');
+      if(!_dd || !_dd.classList.contains('show')){
+        _popC.classList.remove('show');
+      }
+    }
+
     sync();
     if(_nivel >= NIVEL_MAX) return;
     _bloqueado = true;
@@ -969,7 +983,18 @@
     // pantalla completa y el overlay sigue visible (entrada por
     // pestaña que se saltó el flujo), apagarlo.
     var ov = document.getElementById('dial-overlay');
-    if(real <= 1 && !window._hudCascadaEnCurso){
+    if(real <= 1 && !window._hudCascadaEnCurso
+       && window._dialVisible === true
+       && document.documentElement.classList.contains('hud-listo')){
+      // v7.084 — DOS GUARDS CRITICOS:
+      // 1) _dialVisible===true: si el dial esta LEGITIMAMENTE cerrado
+      //    (form RAW abierto via cerrarDial), los hijos del overlay en
+      //    opacity:0 son correctos. El heal los resucitaba detras del
+      //    form a los ~1.2s ('aparecen y nadie los llama').
+      // 2) hud-listo: jamas reparar antes de la primera apertura (el
+      //    estado inicial es opacity:0 legitimo; repararlo encendia el
+      //    dial DE GOLPE sin fade).
+
       // v7.078 — heal con 5 ticks de persistencia (3s) + 12s de gracia
       // tras el load. El heal de 2 ticks mataba los fades LEGÍTIMOS de
       // la cascada de apertura (~2.5s) → el dial entraba "de golpe".
@@ -993,10 +1018,11 @@
           if(child.id === 'dial-particles') return;
           heal(child);
         });
-        if(ov.style.pointerEvents === 'none'){
-          ov.style.pointerEvents = '';
-          window._dialVisible = true;
-        }
+        // v7.084 — flip de pointerEvents/_dialVisible ELIMINADO.
+        // Corrompia la bandera: con el form RAW abierto ponia
+        // _dialVisible=true sin dial visible -> cerrarEntrada veia
+        // !_dialVisible falso -> abrirDial() jamas corria -> dial
+        // muerto sin retorno. 'none' es el estado correcto siempre.
       }
     } else if(real === 2 && ov){
       // v7.076 — SOLO apagar si una sección está REALMENTE visible en

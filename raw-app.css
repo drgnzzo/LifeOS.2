@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.072
+   RAW Entry — Estilos v.5.076
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
 
@@ -1984,11 +1984,12 @@ html.mob .board-face.panel-nutricion .panel-body::-webkit-scrollbar-thumb{
 /* v5.075 — cuando el form RAW esta abierto, las cards HUD (que viven en
    <body>, fuera del overlay) se difuminan y dejan de capturar clics.
    Sin esto, las cards laterales se transparentaban por encima del form. */
-body:has(.entrada-dropdown.show) .hud-pnl{
-  opacity:.08 !important;
+body:has(.entrada-dropdown.show) .hud-pnl,
+body:has(#popup-concepto.show) .hud-pnl{
+  opacity:0 !important;
+  visibility:hidden !important;
   pointer-events:none !important;
-  filter:blur(2px);
-  transition:opacity .25s ease, filter .25s ease;
+  transition:opacity .2s ease, visibility 0s linear .2s;
 }
 .entrada-dropdown-inner{background:none;border:none;border-radius:0;width:auto;height:auto;max-width:none;max-height:none;overflow:visible;box-shadow:none;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0}
 .entrada-selector-hdr{display:none}
