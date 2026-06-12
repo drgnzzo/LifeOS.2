@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.079
+   RAW Entry — Estilos v.5.080
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
 
@@ -3357,3 +3357,17 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
 .pop-search:focus{border-color:var(--hud-border-hov);
   box-shadow:0 0 14px var(--hud-glow)}
 #pop-body{overflow-y:auto;flex:1;padding-bottom:10px}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   v5.080 — SCROLLBARS INVISIBLES EN TODA LA APP (peticion de
+   Electronics: "no lo quiero ver en ningun lado de la appweb").
+   Ademas ARREGLA LA RAIZ de la oscilacion: al definirse los tokens
+   (v5.077) revivieron bordes de 1px que empujaron contenido al limite
+   del overflow; en Windows la scrollbar ocupa ~17px y al aparecer
+   reacomodaba el contenido, volvia a caber, desaparecia, y de nuevo —
+   bucle. Con ancho 0 la scrollbar no altera el layout: el bucle es
+   IMPOSIBLE. El scroll sigue funcionando (rueda, trackpad, touch).
+═══════════════════════════════════════════════════════════════════ */
+*{scrollbar-width:none;-ms-overflow-style:none}
+*::-webkit-scrollbar{width:0!important;height:0!important;display:none}
