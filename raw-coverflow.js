@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.091 (intento 4 — arquitectura segura)
+/* RAW Entry — Cover Flow Nivel 1 v.7.092 (intento 4 — arquitectura segura)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ COVER FLOW CIRCULAR INFINITO — diseño "aro lógico + fantasmas"   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -55,13 +55,19 @@
   var css = document.createElement('style');
   css.id = 'cf4-css';
   css.textContent =
-    '.cf4-ghost{position:fixed;width:200px;max-width:18vw;z-index:8990;'+
+    /* v7.092 — las cards del ARO que no son el centro se OCULTAN en
+       cf-on (estaban fijas en columnas contradiciendo el carrusel).
+       Solo atributo data-cf-ring puesto/quitado por este modulo. */
+    'html.cf-on .hud-pnl[data-cf-ring]{opacity:0 !important;'+
+      'visibility:hidden !important;pointer-events:none !important;'+
+      'transition:opacity .3s ease, visibility 0s linear .3s}'+
+    '.cf4-ghost{position:fixed;width:240px;max-width:20vw;z-index:8990;'+
       'background:var(--hud-form-bg);border:1px solid var(--cf4-col,var(--hud-border));'+
       'box-shadow:0 0 22px rgba(0,0,0,.55),0 0 14px var(--cf4-glow,transparent);'+
       'padding:13px 15px;cursor:pointer;user-select:none;opacity:0;'+
       'transform:scale(.92);pointer-events:none;'+
       'transition:opacity .35s ease,transform .35s ease,box-shadow .2s ease;'+
-      'display:flex;flex-direction:column;gap:7px}'+
+      'display:flex;flex-direction:column;gap:10px;justify-content:center}'+
     'html.cf-on .cf4-ghost{opacity:.78;pointer-events:auto;transform:scale(1)}'+
     '.cf4-ghost:hover{opacity:1 !important;'+
       'box-shadow:0 0 26px rgba(0,0,0,.6),0 0 22px var(--cf4-glow,transparent)}'+
@@ -199,13 +205,28 @@
       var prev = aro[(idx - 1 + n) % n];   // bucle infinito por módulo
       var next = aro[(idx + 1) % n];
 
-      // Posicionar fantasmas junto a la card expandida (leemos SU rect,
-      // jamás escribimos en ella).
+      // v7.092 — marcar centro y miembros del aro con ATRIBUTOS (cero
+      // estilos sobre cards reales; el CSS de cf-on hace el resto).
+      aro.forEach(function(el){
+        if(el === centro){
+          el.removeAttribute('data-cf-ring');
+          el.setAttribute('data-cf-center','1');
+        } else {
+          el.removeAttribute('data-cf-center');
+          el.setAttribute('data-cf-ring','1');
+        }
+      });
+
+      // Fantasmas estilo CARD VECINA: altos (60% de la central), pegados
+      // a sus bordes. Leemos el rect de la central, jamas escribimos en ella.
       var r = centro.getBoundingClientRect();
       if(r.width < 50){ return; }   // aún animando: el próximo tick lo toma
-      var gw = Math.min(200, window.innerWidth * 0.18);
-      var gap = 26;
-      var top = Math.max(70, r.top + r.height/2 - 50);
+      var gw = Math.min(240, window.innerWidth * 0.20);
+      var gh = Math.max(180, r.height * 0.6);
+      var gap = 18;
+      var top = Math.max(70, r.top + (r.height - gh)/2);
+      _ghostL.style.height = gh + 'px';
+      _ghostR.style.height = gh + 'px';
       _ghostL.style.left = Math.max(8, r.left - gw - gap) + 'px';
       _ghostL.style.top  = top + 'px';
       _ghostR.style.left = Math.min(window.innerWidth - gw - 8, r.right + gap) + 'px';
@@ -230,6 +251,13 @@
   function limpiar(){
     document.documentElement.classList.remove('cf-on');
     _centroActual = null;
+    // v7.092 — retirar atributos del aro (las cards vuelven a la vida
+    // normal del nivel; sus estilos jamas fueron tocados).
+    document.querySelectorAll('.hud-pnl[data-cf-ring],.hud-pnl[data-cf-center]')
+      .forEach(function(el){
+        el.removeAttribute('data-cf-ring');
+        el.removeAttribute('data-cf-center');
+      });
     // Los fantasmas/flechas se ocultan vía CSS (sin .cf-on → opacity 0,
     // pointer-events none). No se destruyen: reutilización sin churn.
   }

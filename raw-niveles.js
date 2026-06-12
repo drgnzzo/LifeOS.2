@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.085  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.092  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -141,12 +141,12 @@
       // el dial quedaba pegado arriba-izquierda con el ultimo transform.
       var ov = document.getElementById('dial-overlay');
       if(ov){
+        // v7.092 — SOLO limpiar el overlay. Borrar los transforms de los
+        // HIJOS (v7.081) era un error: el dial se CENTRA con un transform
+        // inline calculado por JS; al borrarlo caia a la esquina
+        // superior-izquierda. Ese era el origen del dial descolocado.
         ov.style.transform = '';
         ov.style.opacity = '';
-        Array.prototype.forEach.call(ov.children, function(ch){
-          if(ch.id === 'dial-particles') return;
-          ch.style.transform = '';
-        });
       }
       // v7.084 — solo reposicionar si NO hay card expandida: hacerlo
       // en nivel 1 provocaba el crece-encoge-crece de la card.
