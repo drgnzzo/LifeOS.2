@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.093  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.100  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1070,4 +1070,23 @@
     irA:    irANivel,
     estado: function(){ return { nivel:_nivel, medidor:_medidor }; }
   };
+
+  // v7.100 — TECLADO DE NIVELES: ArrowUp emerge (hacia nivel 0),
+  // ArrowDown se sumerge (hacia nivel 2). Mismas funciones que la
+  // barra manual (warp, lock _bloqueado y pintado incluidos gratis).
+  // Guards: jamas en movil, jamas escribiendo en un input, jamas con
+  // el form RAW o el popup CONCEPTO abiertos (ahi el teclado es para
+  // capturar datos, no para viajar).
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+    if(window.innerWidth < 900) return;
+    if(e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    var dd = document.getElementById('entrada-dropdown');
+    if(dd && dd.classList.contains('show')) return;
+    var pc = document.getElementById('popup-concepto');
+    if(pc && pc.classList.contains('show')) return;
+    e.preventDefault();
+    if(e.key === 'ArrowUp') subirNivel();
+    else bajarNivel();
+  });
 })();

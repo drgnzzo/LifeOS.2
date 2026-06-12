@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.098 (marcos persistentes + rocola)
+/* RAW Entry — Cover Flow Nivel 1 v.7.099 (swap atomico + geometria estable)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -15,6 +15,15 @@
    · ROCOLA: mantener presionada una flecha encadena giros continuos
      (ticker 120ms que respeta _navegando: dispara el siguiente paso
      en cuanto el anterior libera; suelta y se detiene donde va).
+   · v7.099 SWAP ATOMICO: navegar llama _hudExpand(destino) DIRECTO.
+     La funcion nativa colapsa-sin-reposicionar y expande en la MISMA
+     llamada sincrona: _hudExpanded jamas queda null -> el nivel jamas
+     cae a 0 entre pasos (la barra de niveles ya no brinca y la rocola
+     no se traba — caso 007: niv 1->0->1 en 20.2s/21.4s/22.4s...).
+   · v7.099 GEOMETRIA ESTABLE: los marcos solo se dimensionan cuando
+     dos lecturas consecutivas del rect central coinciden (±3px).
+     Mata las cards "apachurradas" al regresar de nivel 2 (se media
+     la card a medio crecer).
    · Clon por marco montado al entrar al rango visible; se refresca
      solo al reentrar (datos al día sin cortes visibles).
    Reglas vigentes: cero escrituras sobre cards reales, cero
@@ -105,6 +114,7 @@
   var MARCOS = {};          // id de card -> marco persistente
   var _fresco = {};         // id -> id del centro cuando se montó (refresh al reentrar)
   var _fallos=0,_muerto=false,_navegando=false;
+  var _geoFirma='',_geoTimer=null;
   var _aL=null,_aR=null;
 
   function esLateral(el){ return !!(el && el._side && (el._side in SIDES)); }
@@ -281,6 +291,18 @@
 
       var r = centro.getBoundingClientRect();
       if(r.width < 300) return;
+      // v7.099 — ESTABILIZADOR: solo dimensionar con geometria quieta.
+      // Si el rect difiere de la lectura anterior (card aun creciendo,
+      // regreso de niv-2, resize), guardar y reintentar en 120ms sin
+      // escribir nada. Dos lecturas iguales (±3px) = geometria estable.
+      var firma = Math.round(r.left)+','+Math.round(r.top)+','+
+                  Math.round(r.width)+','+Math.round(r.height);
+      if(_geoFirma !== firma){
+        _geoFirma = firma;
+        clearTimeout(_geoTimer);
+        _geoTimer = setTimeout(aplicar, 120);
+        return;
+      }
 
       aro.forEach(function(card, i){
         var d = ((i - idx) % n + n) % n;          // 0..n-1
@@ -338,19 +360,19 @@
     var h = document.documentElement;
     h.classList.add('cf-nav');                    // vela del dial
     try {
-      if(typeof window._hudCollapse === 'function') window._hudCollapse();
-      setTimeout(function(){
-        try{ if(typeof window._hudExpand === 'function') window._hudExpand(destino); }catch(e){}
-        var intentos = 0;
-        (function release(){
-          intentos++;
-          if(h.classList.contains('niv-1') || intentos > 14){
-            _navegando = false;
-            aplicar();                            // slots nuevos → todo se desliza
-            setTimeout(function(){ h.classList.remove('cf-nav'); }, 140);
-          } else setTimeout(release, 60);
-        })();
-      }, 40);
+      // v7.099 — SWAP ATOMICO: _hudExpand nativo maneja "otra expandida"
+      // (colapsa sin reposicionar + expande en la MISMA llamada sincrona).
+      // _hudExpanded jamas es null entre medias -> el nivel jamas cae a 0.
+      if(typeof window._hudExpand === 'function') window._hudExpand(destino);
+      var intentos = 0;
+      (function release(){
+        intentos++;
+        if((window._hudExpanded === destino && h.classList.contains('niv-1')) || intentos > 14){
+          _navegando = false;
+          aplicar();                              // slots nuevos → todo se desliza
+          setTimeout(function(){ h.classList.remove('cf-nav'); }, 140);
+        } else setTimeout(release, 60);
+      })();
     } catch(e){
       _navegando = false;
       h.classList.remove('cf-nav');
