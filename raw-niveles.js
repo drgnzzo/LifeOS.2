@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.092  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.093  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -946,6 +946,25 @@
     if(!esEscritorio()) return;
     if(document.hidden) return;
     if(_bloqueado) return;   // v7.075 — jamás interferir con una transición en curso
+
+    // v7.093 — DIAL ATORADO EN FIXED (caso 007 #1): al expandir, el
+    // nivel 1 pone el canvas del dial en position:fixed (miniatura).
+    // Los regresos por warp o por bajada rapida 2->1->0 no ejecutan la
+    // restauracion a 'relative', y el canvas queda fixed sin left/top:
+    // pegado a la esquina del viewport (centro ~418,418 evidenciado por
+    // el espia). Reconciliacion: en nivel 0, dial visible, sin
+    // expansion, si el canvas sigue 'fixed' -> devolverlo a 'relative'
+    // para que el flex del overlay lo centre. Idempotente.
+    if(real === 0 && window._dialVisible === true && !window._hudExpanded){
+      var _ovD = document.getElementById('dial-overlay');
+      var _cvD = _ovD ? _ovD.querySelector('canvas:not(#dial-particles)') : null;
+      if(_cvD && _cvD.style.position === 'fixed'){
+        _cvD.style.position = 'relative';
+        _cvD.style.left = '';
+        _cvD.style.top = '';
+        _cvD.style.zIndex = '1';
+      }
+    }
 
     // v7.085 — POPUP CONCEPTO huerfano (ahora SI en el watchdog; en
     // v7.084 quedo por error dentro de bajarNivel y solo corria al
