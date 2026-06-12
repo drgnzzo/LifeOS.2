@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.100  (FASE 2 — inmersión)
+/* RAW Entry — Sistema de Niveles v.7.101  (FASE 2 — inmersión)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -942,6 +942,7 @@
      instantáneo de N2: opacity:'0' + visibility:'hidden' inline).
   ════════════════════════════════════════════════════════════════ */
   var _watchT0 = Date.now();   // v7.078 — gracia post-load para el heal
+  var _dialDesvTick = 0;       // v7.101 — doble-tick del dial desviado
   setInterval(function(){
     if(!esEscritorio()) return;
     if(document.hidden) return;
@@ -955,7 +956,11 @@
     // el espia). Reconciliacion: en nivel 0, dial visible, sin
     // expansion, si el canvas sigue 'fixed' -> devolverlo a 'relative'
     // para que el flex del overlay lo centre. Idempotente.
-    if(real === 0 && window._dialVisible === true && !window._hudExpanded){
+    // v7.101 — BUG MORTAL CORREGIDO: este bloque usaba `real` ANTES de
+    // su declaracion (hoisting -> undefined): el heal v7.093 JAMAS
+    // corrio ni una sola vez. Ahora lee el nivel directamente.
+    var realDial = nivelReal();
+    if(realDial === 0 && window._dialVisible === true && !window._hudExpanded){
       var _ovD = document.getElementById('dial-overlay');
       var _cvD = _ovD ? _ovD.querySelector('canvas:not(#dial-particles)') : null;
       if(_cvD && _cvD.style.position === 'fixed'){
@@ -963,6 +968,34 @@
         _cvD.style.left = '';
         _cvD.style.top = '';
         _cvD.style.zIndex = '1';
+        _dialDesvTick = 0;
+      } else if(_cvD && !document.documentElement.classList.contains('niv-warp') &&
+                !document.documentElement.classList.contains('cf-nav')){
+        // v7.101 — DIAL A MEDIO CRECER (caso 007 #2, log 142.9s): la
+        // animacion de restauracion 1->0 quedo interrumpida y el canvas
+        // quedo 'relative' pero chico y en la esquina (86,86->374,374,
+        // congelado lejos de su centro 960,503). Deteccion: centro del
+        // canvas desviado >80px del centro del overlay durante DOS ticks
+        // consecutivos (jamas tocar una animacion legitima en curso).
+        // Cura: soltar los estilos inline del medio-crecimiento; el
+        // layout nativo del overlay lo recoloca y redimensiona solo.
+        var _rc = _cvD.getBoundingClientRect();
+        var _ro = _ovD.getBoundingClientRect();
+        var _dx = (_rc.left+_rc.width/2) - (_ro.left+_ro.width/2);
+        var _dy = (_rc.top+_rc.height/2) - (_ro.top+_ro.height/2);
+        if(Math.sqrt(_dx*_dx+_dy*_dy) > 80){
+          _dialDesvTick++;
+          if(_dialDesvTick >= 2){
+            _cvD.style.transform = '';
+            _cvD.style.width = '';
+            _cvD.style.height = '';
+            _cvD.style.left = '';
+            _cvD.style.top = '';
+            _dialDesvTick = 0;
+          }
+        } else {
+          _dialDesvTick = 0;
+        }
       }
     }
 
