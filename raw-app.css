@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.077
+   RAW Entry — Estilos v.5.078
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
 
@@ -699,7 +699,7 @@ html,body{
 /* ═══════════════════════════════════════════
    POPUPS & MODALES
 ═══════════════════════════════════════════ */
-.popup-overlay{position:fixed;inset:0;background:rgba(0,2,8,.7);backdrop-filter:blur(16px);z-index:800;display:none;align-items:center;justify-content:center}
+.popup-overlay{position:fixed;inset:0;background:rgba(0,2,8,.7);backdrop-filter:blur(16px);z-index:9500;display:none;align-items:center;justify-content:center}
 .popup-overlay.show{display:flex}
 .popup-sheet{
   background:var(--hud-form-bg);
