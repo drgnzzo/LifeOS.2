@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════
-   RAW Entry — Estilos v.5.078
+   RAW Entry — Estilos v.5.079
    Reescrito sobre el design system unificado del dial.
    Depende de raw-tokens.css (cargar antes).
 
@@ -59,6 +59,12 @@ html,body{
 ═══════════════════════════════════════════ */
 #bg{position:fixed;inset:0;background:var(--hud-bg-base);z-index:0}
 #pts{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden}
+/* v5.079 — las .pt (particulas legadas pre-cosmos que suben en bucle)
+   se apagan en ESCRITORIO: el fondo cosmico las reemplazo y solo se
+   asomaban a traves del backdrop translucido del form RAW. Ademas
+   libera 60 animaciones infinitas de CPU. En movil siguen (ahi son
+   el fondo). */
+html:not(.mob) #pts{display:none}
 .pt{position:absolute;width:3px;height:3px;border-radius:50%}
 .pt.blue{background:rgba(120,140,200,0.6);box-shadow:0 0 8px 3px rgba(120,140,200,0.4)}
 .pt.cyan{background:rgba(100,180,160,0.5);box-shadow:0 0 8px 3px rgba(100,180,160,0.35)}
