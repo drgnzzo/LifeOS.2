@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.085
+/* RAW Entry — Overlay v.7.102
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -4799,31 +4799,54 @@ function _crearDialOverlay(){
         // Limpiar transform SOLO si no está animando entrada
         if(!hp.el._animatingEntry) hp.el.style.transform = '';
       });
-      // Medir alturas naturales SIN forzar maxHeight (sin scroll vertical).
-      // Si la suma excede colVAvail, los paneles se extienden hacia abajo
-      // libremente y pueden solaparse con la zona del track. Es preferible
-      // a tener scroll interno en cada panel, que se siente mal.
+      // v7.102 — GRID FIJO: techo duro por columna. Cada card recibe una
+      // celda de alto maximo; si su contenido natural excede la celda, se
+      // RECORTA con scroll interno propio — JAMAS desborda ni empuja a la
+      // card de abajo (causa del encimado: Mision sobre Patrimonio, Nivel
+      // sobre Necesidades en las capturas). El reparto de altura es
+      // proporcional al contenido natural, con un piso digno por card.
       var heights = panels.map(function(hp){
         return hp.el.scrollHeight || hp.el.offsetHeight || 200;
       });
-      var totalH = heights.reduce(function(s,h){ return s+h+GAP; },0) - GAP;
-
-      // Gap entre paneles: GAP normal. Si no cabe, reducir un poco
-      // (sin llegar a 0) para minimizar el overflow.
+      var nP = panels.length;
       var gapBetween = GAP;
-      if(totalH > colVAvail && panels.length > 1){
-        var extra = totalH - colVAvail;
-        var gapsCount = panels.length - 1;
-        gapBetween = Math.max(8, GAP - Math.ceil(extra / gapsCount));
+      var dispo = colVAvail - gapBetween * (nP - 1);   // alto util tras gaps
+      var natTotal = heights.reduce(function(s,h){ return s+h; }, 0);
+
+      // Celdas: si TODO cabe, cada card toma su altura natural (sin recorte).
+      // Si NO cabe, se reparte 'dispo' proporcional al contenido, con un
+      // minimo de 120px por card para que ninguna quede aplastada.
+      var celdas;
+      if(natTotal <= dispo || nP === 1){
+        celdas = heights.slice();                       // holgura: natural
+      } else {
+        var MIN_CELDA = Math.min(120, Math.floor(dispo / nP));
+        var fijo = MIN_CELDA * nP;
+        var flex = Math.max(0, dispo - fijo);           // a repartir por peso
+        var pesoTotal = heights.reduce(function(s,h){ return s + Math.max(1,h - MIN_CELDA); }, 0) || 1;
+        celdas = heights.map(function(h){
+          return Math.floor(MIN_CELDA + flex * (Math.max(1,h - MIN_CELDA) / pesoTotal));
+        });
       }
 
       var curY = colTopY;
       var chamfer = isLeft ? chamferLeft : chamferRight;
       panels.forEach(function(hp, idx){
-        var h = heights[idx];
+        var celda = Math.round(celdas[idx]);
+        var natural = heights[idx];
         hp.el.style.top      = Math.round(curY) + 'px';
         hp.el.style.clipPath = chamfer;
-        curY += h + gapBetween;
+        if(natural > celda + 2){
+          // Contenido mas alto que su celda: fijar alto y dar scroll propio.
+          hp.el.style.height    = celda + 'px';
+          hp.el.style.maxHeight = celda + 'px';
+          hp.el.style.overflowY = 'auto';
+        } else {
+          hp.el.style.height    = '';
+          hp.el.style.maxHeight = '';
+          hp.el.style.overflowY = '';
+        }
+        curY += celda + gapBetween;
       });
     }
 
