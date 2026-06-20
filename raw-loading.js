@@ -1,4 +1,4 @@
-/* RAW Entry — Loading Web v.7.104 (anillo cyber por funcion)
+/* RAW Entry — Loading Web v.7.105 (rayas sutiles + espera total)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ Cada funcion corre su PROPIO 0→100%. Termina, glitch de            ║
    ║ interferencia, arranca la siguiente desde 0 con nuevo color.       ║
@@ -66,13 +66,16 @@
       '@keyframes lcInterf{0%,100%{opacity:.10}45%{opacity:.30}55%{opacity:.08}}'+
       '@keyframes lcRotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}'+
       '#loading-cyber{font-family:"JetBrains Mono","Fira Code",ui-monospace,Menlo,monospace}'+
+      // v7.105 — rayas mas sutiles: paso 8px (era 4), opacity .08 (era .16),
+      // mix-blend-mode:lighten para que NO oscurezcan el texto del centro.
       '#loading-cyber .lc-grid{position:absolute;inset:0;border-radius:50%;overflow:hidden;'+
-        'opacity:.16;pointer-events:none;'+
-        'background:repeating-linear-gradient(0deg,currentColor 0 1px,transparent 1px 4px);'+
-        'animation:lcInterf 2.8s ease-in-out infinite}'+
-      '#loading-cyber .lc-scan{position:absolute;left:0;right:0;height:2px;'+
+        'opacity:.08;pointer-events:none;mix-blend-mode:lighten;'+
+        'background:repeating-linear-gradient(0deg,currentColor 0 1px,transparent 1px 8px);'+
+        'animation:lcInterf 3.2s ease-in-out infinite}'+
+      // Scanline: mas tenue, sin blur, mix-blend lighten.
+      '#loading-cyber .lc-scan{position:absolute;left:0;right:0;height:1px;'+
         'background:linear-gradient(90deg,transparent,currentColor,transparent);'+
-        'opacity:.5;filter:blur(.4px);animation:lcScan 2.2s linear infinite}';
+        'opacity:.25;mix-blend-mode:lighten;animation:lcScan 2.6s linear infinite}';
     document.head.appendChild(st);
 
     _root = document.createElement('div');
@@ -239,13 +242,19 @@
     _pctActual = Math.min(100, _pctActual + v);
     pintar(_pctActual);
     if(_pctActual >= 100){
-      // Esta funcion llego al 100. ¿Es la ultima Y el api ya resolvio?
-      if(_apiResuelto && _idx === FUNCIONES.length - 1){
+      // v7.105 — TERMINAR solo si TODO el arranque resolvio (no solo getAll).
+      // getAll dispara otras 7 promesas en paralelo (getNutricion,
+      // getNecesidades, getNotas, getRevision, getSaldoDia, etc).
+      // El HAR mostro que la mas lenta es ~3.1s, no 1.3s de getAll.
+      // Esperamos _resueltas >= _disparadas para garantizar que el dial
+      // entra cuando TODO esta listo de verdad.
+      var todoListo = _apiResuelto && _disparadas > 0 && _resueltas >= _disparadas;
+      if(todoListo && _idx === FUNCIONES.length - 1){
         clearInterval(_intervaloProgreso);
         terminar();
         return;
       }
-      // Si no, pasa a la siguiente con glitch
+      // Si no, pasa a la siguiente con glitch (sigue cyclando)
       clearInterval(_intervaloProgreso);
       setTimeout(function(){
         siguienteFuncion();
