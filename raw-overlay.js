@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.107
+/* RAW Entry — Overlay v.7.108
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -7775,12 +7775,17 @@ function abrirDial(){
     //   t = 11200ms → limpieza final + vida (breathing/scan al azar)
     // ═══════════════════════════════════════════════════════════════
 
-    var T_RING_IN       = 450;
-    var T_CASCADA_START = 1700;
-    var T_CASCADA_DUR   = 4200; // ventana de la cascada (antes 2800 — mucho más lenta)
-    var T_SLOTS_IN      = T_CASCADA_START + T_CASCADA_DUR; // 5900
-    var T_DIAL_IN       = T_SLOTS_IN + 1800;               // 7700 (pausa 1.8s post-slots)
-    var T_CLEANUP       = T_DIAL_IN + 3500;                // 11200 (espera fade lento del dial)
+    // v7.108 — DIAL PRIMERO, LUEGO CARDS (invertido del orden anterior).
+    // El loading ya completo todo el computo y se desvanecio con
+    // "COMPUTO COMPLETADO" antes de llegar aqui, asi que el dial debe
+    // aparecer protagonico, completo, y solo despues las cards en
+    // cascada rapida y cinematica.
+    var T_RING_IN       = 200;     // aro breathing aparece casi de inmediato
+    var T_DIAL_IN       = 1300;    // dial canvas aparece (cinematico)
+    var T_SLOTS_IN      = T_DIAL_IN + 600;   // slots vacios despues del dial
+    var T_CASCADA_START = T_SLOTS_IN + 500;  // cards arrancan ~2400ms (pausa cinematica)
+    var T_CASCADA_DUR   = 900;     // cascada rapida pero suave (antes 4200)
+    var T_CLEANUP       = T_CASCADA_START + T_CASCADA_DUR + 500;
 
     // ── FASE 1: aro circular aparece (más suave: 1800ms) ──
     setTimeout(function(){
@@ -7812,9 +7817,10 @@ function abrirDial(){
         default:               return 'translate(0,16px) scale(0.94)';
       }
     }
+    // v7.108 — transiciones individuales mas rapidas (~500ms, antes 1800)
     window._hudPanels.forEach(function(hp){
       hp.el.style.transform = _slideOrigin(hp.el._side);
-      hp.el.style.transition = 'opacity 1800ms cubic-bezier(.16,1,.3,1),transform 1900ms cubic-bezier(.16,1,.3,1),filter 1800ms ease';
+      hp.el.style.transition = 'opacity 500ms cubic-bezier(.16,1,.3,1),transform 550ms cubic-bezier(.16,1,.3,1),filter 500ms ease';
       hp.el.style.filter = 'brightness(0.4) blur(2px)';
     });
     var nPanels = window._hudPanels.length;
