@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.108
+/* RAW Entry — Overlay v.7.109
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.071 — FRENOS EN LOS LOOPS DEL DIAL (FIX CPU 137%)             ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -8229,13 +8229,34 @@ window.addEventListener('DOMContentLoaded',()=>{
   // esperamos a hud-listo que el loading marca cuando _resueltas >=
   // _disparadas. Si por alguna razon no hay loading (movil, error),
   // salvavidas de 18s para no atorar al usuario.
+  // v7.109 — FIX CRASH 8277: abrirDial crea _dialOverlay. Antes corria
+  // SINCRONO, asi que las lineas que vienen despues (addEventListener
+  // sobre _dialOverlay) funcionaban. Mi cambio de v7.107 lo volvio
+  // ASINCRONO via MutationObserver, asi que _dialOverlay seguia null
+  // cuando se intentaba el addEventListener → TypeError.
+  //
+  // Solucion: cuando abrirDial corra (sincrono o asincrono), llamar a
+  // _instalarPostDial() que hace el listener y la inicializacion que
+  // depende de _dialOverlay existente.
+  function _instalarPostDial(){
+    if(!_dialOverlay) return;
+    if(_dialOverlay._postInstalled) return;
+    _dialOverlay._postInstalled = true;
+    _dialOverlay.addEventListener('click', function(e){
+      if(e.target === _dialOverlay) cerrarDial();
+    });
+  }
+  function _abrirDialYInstalar(){
+    abrirDial();
+    _instalarPostDial();
+  }
   (function _aperturaInicialGated(){
     var html = document.documentElement;
-    if(html.classList.contains('hud-listo')){ abrirDial(); return; }
+    if(html.classList.contains('hud-listo')){ _abrirDialYInstalar(); return; }
     var obs = new MutationObserver(function(){
       if(html.classList.contains('hud-listo')){
         obs.disconnect();
-        abrirDial();
+        _abrirDialYInstalar();
       }
     });
     obs.observe(html, { attributes: true, attributeFilter: ['class'] });
@@ -8243,7 +8264,7 @@ window.addEventListener('DOMContentLoaded',()=>{
       try { obs.disconnect(); } catch(e){}
       if(!html.classList.contains('hud-listo')){
         html.classList.add('hud-listo');
-        abrirDial();
+        _abrirDialYInstalar();
       }
     }, 18000);
   })();
@@ -8274,9 +8295,8 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(rb && rb.parentNode) rb.parentNode.removeChild(rb);
   }
 
-  _dialOverlay.addEventListener('click', function(e){
-    if(e.target === _dialOverlay) cerrarDial();
-  });
+  // v7.109 — listener movido a _instalarPostDial (arriba), que corre cuando _dialOverlay existe.
+
   // Helper: "reset duro" antes de un reposicionamiento de zoom.
   // Limpia TODOS los inline styles de layout en cada panel (left, top, width,
   // height, minHeight, maxHeight, transform, clipPath, overflowY). Esto
