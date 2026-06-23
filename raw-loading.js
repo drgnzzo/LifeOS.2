@@ -1,4 +1,4 @@
-/* RAW Entry — Loading Web v.7.110 (NEUTRO, no toca api)
+/* RAW Entry — Loading Web v.7.111 (NEUTRO, sin borde recortado)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ Anillo central simple. NO envuelve api. NO bloquea getAll.        ║
    ║ Sube 0→100 en ~4s, dispara hud-listo, desaparece.                 ║
@@ -14,7 +14,7 @@
   var _terminado = false;
   var _intervalo = null;
   var _idleTimer = null;
-  var SIZE = 260, R_PROG = 110, R_EXT = 128;
+  var SIZE = 320, R_PROG = 110, R_EXT = 128;  // v7.111 SIZE 260→320 para evitar borde recortado
   var C_PROG = 2 * Math.PI * R_PROG;
 
   // Espectro de colores que va cambiando
