@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.099 (swap atomico + geometria estable)
+/* RAW Entry — Cover Flow Nivel 1 v.7.113 (doble aplicar post-transicion)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -382,12 +382,27 @@
   function hookear(){
     if(typeof window._hudExpand === 'function' && !window._hudExpand._cf4){
       var oe = window._hudExpand;
-      var we = function(){ var r = oe.apply(this, arguments); setTimeout(aplicar, 90); return r; };
+      var we = function(){
+        var r = oe.apply(this, arguments);
+        // v7.113b — DOBLE APLICAR: la card expandida tiene transition .42s.
+        // Si solo aplicamos a los 90ms, medimos la card a MEDIO crecer y
+        // los marcos laterales quedan pequeños. Forzamos reset del
+        // estabilizador y un segundo aplicar a los 480ms cuando la
+        // animacion ya termino y el rect es el final real.
+        setTimeout(aplicar, 90);
+        setTimeout(function(){ _geoFirma = ''; aplicar(); }, 480);
+        return r;
+      };
       we._cf4 = true; window._hudExpand = we;
     }
     if(typeof window._hudCollapse === 'function' && !window._hudCollapse._cf4){
       var oc = window._hudCollapse;
-      var wc = function(){ var r = oc.apply(this, arguments); setTimeout(aplicar, 90); return r; };
+      var wc = function(){
+        var r = oc.apply(this, arguments);
+        setTimeout(aplicar, 90);
+        setTimeout(function(){ _geoFirma = ''; aplicar(); }, 480);
+        return r;
+      };
       wc._cf4 = true; window._hudCollapse = wc;
     }
     if(!window._hudExpand || !window._hudExpand._cf4) setTimeout(hookear, 400);
