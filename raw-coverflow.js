@@ -1,4 +1,4 @@
-/* RAW Entry — Cover Flow Nivel 1 v.7.113 (doble aplicar post-transicion)
+/* RAW Entry — Cover Flow Nivel 1 v.7.115 (marcos altos pese a centro aplastado)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ CARRUSEL REAL: 7 marcos persistentes, uno por card, viajando      ║
    ║ entre slots. El contenido jamás cambia de marco → cero cortes.   ║
@@ -248,11 +248,25 @@
   // Geometría de cada slot relativo al centro.
   function slotGeo(d, r){
     var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    // v7.115 — FIX CARDS APLASTADAS: la card central a veces queda con
+    // altura provisional baja (ej. 348px en pantallas donde deberian ser
+    // ~700px) porque _hudAjustarTamañoExpandido no se dispara o se queda
+    // con ese valor. Los marcos laterales heredaban esa altura aplastada
+    // y se veian raros (las cards laterales del Cover Flow estaban muy
+    // chicas hasta que el usuario navegaba).
+    // Solucion: la ALTURA de los marcos se calcula desde la ZONA DISPONIBLE
+    // real (vh - top - margen inferior), NO desde r.height del centro.
+    // Asi los marcos siempre tienen altura digna aunque el centro este
+    // provisionalmente bajo.
+    var zonaH = Math.max(360, vh - r.top - 120);   // 120 = barra bottom + margen
     var w1 = Math.min(470, Math.max(300, r.width*0.46));
-    var h1 = Math.round(r.height*0.88);
+    var h1 = Math.round(zonaH*0.88);
     var w2 = Math.round(w1*0.8), h2 = Math.round(h1*0.84);
-    var t1 = Math.max(60, r.top + (r.height-h1)/2);
-    var t2 = Math.max(60, r.top + (r.height-h2)/2);
+    // Centrar verticalmente en la zona disponible, no en r (r.height
+    // puede ser la altura provisional baja).
+    var t1 = Math.max(60, r.top + (zonaH-h1)/2);
+    var t2 = Math.max(60, r.top + (zonaH-h2)/2);
     if(d === 0)  return { w:Math.round(r.width), h:Math.round(r.height), top:Math.round(r.top), left:Math.round(r.left), rot:0 };
     if(d === -1) return { w:w1,h:h1,top:t1, left:Math.max(4, r.left - w1 + 28), rot:+20 };
     if(d === +1) return { w:w1,h:h1,top:t1, left:Math.min(vw-w1-4, r.right - 28), rot:-20 };
