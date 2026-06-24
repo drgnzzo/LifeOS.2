@@ -1,4 +1,4 @@
-/* RAW Entry — Loading Web v.7.111 (NEUTRO, sin borde recortado)
+/* RAW Entry — Loading Web v.7.117 (NEUTRO, SVG sin cuadrado)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ Anillo central simple. NO envuelve api. NO bloquea getAll.        ║
    ║ Sube 0→100 en ~4s, dispara hud-listo, desaparece.                 ║
@@ -14,7 +14,7 @@
   var _terminado = false;
   var _intervalo = null;
   var _idleTimer = null;
-  var SIZE = 320, R_PROG = 110, R_EXT = 128;  // v7.111 SIZE 260→320 para evitar borde recortado
+  var SIZE = 380, R_PROG = 110, R_EXT = 128;  // v7.117 SIZE 320→380 + overflow:visible en SVG
   var C_PROG = 2 * Math.PI * R_PROG;
 
   // Espectro de colores que va cambiando
@@ -53,7 +53,7 @@
     _root.innerHTML =
       '<div class="lc-scan" style="top:48%"></div>'+
       '<svg width="'+SIZE+'" height="'+SIZE+'" viewBox="0 0 '+SIZE+' '+SIZE+'" '+
-        'style="position:absolute;inset:0">'+
+        'style="position:absolute;inset:0;overflow:visible">'+
         '<circle cx="'+(SIZE/2)+'" cy="'+(SIZE/2)+'" r="'+(R_EXT+8)+'" '+
           'fill="none" stroke="currentColor" stroke-width="1" opacity="0.18"/>'+
         '<g stroke="currentColor" stroke-width="1" opacity="0.45">'+

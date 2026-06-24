@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.116  (reposicionar tras warp)
+/* RAW Entry — Sistema de Niveles v.7.117  (reposicionar tras warp)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -148,20 +148,25 @@
         ov.style.transform = '';
         ov.style.opacity = '';
       }
-      // v7.116 — REPOSICIONAR SIEMPRE al terminar warp. El guard v7.084
-      // (!window._hudExpanded) evitaba el crece-encoge-crece pero causaba
-      // un bug peor: al regresar de nivel 2→1, SIEMPRE hay card expandida
-      // (es el centro del Cover Flow), entonces _reposicionarHUD JAMAS se
-      // llamaba, y la card quedaba con valores intermedios capturados
-      // durante el warp (zonaY=416, zonaH=352 en vez de zonaY=147,
-      // zonaH=623). Confirmado con diagnostico: llamar _reposicionarHUD
-      // manualmente arregla todo.
-      // Llamamos siempre — si causa crece-encoge en algun escenario, ese
-      // se arregla por separado, no a costa de la card aplastada.
-      if(typeof window._reposicionarHUD === 'function'){
+      // v7.117 — REPOSICIONAR INTELIGENTE tras warp:
+      //   · Si nivel destino es 1 CON card expandida → si reposicionar
+      //     (caso Cover Flow regresando de 2→1, card aplastada en 352px).
+      //   · Si nivel destino es 0 SIN card expandida → si reposicionar
+      //     (caso 1→0 o 2→0 ya estaba en v7.084, lo mantenemos).
+      //   · Caso especial: NIVEL 0 con _pUser.style.top fuera de rango
+      //     normal (>200px) indica valores corruptos del warp; reposicionar
+      //     para recuperar layout.
+      // El motivo del bug raiz de v7.116: llamar _reposicionarHUD durante
+      // transicion a niv-0 capturaba _pUser en posicion intermedia (291px)
+      // y rompia todo. Ahora solo lo llamamos cuando es seguro y util.
+      var _nivDestino = h.className.match(/niv-(\d)/);
+      _nivDestino = _nivDestino ? _nivDestino[1] : null;
+      var _enNivel1ConExpand = (_nivDestino === '1') && !!window._hudExpanded;
+      var _enNivel0SinExpand = (_nivDestino === '0') && !window._hudExpanded;
+      if((_enNivel1ConExpand || _enNivel0SinExpand) &&
+         typeof window._reposicionarHUD === 'function'){
         try { window._reposicionarHUD(); } catch(e){}
-        // Tambien forzar el ajuste de tamano expandido si hay card
-        if(window._hudExpanded && typeof window._hudAjustarTamañoExpandido === 'function'){
+        if(_enNivel1ConExpand && typeof window._hudAjustarTamañoExpandido === 'function'){
           try { window._hudAjustarTamañoExpandido(); } catch(e){}
         }
       }
