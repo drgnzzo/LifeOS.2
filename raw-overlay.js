@@ -4351,7 +4351,12 @@ function _crearDialOverlay(){
       expandedEl.style.width     = centerW + 'px';
       expandedEl.style.top       = topRowBottom + 'px';
       expandedEl.style.height    = zonaH + 'px';
-      expandedEl.style.minHeight = '280px';
+      // v7.118 — minHeight = zonaH real (no el placeholder 280px). Antes el
+      // panel colapsaba a 280px durante la transición CSS de height (.42s)
+      // si el contenido interno no llenaba: ese era el parpadeo "aplastada
+      // 280px" que quedaba tras el fix de topRowBottom. Anclando minHeight a
+      // la zona real, el panel NUNCA cae por debajo de su altura objetivo.
+      expandedEl.style.minHeight = zonaH + 'px';
       expandedEl.style.clipPath  = chamferRect;
       // Guardar la zona disponible para el ajuste post-hydrate
       expandedEl._zonaY = topRowBottom;
