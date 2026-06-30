@@ -4832,6 +4832,7 @@ function _crearDialOverlay(){
     // USER y Stats NO se estiran. Solo se centran verticalmente con Sim:
     // aplicamos un transform translateY a sus inline top.
 
+    var topY = topPad;   // ← v7.121 fix: restaurada (la borré al reescribir y rompía todo)
     // v7.121 — USER y Estado-del-SIM forman UNA barra superior PEGADA ARRIBA.
     // USER va a la izquierda, SIM pegado a su derecha, ambos anclados a topY.
     // ANTES: USER se centraba verticalmente contra hSim con
