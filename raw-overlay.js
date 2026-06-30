@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.8 (gajo Timer + hud-pnl oculto en niv-2 + contenedor expandido tokenizado)
+/* RAW Entry — Overlay v.8.9 (header unificado en las 7 cards expandidas: títulos consistentes)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -5396,19 +5396,42 @@ function _crearDialOverlay(){
 
   // de hidratación que rellena los datos. Se ejecuta cada vez que se expande
   // (no solo la primera) para que los datos siempre reflejen lo último.
+
+  // v8.9 — HEADER UNIFORME para cards expandidas. Antes cada card armaba su
+  // propio header inline con tamaños distintos (15px aquí, 14px allá) y
+  // algunas (Bitácora, Activity) NO tenían header → "cards sin título". Este
+  // helper genera un header consistente: ícono en cuadro con el color de la
+  // card + título + subtítulo opcional. Todas las cards lo usan.
+  function _expHeader(titulo, subtitulo, iconClass, color){
+    var sub = subtitulo
+      ? '<div style="font-size:var(--fs-2xs);font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:var(--hud-text-dim);margin-top:2px">'+subtitulo+'</div>'
+      : '';
+    return ''+
+      '<div style="display:flex;align-items:center;gap:var(--sp-3);padding:0 2px">'+
+        '<div style="width:34px;height:34px;border-radius:var(--rad-card);flex-shrink:0;'+
+          'background:color-mix(in srgb,'+color+' 12%,transparent);'+
+          'border:1px solid color-mix(in srgb,'+color+' 40%,transparent);'+
+          'display:flex;align-items:center;justify-content:center;'+
+          'box-shadow:0 0 12px color-mix(in srgb,'+color+' 22%,transparent)">'+
+          '<i class="'+iconClass+'" style="color:'+color+';font-size:15px"></i>'+
+        '</div>'+
+        '<div style="min-width:0">'+
+          '<div style="font-size:var(--fs-base);font-weight:var(--fw-bold);letter-spacing:var(--ls-title);'+
+            'color:'+color+';text-shadow:0 0 8px color-mix(in srgb,'+color+' 35%,transparent)">'+titulo+'</div>'+
+          sub+
+        '</div>'+
+      '</div>';
+  }
+  window._expHeader = _expHeader;
+
   var _EXPAND_CONFIG = {
     // ── PATRIMONIO ──
     'hud-patrimonio': {
       html: function(){
         return ''+
         '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
-          // ── HEADER (sin tabs ni chip decorativo) ──
-          '<div style="display:flex;align-items:center;gap:10px">'+
-            '<div style="width:34px;height:34px;border-radius:8px;background:rgba(34,197,94,0.12);border:1px solid rgba(34,197,94,0.40);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(34,197,94,0.20)">'+
-              '<i class="fas fa-landmark" style="color:#22C55E;font-size:15px"></i>'+
-            '</div>'+
-            '<div style="font-size:15px;font-weight:800;letter-spacing:.10em;color:#fff;text-shadow:0 0 8px rgba(34,197,94,0.30)">CENTRO PATRIMONIAL</div>'+
-          '</div>'+
+          // ── HEADER unificado (v8.9) ──
+          _expHeader('CENTRO PATRIMONIAL', '', 'fas fa-landmark', '#22C55E')+
           // ── 5 cards top con sparkline + delta ──
           '<div id="pat-cards-row" style="display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr 1.1fr;gap:10px"></div>'+
           // ── Banda Bruto = Disponible + Apartados ──
@@ -5708,18 +5731,8 @@ function _crearDialOverlay(){
       html: function(){
         return ''+
         '<div style="display:flex;flex-direction:column;gap:14px;padding:0">'+
-          // Header
-          '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px">'+
-            '<div style="display:flex;align-items:center;gap:10px">'+
-              '<div style="width:32px;height:32px;border-radius:8px;background:rgba(34,211,238,0.12);border:1px solid rgba(34,211,238,0.40);display:flex;align-items:center;justify-content:center">'+
-                '<i class="fas fa-chart-line" style="color:#22D3EE;font-size:14px"></i>'+
-              '</div>'+
-              '<div>'+
-                '<div style="font-size:14px;font-weight:800;color:#22D3EE;text-shadow:0 0 8px rgba(34,211,238,0.4)">FINANCIERO</div>'+
-                '<div style="font-size:9px;font-weight:600;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45);margin-top:2px">Resumen del mes</div>'+
-              '</div>'+
-            '</div>'+
-          '</div>'+
+          // Header unificado (v8.9)
+          _expHeader('FINANCIERO', 'Resumen del mes', 'fas fa-chart-line', '#22D3EE')+
           // 5 cards top
           '<div id="fin-cards-row" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px"></div>'+
           // Mid: Visión General + Gasto promedio (proyección eliminada — datos sintéticos)
@@ -6068,7 +6081,11 @@ function _crearDialOverlay(){
     // ── BITÁCORA — clonado del DOM de Home (sec-maslow-inline / col bitacora) ──
     'hud-bitacora': {
       html: function(){
-        return '<div id="hud-bit-clone" style="padding:0;display:flex;flex-direction:column;gap:14px;height:100%"></div>';
+        return ''+
+          '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+            _expHeader('BITÁCORA', 'Pensamientos, relaciones y salud', 'fas fa-book-open', '#C084FC')+
+            '<div id="hud-bit-clone" style="display:flex;flex-direction:column;gap:14px;flex:1;min-height:0"></div>'+
+          '</div>';
       },
       hydrate: function(){
         var dest = document.getElementById('hud-bit-clone');
@@ -6122,7 +6139,11 @@ function _crearDialOverlay(){
     // ── ACTIVITY + LOGROS expandido ──
     'hud-activity': {
       html: function(){
-        return '<div id="hud-act-expanded-body" style="padding:0;display:flex;flex-direction:column;gap:14px;height:100%"></div>';
+        return ''+
+          '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+            _expHeader('ACTIVITY', 'Hábitos y logros de hoy', 'fas fa-bolt', '#FB923C')+
+            '<div id="hud-act-expanded-body" style="display:flex;flex-direction:column;gap:14px;flex:1;min-height:0"></div>'+
+          '</div>';
       },
       hydrate: function(){
         var dest = document.getElementById('hud-act-expanded-body');
@@ -6165,18 +6186,12 @@ function _crearDialOverlay(){
       html: function(){
         return ''+
           '<div style="display:flex;flex-direction:column;gap:14px;min-height:0">'+
-            // Header con título + filtros
+            // Header unificado (v8.9) + filtros a la derecha
             '<div style="display:flex;align-items:center;justify-content:space-between">'+
-              '<div style="display:flex;align-items:center;gap:10px">'+
-                '<div style="width:32px;height:32px;border-radius:8px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.40);display:flex;align-items:center;justify-content:center">'+
-                  '<i class="fas fa-wave-square" style="color:#A855F7;font-size:14px"></i>'+
-                '</div>'+
-                '<div style="font-size:14px;font-weight:800;color:#A855F7;letter-spacing:.10em;text-shadow:0 0 8px rgba(168,85,247,0.40)">NECESIDADES</div>'+
-              '</div>'+
+              _expHeader('NECESIDADES', '', 'fas fa-wave-square', '#A855F7')+
               '<div style="display:flex;align-items:center;gap:8px">'+
-                '<div id="nec-overlay-anio-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85);font-family:JetBrains Mono,monospace">'+(new Date().getFullYear())+'</div>'+
-                '<div id="nec-overlay-mes-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:8px;background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85)">Hasta hoy</div>'+
-                // v5.151: botón "Hoy" decorativo eliminado — sin listener real
+                '<div id="nec-overlay-anio-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:var(--rad-card);background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85);font-family:var(--font-mono)">'+(new Date().getFullYear())+'</div>'+
+                '<div id="nec-overlay-mes-chip" style="padding:5px 10px;border:1px solid rgba(168,85,247,0.30);border-radius:var(--rad-card);background:rgba(168,85,247,0.06);font-size:10px;font-weight:700;color:rgba(220,224,235,0.85)">Hasta hoy</div>'+
               '</div>'+
             '</div>'+
             // Radar + Pirámide lado a lado

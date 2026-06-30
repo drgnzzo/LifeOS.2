@@ -1,4 +1,4 @@
-/* RAW Entry — Dashboard v.8.8 (columna congelada Fijos/Variables + fuentes y radios tokenizados)
+/* RAW Entry — Dashboard v.8.9 (header en Fijos/Variables + columna congelada + tokens)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1098,8 +1098,13 @@ function renderFijosExpandido(data, containerId){
       '<div style="height:120px"><canvas id="fjx-trend-canvas"></canvas></div>'+
     '</div>';
 
+  var _hdr = (typeof window._expHeader==='function')
+    ? window._expHeader('GASTOS FIJOS', 'Servicios y suscripciones', 'fas fa-thumbtack', FC)
+    : '';
   body.innerHTML=css+
-    '<div class="fjx">'+
+    '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+    _hdr+
+    '<div class="fjx" style="flex:1;min-height:0">'+
       '<div class="fjx-main">'+
         tablaHTML+
         '<div class="fjx-foot">Activo (se cobra) · Pendiente (próximo cobro) · '+
@@ -1109,6 +1114,7 @@ function renderFijosExpandido(data, containerId){
         statsHTML+
         graficasHTML+
       '</div>'+
+    '</div>'+
     '</div>';
 
   // Guardar contexto para que las graficas se pinten en hydrate
@@ -1445,8 +1451,13 @@ function renderVariablesExpandido(data, containerId){
     '<div style="height:210px"><canvas id="vrx-trend-canvas"></canvas></div>'+
   '</div>';
 
+  var _hdrV = (typeof window._expHeader==='function')
+    ? window._expHeader('GASTOS VARIABLES', 'Movimientos del periodo', 'fas fa-chart-column', VC)
+    : '';
   body.innerHTML=css+
-    '<div class="vrx">'+
+    '<div style="display:flex;flex-direction:column;gap:14px;height:100%">'+
+    _hdrV+
+    '<div class="vrx" style="flex:1;min-height:0">'+
       '<div class="vrx-main">'+
         tablaHTML+
         '<div class="vrx-foot">Inicio · Final · Rectificación · Bancos se excluyen de los cálculos. BW es ingreso.</div>'+
@@ -1456,6 +1467,7 @@ function renderVariablesExpandido(data, containerId){
         graficaHTML+
         chipsHTML+
       '</div>'+
+    '</div>'+
     '</div>';
 
   window._vrxCtx={meses:meses,entes:entes,idx:idx,VC:VC};
