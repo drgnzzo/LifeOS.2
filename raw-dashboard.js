@@ -1,4 +1,4 @@
-/* RAW Entry — Dashboard v.6.043
+/* RAW Entry — Dashboard v.8.0 (botón ↻ trae datos FRESCOS del Sheet, salta caché backend)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -411,7 +411,16 @@ function refreshTodo(){
   // dentro del Promise.all GATEANDO todo el render: las cards no se
   // pintaban hasta que el saldo respondiera. Ahora corre en paralelo
   // sin bloquear nada — el saldo aparece cuando llegue.
-  api.getAll().then((d)=>{
+  // v8.0 — SYNC WEB↔SHEET: el botón ↻ pide datos FRESCOS, saltando el caché
+  // del backend (CacheService). Antes refreshTodo usaba api.getAll() normal,
+  // que servía el caché de hasta 5 min → si editabas el Sheet a mano (p.ej.
+  // agregar una movie nueva en Activity Check), NO aparecía hasta el refresco
+  // automático. Ahora ↻ llama getAll con fresh=1 (en GAS: forceFresh=true),
+  // que recalcula getActivityCheck() leyendo el Sheet en vivo y re-guarda el
+  // caché. NO se envuelve api.getAll (regla de oro): es una llamada directa.
+  var _getAllFresco = EN_GAS ? gasRun('getAll', true)
+                             : apiGet('getAll', { fresh:'1' });
+  _getAllFresco.then((d)=>{
     if(d&&d.catalogos)onCats(d.catalogos);
     if(d&&d.apartados)renderApartados(d.apartados);
     if(d&&d.fijos)renderEntes(d.fijos);

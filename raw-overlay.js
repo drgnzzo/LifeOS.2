@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.7.121 (barra USER+SIM arriba fija + fix vuelo USER/inferiores + niv-1 solo coverflow)
+/* RAW Entry — Overlay v.8.0 (barra USER+SIM fija + niv-1 solo coverflow + _GRID estable)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).

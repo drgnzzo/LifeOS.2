@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.7.120 (laterales solo en coverflow niv-1; niv-0 sin cards laterales)
+/* RAW Entry — Sistema de Niveles v.8.0 (flechas ←/→ recorren pestañas del panel superior; HOME=dial)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1227,5 +1227,62 @@
     e.preventDefault();
     if(e.key === 'ArrowUp') subirNivel();
     else bajarNivel();
+  });
+
+  // ════════════════════════════════════════════════════════════════════
+  //  v8.0 — TECLADO ←/→ : NAVEGAR LAS PESTAÑAS DEL PANEL SUPERIOR
+  //  ───────────────────────────────────────────────────────────────────
+  //  El panel de navegación superior (HOME, LOGROS, BITÁCORA, ACTIVITY,
+  //  SOS, NUTRICIÓN, NOTAS, RAW) se recorre con ←/→. HOME = el dial
+  //  (overlay con sus niveles 0/1/2); las demás son secciones a pantalla
+  //  completa (board-face). Moverte a HOME muestra el dial; moverte a
+  //  cualquier otra muestra su sección. Así, "llegar a HOME" equivale a
+  //  volver al nivel 0, y moverte a otra pestaña te saca del dial — el
+  //  comportamiento que el usuario describió como "alojadas en nivel 2".
+  //
+  //  GUARDA CLAVE: si el coverflow está activo (cf-on, nivel 1 del dial),
+  //  ←/→ las consume el coverflow para girar el aro. Por eso aquí se
+  //  ignora cuando cf-on está puesto — los dos sistemas no se pisan.
+  // ════════════════════════════════════════════════════════════════════
+  // Orden visual de las pestañas y la función que activa cada una.
+  // (SOS se omite del recorrido: es una acción modal, no una sección
+  //  navegable; se sigue activando con su botón.)
+  var _TABS = [
+    { id:'btn-home',      fn:'volverAlAnverso' },
+    { id:'btn-logros',    fn:'irALogros'       },
+    { id:'btn-maslow',    fn:'irABitacora'     },
+    { id:'btn-activity',  fn:'irAActivity'     },
+    { id:'btn-nutricion', fn:'irANutricion'    },
+    { id:'btn-notas',     fn:'irANotas'        }
+  ];
+  function _tabActivaIdx(){
+    // La sección activa la marca window._osSeccion ('home','logros',...).
+    var sec = window._osSeccion || 'home';
+    var mapa = { home:'btn-home', logros:'btn-logros', bitacora:'btn-maslow',
+                 activity:'btn-activity', nutricion:'btn-nutricion', notas:'btn-notas' };
+    var id = mapa[sec] || 'btn-home';
+    for(var i=0;i<_TABS.length;i++){ if(_TABS[i].id===id) return i; }
+    return 0;
+  }
+  function _irATab(idx){
+    // Envolver con módulo para recorrer circularmente.
+    var n = _TABS.length;
+    idx = ((idx % n) + n) % n;
+    var fn = window[_TABS[idx].fn];
+    if(typeof fn === 'function') fn();
+  }
+  document.addEventListener('keydown', function(e){
+    if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    if(window.innerWidth < 900) return;
+    if(e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+    // Coverflow activo (nivel 1 del dial): las flechas son suyas.
+    if(document.documentElement.classList.contains('cf-on')) return;
+    var dd = document.getElementById('entrada-dropdown');
+    if(dd && dd.classList.contains('show')) return;
+    var pc = document.getElementById('popup-concepto');
+    if(pc && pc.classList.contains('show')) return;
+    e.preventDefault();
+    var idx = _tabActivaIdx();
+    _irATab(idx + (e.key === 'ArrowRight' ? 1 : -1));
   });
 })();
