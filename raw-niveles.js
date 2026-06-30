@@ -163,6 +163,32 @@
       _nivDestino = _nivDestino ? _nivDestino[1] : null;
       var _enNivel1ConExpand = (_nivDestino === '1') && !!window._hudExpanded;
       var _enNivel0SinExpand = (_nivDestino === '0') && !window._hudExpanded;
+
+      // v7.118 — RESET DURO en nivel 0, AQUÍ (pantalla ya quieta tras el
+      // warp de 1150ms). Antes lo hacíamos antes del warp y se contaminaba.
+      // Al llegar a niv-0, los paneles conservaban dimensiones residuales
+      // del modo expandido (financiero alto 193 con inner 384 → descuadre,
+      // cards a Y=806). Limpiamos width/height/transform de TODOS los
+      // paneles no-expandidos e invalidamos el grid, justo antes de
+      // reposicionar, para que se recalculen desde cero en sus celdas.
+      if(_enNivel0SinExpand){
+        if(window._GRID) window._GRID.medido = false;
+        (window._hudPanels || []).forEach(function(hp){
+          if(!hp || !hp.el) return;
+          if(hp.el.classList.contains('hud-expanded')) return;
+          hp.el.style.width     = '';
+          hp.el.style.height    = '';
+          hp.el.style.minHeight = '';
+          hp.el.style.maxHeight = '';
+          hp.el.style.transform = '';
+          hp.el.style.clipPath  = '';
+          hp.el._zonaY = undefined;
+          hp.el._zonaH = undefined;
+          var inner = hp.el.querySelector(':scope > [id$="-inner"]');
+          if(inner){ inner.style.minHeight = ''; inner.style.maxHeight = ''; }
+        });
+      }
+
       if((_enNivel1ConExpand || _enNivel0SinExpand) &&
          typeof window._reposicionarHUD === 'function'){
         try { window._reposicionarHUD(); } catch(e){}
@@ -359,10 +385,18 @@
       var p = panelEntrada();
       if(p) window._hudExpand(p);
     }
+    // v7.118 — marcar el aro de inmediato para ocultar las cards laterales
+    // antes de que el overlay las muestre crudas (bug 28 paneles fantasma).
+    if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
+      try { window._coverflow.marcarAro(); } catch(e){}
+    }
     // Pequeño respiro y encender el overlay limpio.
     setTimeout(function(){
       _encenderOverlayInstant();
       window._hudCascadaEnCurso = false;
+      if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
+        try { window._coverflow.marcarAro(); } catch(e){}
+      }
     }, 50);
     // Plan B: si por timing la card no quedó expandida, reexpandirla.
     setTimeout(function(){
@@ -371,6 +405,9 @@
         if(p2) window._hudExpand(p2);
       }
       window._hudCascadaEnCurso = false;
+      if(window._coverflow && typeof window._coverflow.marcarAro === 'function'){
+        try { window._coverflow.marcarAro(); } catch(e){}
+      }
     }, 300);
   }
 
@@ -498,28 +535,11 @@
       if(window._hudExpanded && typeof window._hudCollapse === 'function'){
         window._hudCollapse();
       }
-      // v7.118 — FIX nivel 0 roto al regresar (dial a la izquierda, cards
-      // aplastadas a media pantalla). Al colapsar 1→0, el panel que estaba
-      // expandido conservaba dimensiones residuales (financiero 163px) y el
-      // _reposicionarHUD post-warp lo capturaba a medio colapsar. Solución:
-      // (1) invalidar el grid para que remida la fila top con pantalla
-      // quieta; (2) reset duro de width/height/top/transform en TODOS los
-      // paneles, para que el reposicionamiento los recalcule desde cero.
+      // v7.118 — invalidar el grid para que el reposicionamiento post-warp
+      // (a los 1150ms, ya con pantalla quieta) remida la fila top limpia.
+      // El reset duro de paneles se hace ALLÁ, no aquí, para no contaminar
+      // durante la ventana del warp.
       if(window._GRID) window._GRID.medido = false;
-      (window._hudPanels || []).forEach(function(hp){
-        if(!hp || !hp.el) return;
-        if(hp.el.classList.contains('hud-expanded')) return;
-        hp.el.style.width     = '';
-        hp.el.style.height    = '';
-        hp.el.style.minHeight = '';
-        hp.el.style.maxHeight = '';
-        hp.el.style.transform = '';
-        hp.el.style.clipPath  = '';
-        hp.el._zonaY = undefined;
-        hp.el._zonaH = undefined;
-        var inner = hp.el.querySelector(':scope > [id$="-inner"]');
-        if(inner){ inner.style.minHeight = ''; inner.style.maxHeight = ''; }
-      });
       if(typeof window._dispararWarp === 'function'){
         setTimeout(function(){ window._dispararWarp(-1); }, 120);
       }
@@ -541,20 +561,6 @@
     // reposicionar y podría dejar un overflow residual.
     if(_nivel === 0){
       sanearCards();
-      // v7.118 — tras sanear, forzar un reposicionamiento limpio con el
-      // grid invalidado, para que las cards vuelvan a sus celdas correctas
-      // (no a media pantalla). Se hace escalonado para cubrir el momento
-      // en que la animación de colapso/warp termina.
-      [60, 480, 780].forEach(function(ms){
-        setTimeout(function(){
-          if(_nivel !== 0) return;             // si ya cambió de nivel, abortar
-          if(window._hudExpanded) return;      // si hay algo expandido, no tocar
-          if(window._GRID) window._GRID.medido = false;
-          if(typeof window._reposicionarHUD === 'function'){
-            try { window._reposicionarHUD(); } catch(e){}
-          }
-        }, ms);
-      });
       setTimeout(sanearCards, 480);
       setTimeout(sanearCards, 780);
     }

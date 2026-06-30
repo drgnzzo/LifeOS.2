@@ -456,6 +456,24 @@
     if(e.key === 'ArrowRight'){ e.preventDefault(); navegar(+1); }
   });
 
+  // v7.118 — Marca el aro de inmediato (oculta las cards laterales) sin
+  // esperar geometría estable. Se llama al regresar 2→1 para evitar que las
+  // cards del aro aparezcan crudas un instante antes de que aplicar() las
+  // capture. Solo marca si estamos (o vamos) a niv-1 con un centro lateral.
+  function marcarAroInstant(){
+    var h = document.documentElement;
+    if(!h.classList.contains('niv-1')) return;
+    var centro = window._hudExpanded || null;
+    if(!centro || !esLateral(centro)) return;
+    var aro = anillo();
+    if(aro.length < 2) return;
+    aro.forEach(function(el){
+      if(el === centro){ el.removeAttribute('data-cf-ring'); el.setAttribute('data-cf-center','1'); }
+      else { el.removeAttribute('data-cf-center'); el.setAttribute('data-cf-ring','1'); }
+    });
+    h.classList.add('cf-on');   // activa la regla CSS que las oculta
+  }
+
   window._coverflow = {
     estado: function(){
       var aro = anillo();
@@ -470,6 +488,7 @@
         aro: aro.map(function(el){ return el.id; })
       };
     },
-    navegar: navegar
+    navegar: navegar,
+    marcarAro: marcarAroInstant
   };
 })();
