@@ -47,7 +47,7 @@
 
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{
-  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Arial,sans-serif;
+  font-family:var(--font-ui);
   background:transparent;color:var(--hud-text);
   height:100%;overflow:hidden;
   font-size:var(--base);
@@ -898,7 +898,7 @@ html:not(.mob) #pts{display:none}
   }
   .board-wrap::-webkit-scrollbar{width:6px}
   .board-wrap::-webkit-scrollbar-track{background:rgba(255,255,255,.03)}
-  .board-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+  .board-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:var(--rad-chip)}
   .board-wrap::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.25)}
   #sheets-iframe-cont{height:calc(100vh - 120px)}
   .hero-hamburger{display:none}
@@ -2131,7 +2131,7 @@ body:has(#popup-concepto.show) .hud-pnl{
   width:44px;height:44px;flex-shrink:0;
   background:rgba(14,8,28,0.92);
   border:1px solid rgba(140,100,220,0.18);
-  border-radius:8px;
+  border-radius:var(--rad-card);
   color:var(--acc-cyan);font-size:14px;
   cursor:pointer;margin-right:16px;
   font-family:inherit;transition:all .15s;
@@ -2216,14 +2216,14 @@ body:has(#popup-concepto.show) .hud-pnl{
   align-items:stretch;
 }
 #bit-cols::-webkit-scrollbar{height:6px}
-#bit-cols::-webkit-scrollbar-thumb{background:rgba(140,100,220,0.25);border-radius:3px}
+#bit-cols::-webkit-scrollbar-thumb{background:rgba(140,100,220,0.25);border-radius:var(--rad-chip)}
 
 /* Column wrapper */
 .bit-col{
   flex:1 1 0;min-width:200px;
   background:rgba(14,8,28,0.92);
   border:1px solid rgba(140,100,220,0.18);
-  border-radius:12px;
+  border-radius:var(--rad-lg);
   display:flex;flex-direction:column;
   overflow:hidden;
   box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4);
@@ -2266,7 +2266,7 @@ body:has(#popup-concepto.show) .hud-pnl{
   width:24px;height:24px;
   background:rgba(20,12,40,0.6);
   border:1px solid var(--bit-acc);
-  border-radius:6px;
+  border-radius:var(--rad-chip);
   color:var(--bit-acc);
   font-size:10px;cursor:pointer;font-family:inherit;
   display:flex;align-items:center;justify-content:center;
@@ -2319,7 +2319,7 @@ body:has(#popup-concepto.show) .hud-pnl{
   background:rgba(20,12,40,0.6);
   border:1px solid rgba(140,100,220,0.18);
   border-left:3px solid var(--bit-acc);
-  border-radius:8px;
+  border-radius:var(--rad-card);
   padding:11px 12px;
   display:flex;flex-direction:column;gap:6px;
   transition:all .15s;cursor:default;
@@ -2411,7 +2411,7 @@ body:has(#popup-concepto.show) .hud-pnl{
 .bit-sb-card{
   background:rgba(14,8,28,0.92);
   border:1px solid rgba(140,100,220,0.18);
-  border-radius:12px;
+  border-radius:var(--rad-lg);
   padding:14px;
   box-shadow:0 0 0 1px rgba(120,160,255,0.04),0 4px 24px rgba(0,0,0,0.4);
 }
@@ -2445,13 +2445,13 @@ body:has(#popup-concepto.show) .hud-pnl{
 .bit-sb-resumen-bar{
   height:5px;
   background:rgba(6,4,14,0.95);
-  border-radius:3px;overflow:hidden;
+  border-radius:var(--rad-chip);overflow:hidden;
   margin-bottom:8px;
 }
 #bit-sb-resumen-fill{
   height:100%;width:0%;
   background:linear-gradient(90deg,var(--acc-violet),var(--acc-purple));
-  border-radius:3px;
+  border-radius:var(--rad-chip);
   box-shadow:0 0 8px var(--acc-purple-glow);
   transition:width .8s cubic-bezier(.4,0,.2,1);
 }
@@ -2532,7 +2532,7 @@ body:has(#popup-concepto.show) .hud-pnl{
 }
 .bit-footer-cell:last-child{border-right:none}
 .bit-footer-badge{
-  width:36px;height:36px;border-radius:8px;
+  width:36px;height:36px;border-radius:var(--rad-card);
   background:rgba(6,4,14,0.95);
   border:1px solid rgba(140,100,220,0.18);
   display:flex;align-items:center;justify-content:center;
@@ -2739,7 +2739,7 @@ html.mob .os-dot{
   transition:background .2s,transform .2s,width .2s;
 }
 html.mob .os-dot.active{
-  width:20px;border-radius:4px;
+  width:20px;border-radius:var(--rad-chip);
   background:var(--acc-violet);
   box-shadow:0 0 8px var(--acc-violet-glow);
 }
@@ -2843,7 +2843,7 @@ html.mob .board-face.anverso.slide-right .os-carousel-dots{
 .grafo-nodo{
   position:absolute;
   border:1.5px solid;
-  border-radius:3px;
+  border-radius:var(--rad-chip);
   padding:10px 12px;
   box-sizing:border-box;
   cursor:grab;
@@ -3314,34 +3314,15 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
    propiedades y el popup se veia negro plano con input blanco nativo.
    Definirlos aqui revive ademas TODAS las reglas HUD que los usan.
 ═══════════════════════════════════════════════════════════════════ */
+/* v8.7 — UNIFICACIÓN DE TOKENS: este :root duplicaba TODOS los tokens que
+   ya define raw-tokens.css, pero con valores DISTINTOS (p.ej. --hud-rad:10px
+   vs 8px, --hud-ok:#34d399 vs #4ADE80). Como raw-app carga después, pisaba
+   a raw-tokens → inconsistencias visuales (unas esquinas rectas, otras muy
+   redondeadas; dos verdes de "ok" distintos). Se ELIMINA el bloque: la única
+   fuente de verdad de los tokens es ahora raw-tokens.css. Verificado: los 27
+   tokens que vivían aquí existen todos allá. */
 :root{
-  --hud-bg-base: #070512;
-  --hud-bg-deep: #04030c;
-  --hud-form-bg: rgba(12,9,26,.97);
-  --hud-panel-bg: rgba(15,11,32,.78);
-  --hud-panel-bg-hov: rgba(22,16,46,.88);
-  --hud-panel-bg-act: rgba(28,20,58,.94);
-  --hud-border: rgba(139,92,246,.32);
-  --hud-border-hov: rgba(167,139,250,.55);
-  --hud-border-strong: rgba(167,139,250,.8);
-  --hud-glow: rgba(139,92,246,.22);
-  --hud-glow-strong: rgba(139,92,246,.45);
-  --hud-text: rgba(235,233,248,.95);
-  --hud-text-dim: rgba(199,196,224,.55);
-  --hud-text-faint: rgba(199,196,224,.3);
-  --hud-ok: #34d399;
-  --hud-warn: #fbbf24;
-  --hud-err: #f87171;
-  --hud-rad: 10px;
-  --hud-rad-pill: 999px;
-  --hud-shadow: 0 8px 28px rgba(0,0,0,.55);
-  --hud-shadow-md: 0 14px 44px rgba(0,0,0,.65);
-  --hud-grid-color: rgba(139,92,246,.05);
-  --hud-grid-size: 22px;
-  --hud-corner-size: 12px;
-  --hud-corner-thick: 1.5px;
-  --hud-breath-dur: 6s;
-  --hud-breath-easing: cubic-bezier(.45,0,.55,1);
+  /* (intencionalmente vacío — ver nota arriba; tokens en raw-tokens.css) */
 }
 
 /* ── v5.077 — POPUP CONCEPTO: estilos faltantes ── */
@@ -3350,13 +3331,13 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
 .popup-title{font-size:13px;font-weight:700;letter-spacing:.08em;
   text-transform:uppercase;color:var(--hud-text)}
 .popup-close{background:none;border:1px solid transparent;color:var(--hud-text-dim);
-  font-size:15px;line-height:1;cursor:pointer;padding:6px 9px;border-radius:6px;
+  font-size:15px;line-height:1;cursor:pointer;padding:6px 9px;border-radius:var(--rad-chip);
   transition:all .15s}
 .popup-close:hover{color:#fff;border-color:var(--hud-border-hov);
   box-shadow:0 0 12px var(--hud-glow)}
 .pop-search{margin:12px 18px 4px;padding:9px 13px;width:calc(100% - 36px);
   background:rgba(255,255,255,.05);border:1px solid var(--hud-border);
-  border-radius:8px;color:var(--hud-text);font-size:13px;font-family:inherit;
+  border-radius:var(--rad-card);color:var(--hud-text);font-size:13px;font-family:inherit;
   outline:none;transition:border-color .15s,box-shadow .15s}
 .pop-search::placeholder{color:var(--hud-text-faint)}
 .pop-search:focus{border-color:var(--hud-border-hov);

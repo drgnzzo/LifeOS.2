@@ -75,11 +75,52 @@
   --acc-yellow-glow:   rgba(250, 204, 21, 0.35);
 
   /* ── Geometría ─────────────────────────────────────────────────── */
-  --hud-rad:           0px;       /* esquinas rectas — lenguaje del dial */
-  --hud-rad-pill:      2px;       /* pseudo-pill */
-  --hud-chamfer:       12px;      /* tamaño del corte del chamfer */
+  /* v8.7 — UNIFICACIÓN: micro-redondeo sutil como carácter de toda la app.
+     Antes había conflicto: este token decía 0px pero raw-app lo pisaba con
+     10px → unas esquinas rectas, otras muy redondeadas. Ahora un solo
+     sistema de radios coherente (sutil, 6-8px) consumido por todos. */
+  --hud-rad:           8px;       /* radio de tarjetas/paneles (sutil) */
+  --hud-rad-pill:      999px;     /* pills reales */
+  --hud-chamfer:       12px;      /* tamaño del corte del chamfer (dial) */
   --hud-corner-size:   8px;       /* tamaño de las esquinas decorativas */
   --hud-corner-thick:  1.5px;     /* grosor de las esquinas decorativas */
+
+  /* ── ESCALA DE RADIOS (v8.7 — capa semántica) ──────────────────── */
+  --rad-0:             0px;       /* recto puro (dial, divisores) */
+  --rad-chip:          6px;       /* chips, badges, botones pequeños */
+  --rad-card:          8px;       /* tarjetas, paneles, inputs */
+  --rad-lg:            12px;      /* contenedores grandes, modales */
+  --rad-pill:          999px;     /* pills */
+
+  /* ── ESCALA DE ESPACIADO (v8.7 — base 4) ───────────────────────── */
+  --sp-1:              4px;
+  --sp-2:              8px;
+  --sp-3:              12px;
+  --sp-4:              16px;
+  --sp-5:              20px;
+  --sp-6:              24px;
+  --sp-8:              32px;
+
+  /* ── TIPOGRAFÍA (v8.7 — roles y escala) ────────────────────────── */
+  /* Dos familias: UI (sans del sistema) y datos/cifras (mono). */
+  --font-ui:    -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Inter, Arial, sans-serif;
+  --font-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  /* Escala de tamaños */
+  --fs-3xs:            8px;       /* labels uppercase diminutos */
+  --fs-2xs:            9px;       /* labels uppercase */
+  --fs-xs:             11px;      /* metadatos, captions */
+  --fs-sm:             13px;      /* texto secundario, botones */
+  --fs-base:           15px;      /* cuerpo / títulos de card */
+  --fs-lg:             18px;      /* subtítulos */
+  --fs-xl:             24px;      /* cifras medianas */
+  --fs-2xl:            34px;      /* cifras hero / cronómetro */
+  /* Pesos */
+  --fw-med:            600;
+  --fw-num:            700;       /* cifras */
+  --fw-bold:           800;       /* labels uppercase, títulos */
+  /* Tracking (letter-spacing) para labels uppercase */
+  --ls-label:          .12em;
+  --ls-title:          .06em;
 
   /* ── Sombras ───────────────────────────────────────────────────── */
   --hud-shadow:        0 0 0 1px rgba(255,255,255,0.06), 0 4px 24px rgba(0,0,0,0.5);
