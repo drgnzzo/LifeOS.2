@@ -1,4 +1,4 @@
-/* RAW Entry — Dashboard v.8.0 (botón ↻ trae datos FRESCOS del Sheet, salta caché backend)
+/* RAW Entry — Dashboard v.8.8 (columna congelada Fijos/Variables + fuentes y radios tokenizados)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ FASE v6.040 — BOTÓN ACTUALIZAR                                   ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -154,10 +154,10 @@ function _dibujarNecesidesInlineCompleto(niveles){
     var vacio = abs === 0;
     var tops  = (d.conceptos || []).slice(0, 3).join(', ');
     var status = vacio
-      ? '<span style="font-size:9px;color:var(--warn);background:rgba(245,158,11,.1);padding:1px 7px;border-radius:10px;white-space:nowrap">⚠ descuidado</span>'
+      ? '<span style="font-size:9px;color:var(--warn);background:rgba(245,158,11,.1);padding:1px 7px;border-radius:var(--rad-lg);white-space:nowrap">⚠ descuidado</span>'
       : (pct > 40
-          ? '<span style="font-size:9px;color:var(--err);background:rgba(239,68,68,.08);padding:1px 7px;border-radius:10px;white-space:nowrap">Alto</span>'
-          : '<span style="font-size:9px;color:var(--ok);background:rgba(74,222,128,.08);padding:1px 7px;border-radius:10px;white-space:nowrap">✓ OK</span>');
+          ? '<span style="font-size:9px;color:var(--err);background:rgba(239,68,68,.08);padding:1px 7px;border-radius:var(--rad-lg);white-space:nowrap">Alto</span>'
+          : '<span style="font-size:9px;color:var(--ok);background:rgba(74,222,128,.08);padding:1px 7px;border-radius:var(--rad-lg);white-space:nowrap">✓ OK</span>');
     return '<div style="margin-bottom:11px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'+
         '<div style="display:flex;align-items:center;gap:6px">'+
@@ -535,14 +535,14 @@ function _renderCFO(containerId){
         <div style="font-size:10px;color:${velColor};font-weight:500">${pctGasto>pctMes+20?'⚠ Gastas más rápido de lo que avanza el mes':pctGasto>pctMes+10?'◆ Ritmo de gasto algo elevado':pctGasto>0?'✓ Ritmo proporcional al mes':'—'}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-        <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.15);border-radius:8px;padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(74,222,128,.7);margin-bottom:3px">Ingresos</div><div style="font-size:14px;font-weight:700;color:#4ADE80;font-variant-numeric:tabular-nums">${fmtM(ingresosMes)}</div></div>
-        <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.15);border-radius:8px;padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(239,68,68,.7);margin-bottom:3px">Egresos</div><div style="font-size:14px;font-weight:700;color:#EF4444;font-variant-numeric:tabular-nums">${fmtM(egresosMes)}</div></div>
-        <div style="background:${excedente>=0?'rgba(74,222,128,.07)':'rgba(239,68,68,.07)'};border:1px solid ${excedente>=0?'rgba(74,222,128,.15)':'rgba(239,68,68,.15)'};border-radius:8px;padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${excedente>=0?'rgba(74,222,128,.7)':'rgba(239,68,68,.7)'};margin-bottom:3px">Excedente</div><div style="font-size:14px;font-weight:700;color:${excedente>=0?'#4ADE80':'#EF4444'};font-variant-numeric:tabular-nums">${excedente>=0?'+':''}${fmtM(excedente)}</div></div>
+        <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.15);border-radius:var(--rad-card);padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(74,222,128,.7);margin-bottom:3px">Ingresos</div><div style="font-size:14px;font-weight:700;color:#4ADE80;font-variant-numeric:tabular-nums">${fmtM(ingresosMes)}</div></div>
+        <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.15);border-radius:var(--rad-card);padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:rgba(239,68,68,.7);margin-bottom:3px">Egresos</div><div style="font-size:14px;font-weight:700;color:#EF4444;font-variant-numeric:tabular-nums">${fmtM(egresosMes)}</div></div>
+        <div style="background:${excedente>=0?'rgba(74,222,128,.07)':'rgba(239,68,68,.07)'};border:1px solid ${excedente>=0?'rgba(74,222,128,.15)':'rgba(239,68,68,.15)'};border-radius:var(--rad-card);padding:8px 10px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:${excedente>=0?'rgba(74,222,128,.7)':'rgba(239,68,68,.7)'};margin-bottom:3px">Excedente</div><div style="font-size:14px;font-weight:700;color:${excedente>=0?'#4ADE80':'#EF4444'};font-variant-numeric:tabular-nums">${excedente>=0?'+':''}${fmtM(excedente)}</div></div>
       </div>
     </div>
     ${proy.diasRestantes>0?`<div style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06)"><div style="display:flex;align-items:center;justify-content:space-between"><div><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--m);margin-bottom:3px">Proyección fin de mes · ${proy.diasRestantes} días restantes</div><div style="font-size:11px;color:var(--m)">Al ritmo actual de ${fmtM(gastoDia)}/día</div></div><div style="text-align:right"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m);margin-bottom:3px">Excedente proyectado</div><div style="font-size:22px;font-weight:800;letter-spacing:-.03em;color:${(proy.excedente||0)>=0?'#4ADE80':'#EF4444'};font-variant-numeric:tabular-nums">${(proy.excedente||0)>=0?'+':''}${fmtM(proy.excedente)}</div></div></div></div>`:''}
     ${tieneRevision?`<div style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06)"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--m)">IDENTIDAD ${rev.periodo?'· '+rev.periodo.inicio+' – '+rev.periodo.fin:''}</div><div style="font-size:9px;color:#C4B5FD;font-weight:600;text-transform:uppercase;letter-spacing:.06em">${(rev.tipo||'').toUpperCase()}</div></div><div><div style="height:8px;border-radius:4px;overflow:hidden;display:flex"><div style="height:100%;width:${scoreInv}%;background:linear-gradient(90deg,#22C55E,#4ADE80);transition:width .6s ease"></div><div style="height:100%;flex:1;background:linear-gradient(90deg,#EF4444,#DC2626)"></div></div><div style="display:flex;justify-content:space-between;margin-top:5px"><div style="display:flex;align-items:center;gap:5px"><div style="width:8px;height:8px;border-radius:50%;background:#4ADE80"></div><span style="font-size:11px;font-weight:700;color:#4ADE80">${scoreInv}% Inversionista</span></div><div style="display:flex;align-items:center;gap:5px"><span style="font-size:11px;font-weight:700;color:#EF4444">${scoreConsum}% Consumidor</span><div style="width:8px;height:8px;border-radius:50%;background:#EF4444"></div></div></div></div></div>`:`<div id="revision-body" style="padding:10px 16px;color:var(--m);font-size:11px;text-align:center;border-bottom:1px solid rgba(255,255,255,.06)">Selecciona período para ver análisis</div>`}
-    ${insightsFiltrados.length?`<div style="padding:10px 16px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--m);margin-bottom:8px">💡 INSIGHTS</div><div style="display:flex;flex-direction:column;gap:5px">${insightsFiltrados.map(i=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:6px;background:${i.tipo==='alerta'?'rgba(239,68,68,.06)':i.tipo==='positivo'?'rgba(74,222,128,.06)':'rgba(255,255,255,.03)'};border:1px solid ${i.tipo==='alerta'?'rgba(239,68,68,.12)':i.tipo==='positivo'?'rgba(74,222,128,.12)':'rgba(255,255,255,.06)'}"><div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px;background:${i.tipo==='alerta'?'#EF4444':i.tipo==='positivo'?'#4ADE80':i.tipo==='identidad'?'#C4B5FD':'var(--m)'}"></div><span style="font-size:12px;line-height:1.5;color:${i.tipo==='alerta'?'#FCA5A5':i.tipo==='positivo'?'#86EFAC':i.tipo==='identidad'?'#C4B5FD':'var(--m)'}">${i.msg}</span></div>`).join('')}</div></div>`:''}`;
+    ${insightsFiltrados.length?`<div style="padding:10px 16px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--m);margin-bottom:8px">💡 INSIGHTS</div><div style="display:flex;flex-direction:column;gap:5px">${insightsFiltrados.map(i=>`<div style="display:flex;align-items:flex-start;gap:8px;padding:7px 10px;border-radius:var(--rad-chip);background:${i.tipo==='alerta'?'rgba(239,68,68,.06)':i.tipo==='positivo'?'rgba(74,222,128,.06)':'rgba(255,255,255,.03)'};border:1px solid ${i.tipo==='alerta'?'rgba(239,68,68,.12)':i.tipo==='positivo'?'rgba(74,222,128,.12)':'rgba(255,255,255,.06)'}"><div style="width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:5px;background:${i.tipo==='alerta'?'#EF4444':i.tipo==='positivo'?'#4ADE80':i.tipo==='identidad'?'#C4B5FD':'var(--m)'}"></div><span style="font-size:12px;line-height:1.5;color:${i.tipo==='alerta'?'#FCA5A5':i.tipo==='positivo'?'#86EFAC':i.tipo==='identidad'?'#C4B5FD':'var(--m)'}">${i.msg}</span></div>`).join('')}</div></div>`:''}`;
 
   setTimeout(function(){
     const sf=document.getElementById('saldo-fecha');
@@ -799,7 +799,7 @@ function renderPatrimonio(data, containerId){
   chipItems.forEach(function(ch){html+='<div style="width:1px;height:32px;background:rgba(255,255,255,.1);margin:0 16px;flex-shrink:0"></div><div style="flex:1;min-width:0"><div style="font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--m);margin-bottom:3px">'+ch.nombre+'</div><div style="font-size:18px;font-weight:700;color:'+ch.color+';letter-spacing:-.02em;line-height:1">'+fmt(ch.disp)+'</div>'+(ch.apIt>0?'<div style="font-size:10px;color:rgba(255,255,255,.25);margin-top:1px">saldo '+fmt(ch.saldo)+'</div>':'')+'</div>';});
   html+='</div></div>';
   if(totalBruto>0){html+='<div style="margin:0 16px 10px;height:5px;border-radius:3px;overflow:hidden;display:flex;gap:1px">';(banco.items||[]).forEach(function(it){var apIt=apPorBanco[(it.nombre||'').toUpperCase()]||0;var dP=Math.round(((it.monto||0)-apIt)/totalBruto*100);var aP=Math.round(apIt/totalBruto*100);if(dP>0)html+='<div style="width:'+dP+'%;background:#4ADE80"></div>';if(aP>0)html+='<div style="width:'+aP+'%;background:rgba(245,158,11,.4)"></div>';});(fisico.items||[]).forEach(function(it){var pct=Math.round((it.monto||0)/totalBruto*100);if(pct>0)html+='<div style="width:'+pct+'%;background:#FBBF24"></div>';});if(inversion.saldo>0){var pct=Math.round(inversion.saldo/totalBruto*100);if(pct>0)html+='<div style="width:'+pct+'%;background:#8B5CF6"></div>';}html+='</div>';}
-  if(f.meta>0){html+='<div style="margin:0 16px 10px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="font-size:11px;color:var(--m)">🎯 Fondo emergencia</span><span style="font-size:12px;font-weight:700;color:'+saludColor+'">'+(f.avance||0)+'% · '+saludLbl+'</span></div><div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:5px"><div style="height:100%;width:'+Math.min(100,f.avance||0)+'%;background:'+saludColor+';border-radius:2px"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--m)"><span>Banco: <b style="color:rgba(255,255,255,.5)">'+fmt(banco.saldo)+'</b></span><span>Meta: <b style="color:rgba(255,255,255,.5)">'+fmt(f.meta)+'</b> · '+(f.meses||0)+' meses</span></div></div>';}
+  if(f.meta>0){html+='<div style="margin:0 16px 10px;padding:10px 12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:var(--rad-card)"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px"><span style="font-size:11px;color:var(--m)">🎯 Fondo emergencia</span><span style="font-size:12px;font-weight:700;color:'+saludColor+'">'+(f.avance||0)+'% · '+saludLbl+'</span></div><div style="height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:5px"><div style="height:100%;width:'+Math.min(100,f.avance||0)+'%;background:'+saludColor+';border-radius:2px"></div></div><div style="display:flex;justify-content:space-between;font-size:10px;color:var(--m)"><span>Banco: <b style="color:rgba(255,255,255,.5)">'+fmt(banco.saldo)+'</b></span><span>Meta: <b style="color:rgba(255,255,255,.5)">'+fmt(f.meta)+'</b> · '+(f.meses||0)+' meses</span></div></div>';}
   html+='<div style="border-top:1px solid rgba(255,255,255,.06);margin:2px 0 0"></div>';
   html+='<div style="padding:4px 0 0">';
   var _fijosGlobal=window._fijosData||[];
@@ -949,10 +949,10 @@ function renderFijosExpandido(data, containerId){
 
   // ── CSS de la vista (scoped con prefijo .fjx-) ──
   var css='<style>'+
-    '.fjx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:Manrope,-apple-system,sans-serif}'+
+    '.fjx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:var(--font-ui)}'+
     '.fjx-main{flex:1.35;min-width:0;display:flex;flex-direction:column}'+
     '.fjx-side{flex:0.95;min-width:0;display:flex;flex-direction:column;gap:14px}'+
-    '.fjx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding-bottom:8px}'+
+    '.fjx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:var(--rad-lg);padding-bottom:8px}'+
     '.fjx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
     '.fjx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
       'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
@@ -961,10 +961,19 @@ function renderFijosExpandido(data, containerId){
     '.fjx-tbl td{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);'+
       'white-space:nowrap;text-align:center;font-variant-numeric:tabular-nums}'+
     '.fjx-tbl tr:hover td{background:rgba(255,255,255,.02)}'+
+    // v8.8 — COLUMNA CONGELADA: la 1ª columna (concepto) queda fija al hacer
+    // scroll horizontal. position:sticky + left:0 + fondo OPACO (si fuera
+    // translúcido se vería el contenido pasar por debajo). z-index sobre las
+    // demás celdas; las cabeceras sticky van un nivel más alto.
+    '.fjx-tbl th:first-child,.fjx-tbl td:first-child{position:sticky;left:0;z-index:2;'+
+      'background:#0c0a18;box-shadow:1px 0 0 rgba(255,255,255,.06)}'+
+    '.fjx-tbl th:first-child{z-index:3}'+
+    '.fjx-tbl tr:hover td:first-child{background:#141027}'+
+    '.fjx-tot-row td:first-child{background:#0a1417 !important}'+
     '.fjx-concepto{display:flex;align-items:center;gap:9px;text-align:left;font-weight:700;color:#fff;font-size:12.5px}'+
     '.fjx-concepto i{width:26px;height:26px;display:flex;align-items:center;justify-content:center;'+
-      'border-radius:7px;background:rgba(255,255,255,.05);font-size:11px;flex-shrink:0;color:'+FC+'}'+
-    '.fjx-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;'+
+      'border-radius:var(--rad-card);background:rgba(255,255,255,.05);font-size:11px;flex-shrink:0;color:'+FC+'}'+
+    '.fjx-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:var(--rad-pill);'+
       'font-size:9.5px;font-weight:800;letter-spacing:.03em;border:1px solid}'+
     '.fjx-badge i{font-size:6px}'+
     '.fjx-mes-amt{font-weight:700;font-size:11.5px}'+
@@ -976,12 +985,12 @@ function renderFijosExpandido(data, containerId){
       'text-transform:uppercase;color:'+FC+'}'+
     '.fjx-tot-amt{color:'+FC+';font-size:11.5px}'+
     '.fjx-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
-      'border-radius:10px;padding:13px 14px}'+
+      'border-radius:var(--rad-lg);padding:13px 14px}'+
     '.fjx-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}'+
     '.fjx-stat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
-      'border-radius:10px;padding:12px 11px;display:flex;flex-direction:column;gap:5px}'+
+      'border-radius:var(--rad-lg);padding:12px 11px;display:flex;flex-direction:column;gap:5px}'+
     '.fjx-stat-top{display:flex;align-items:center;gap:7px}'+
-    '.fjx-stat-ico{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;'+
+    '.fjx-stat-ico{width:24px;height:24px;border-radius:var(--rad-chip);display:flex;align-items:center;'+
       'justify-content:center;font-size:10px;flex-shrink:0}'+
     '.fjx-stat-lbl{font-size:7.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;'+
       'color:rgba(220,224,235,.5);line-height:1.3}'+
@@ -1327,10 +1336,10 @@ function renderVariablesExpandido(data, containerId){
 
   // ── CSS scoped (.vrx-) ──
   var css='<style>'+
-    '.vrx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:Manrope,-apple-system,sans-serif}'+
+    '.vrx{display:flex;gap:16px;align-items:stretch;width:100%;font-family:var(--font-ui)}'+
     '.vrx-main{flex:1.2;min-width:0;display:flex;flex-direction:column}'+
     '.vrx-side{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}'+
-    '.vrx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:10px}'+
+    '.vrx-tbl-wrap{overflow-x:auto;border:1px solid rgba(255,255,255,.06);border-radius:var(--rad-lg)}'+
     '.vrx-tbl{width:100%;border-collapse:collapse;font-size:12px}'+
     '.vrx-tbl th{padding:10px 12px;background:rgba(255,255,255,.03);font-size:9px;font-weight:800;'+
       'letter-spacing:.07em;text-transform:uppercase;color:rgba(220,224,235,.6);'+
@@ -1340,24 +1349,30 @@ function renderVariablesExpandido(data, containerId){
       'white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:11.5px}'+
     '.vrx-tbl td:first-child{text-align:left}'+
     '.vrx-tbl tr:hover td{background:rgba(255,255,255,.02)}'+
+    // v8.8 — COLUMNA CONGELADA (misma técnica que Fijos): 1ª columna fija al
+    // hacer scroll horizontal, con fondo opaco para tapar lo que pasa debajo.
+    '.vrx-tbl th:first-child,.vrx-tbl td:first-child{position:sticky;left:0;z-index:2;'+
+      'background:#0c0a18;box-shadow:1px 0 0 rgba(255,255,255,.06)}'+
+    '.vrx-tbl th:first-child{z-index:3}'+
+    '.vrx-tbl tr:hover td:first-child{background:#141027}'+
     '.vrx-ente{display:flex;align-items:center;gap:9px;font-weight:700;color:#fff;font-size:12.5px}'+
     '.vrx-ente i{width:24px;height:24px;display:flex;align-items:center;justify-content:center;'+
-      'border-radius:6px;background:rgba(255,255,255,.05);font-size:10px;flex-shrink:0}'+
+      'border-radius:var(--rad-chip);background:rgba(255,255,255,.05);font-size:10px;flex-shrink:0}'+
     '.vrx-th-act{color:'+VC+'!important}'+
     '.vrx-pos{color:#4ADE80}.vrx-neg{color:#EF4444}.vrx-zero{color:rgba(220,224,235,.3)}'+
     '.vrx-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px}'+
     '.vrx-stat{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
-      'border-radius:10px;padding:12px 12px;display:flex;flex-direction:column;gap:5px}'+
+      'border-radius:var(--rad-lg);padding:12px 12px;display:flex;flex-direction:column;gap:5px}'+
     '.vrx-stat-lbl{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;'+
       'color:rgba(220,224,235,.5)}'+
     '.vrx-stat-v{font-size:18px;font-weight:800;font-family:JetBrains Mono,monospace;line-height:1}'+
     '.vrx-stat-sub{font-size:9px;color:rgba(220,224,235,.45);font-weight:600}'+
     '.vrx-card{background:rgba(255,255,255,.025);border:1px solid rgba(255,255,255,.07);'+
-      'border-radius:10px;padding:13px 14px}'+
+      'border-radius:var(--rad-lg);padding:13px 14px}'+
     '.vrx-sec-t{font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;'+
       'color:rgba(220,224,235,.65);margin-bottom:10px}'+
     '.vrx-chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:4px}'+
-    '.vrx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;'+
+    '.vrx-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:var(--rad-pill);'+
       'font-size:10px;font-weight:700;border:1px solid}'+
     '.vrx-chip-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}'+
     '.vrx-foot{font-size:10px;color:rgba(220,224,235,.4);padding:10px 2px 0;font-weight:600}'+

@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.6 (gajo Timer + oculta hud-pnl en secciones nivel 2)
+/* RAW Entry — Overlay v.8.8 (gajo Timer + hud-pnl oculto en niv-2 + contenedor expandido tokenizado)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -3357,7 +3357,7 @@ function _crearDialOverlay(){
       // Wrapper de contenido expandido (oculto por defecto, visible cuando .hud-expanded)
       // v5.142 (heredado v5.137): overflow-y:auto + min-height:0 + overflow-x:hidden
       // para que el scrollbar solo aparezca si el contenido excede.
-      '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:14px 18px}',
+      '.hud-expanded-content{display:none;flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:var(--sp-4) var(--sp-5)}',
       // v5.205 — SCROLLBAR rediseñado: barra delgada, redondeada, violeta
       // con glow (no el gris cuadrado del navegador). Aplica al panel
       // expandido y a las tablas con scroll dentro de él.
