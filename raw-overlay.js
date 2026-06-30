@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.9 (header unificado en las 7 cards expandidas: títulos consistentes)
+/* RAW Entry — Overlay v.8.10 (Bitácora/Activity: grid llena el alto, menos hueco desperdiciado)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -6093,7 +6093,11 @@ function _crearDialOverlay(){
         dest.innerHTML = '';
         // Clonar resúmenes de pensamientos, relaciones, salud, nutrición, entrena
         var d = window._pensamientosData;
-        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px">';
+        // v8.10 — El grid LLENA el alto disponible. Antes tenía altura natural
+        // (solo lo que ocupaban las tarjetas) → quedaba un gran hueco vacío
+        // abajo. Ahora grid-auto-rows:1fr reparte el alto entre las filas y
+        // cada tarjeta crece; su lista interna hace scroll si es larga.
+        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);grid-auto-rows:1fr;gap:14px;flex:1;min-height:0">';
         function tarjeta(titulo, color, icon, items, vacio){
           // v5.212: formateo de fecha seguro. Antes se hacía
           // new Date(it.fecha).toLocaleDateString(...) directo — si
@@ -6124,7 +6128,7 @@ function _crearDialOverlay(){
           } else {
             rows = '<div style="padding:18px;text-align:center;color:rgba(220,224,235,0.35);font-size:10px">'+vacio+'</div>';
           }
-          return '<div style="border:1px solid '+color+'33;border-radius:10px;background:'+color+'08;overflow:hidden"><div style="padding:9px 12px;border-bottom:1px solid '+color+'22;display:flex;align-items:center;gap:8px"><i class="fas '+icon+'" style="color:'+color+';font-size:12px"></i><span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:'+color+'">'+titulo+'</span></div><div>'+rows+'</div></div>';
+          return '<div style="border:1px solid '+color+'33;border-radius:var(--rad-lg);background:'+color+'08;overflow:hidden;display:flex;flex-direction:column;min-height:0"><div style="padding:9px 12px;border-bottom:1px solid '+color+'22;display:flex;align-items:center;gap:8px;flex-shrink:0"><i class="fas '+icon+'" style="color:'+color+';font-size:12px"></i><span style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:'+color+'">'+titulo+'</span></div><div style="overflow-y:auto;flex:1;min-height:0">'+rows+'</div></div>';
         }
         html += tarjeta('Pensamientos', '#C084FC', 'fa-brain', (window._pensamientosData||{}).items, 'Sin pensamientos');
         html += tarjeta('Relaciones', '#93C5FD', 'fa-users', (window._relacionesData||{}).items, 'Sin relaciones');
@@ -6159,7 +6163,7 @@ function _crearDialOverlay(){
         var lgDone = (logros.items||[]).filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length;
         var lgTotal = (logros.items||[]).length;
         function bar(pct, color){ return '<div style="height:6px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:6px"><div style="width:'+Math.min(100,pct)+'%;height:100%;background:'+color+';box-shadow:0 0 8px '+color+'80;border-radius:999px"></div></div>'; }
-        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">';
+        var html = '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;align-content:start">';
         // Hábitos personales
         html += '<div style="padding:14px;border:1px solid rgba(251,146,60,0.30);border-radius:12px;background:rgba(251,146,60,0.04)"><div style="font-size:10px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:#FB923C;margin-bottom:8px">Hábitos personales hoy</div><div style="font-size:24px;font-weight:800;color:#FB923C;font-family:JetBrains Mono,monospace">'+doneP+' / '+habitsP.length+'</div>'+bar(habitsP.length?(doneP/habitsP.length*100):0,'#FB923C')+'</div>';
         // Electronics
