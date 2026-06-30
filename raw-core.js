@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.2 (HOME fuerza niv-0 + reposiciona siempre: purga laterales al volver de sección)
+/* RAW Entry — Core v.8.5 (api timers + gajo Timer en dial + sección timers + sync web↔Sheet)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -153,7 +153,13 @@ const api = {
   actualizarNota:       (d)=>EN_GAS?gasRun('actualizarNota',d):apiPost('actualizarNota',{datos:d}),
   borrarNota:           (id)=>EN_GAS?gasRun('borrarNota',id):apiPost('borrarNota',{id:id}),
   moverNota:            (id,slot)=>EN_GAS?gasRun('moverNota',id,slot):apiPost('moverNota',{id:id,slot:slot}),
+  // v8.5 — Timers (cronómetros). Backend: getTimers / crearTimer / actualizarTimer.
+  getTimers:            ()=>EN_GAS?gasRun('getTimers'):apiGet('getTimers'),
+  crearTimer:           (datos)=>EN_GAS?gasRun('crearTimer',datos):apiPost('crearTimer',{datos:datos}),
+  actualizarTimer:      (clave,campos)=>EN_GAS?gasRun('actualizarTimer',clave,campos):apiPost('actualizarTimer',{clave:clave,campos:campos}),
 };
+// v8.5 — Exponer api en window para módulos cargados aparte (p.ej. raw-timers).
+try { window.api = api; } catch(e){}
 
 // ══════════════════════════════════════════
 //  ESTADO
@@ -316,6 +322,16 @@ var _DIAL_ITEMS = [
        preset:function(){ window._dialPreset={tab:'persona',energia:0}; }},
       {id:'persona', label:'− Energía', accent:'#f87171', draw:_icoTexto('−'),
        preset:function(){ window._dialPreset={tab:'persona',energia:-1}; }},
+    ]},
+
+  // ── TIMER (v8.5) ── cronómetros que cuentan hacia arriba
+  { id:'timer', label:'Timer', accent:'#67e8f9',
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y+1*k,8*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x,y+1*k);ctx.lineTo(x,y-4*k);ctx.moveTo(x,y+1*k);ctx.lineTo(x+4*k,y+3*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();ctx.beginPath();ctx.moveTo(x-3*k,y-9*k);ctx.lineTo(x+3*k,y-9*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.stroke();},
+    subs:[
+      {id:'timer', label:'Ver timers', accent:'#67e8f9', draw:_icoTexto('⏱'),
+       preset:function(){ window._dialPreset={tab:'timer', accion:'ver'}; }},
+      {id:'timer', label:'Nuevo',      accent:'#4ade80', draw:_icoTexto('+'),
+       preset:function(){ window._dialPreset={tab:'timer', accion:'nuevo'}; }},
     ]},
 
   // ── EDITAR ──
@@ -651,6 +667,7 @@ var _OS_SECCIONES = {
   activity:  { board:'board-activity', tab:'btn-activity'  },
   nutricion: { board:'board-nutricion',tab:'btn-nutricion' },
   notas:     { board:'board-notas',    tab:'btn-notas'     },
+  timers:    { board:'board-timers',   tab:'btn-timers'    },
   sheets:    { board:'board-sheets',   tab:'btn-sheets'    }
 };
 // Mapa sección → data-tab de la tabbar móvil legacy
@@ -815,6 +832,14 @@ window.irANotas = function(){
   if(window._osSeccion === 'notas'){ _osMostrar('home'); return; }
   _osMostrar('notas');
   if(typeof window._notasMontar === 'function') window._notasMontar();
+};
+
+// v8.5 — TIMERS. Sección de cronómetros. El módulo raw-timers.js monta y
+// gestiona todo; aquí solo se enruta y se le pide montar/cargar.
+window.irATimers = function(){
+  if(window._osSeccion === 'timers'){ _osMostrar('home'); return; }
+  _osMostrar('timers');
+  if(typeof window._timersAlEntrar === 'function') window._timersAlEntrar();
 };
 
 // Layout completo de Nutrición: SIEMPRE muestra todos los componentes (KPIs, macros, agua, semana, items)

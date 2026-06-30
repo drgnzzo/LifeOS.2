@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.4 (laterales ocultas por defecto salvo en coverflow: sin fantasma en transiciones)
+/* RAW Entry — Overlay v.8.5 (intercepta gajo Timer: ver sección / abrir form, sin form RAW)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -6944,6 +6944,20 @@ function _crearDialOverlay(){
         if(sub){
           window._dialPreset={};
           if(typeof sub.preset==='function') sub.preset();
+          // v8.5 — TIMER no usa el form RAW genérico. Intercepta su preset:
+          //   accion 'ver'   → abre la sección Timers (irATimers)
+          //   accion 'nuevo' → abre el formulario modal de timer
+          if(window._dialPreset && window._dialPreset.tab === 'timer'){
+            var _acc = window._dialPreset.accion;
+            window._dialPreset = {};
+            cerrarDial();
+            if(_acc === 'nuevo'){
+              if(typeof window._abrirFormTimer === 'function') window._abrirFormTimer('');
+            } else {
+              if(typeof window.irATimers === 'function') window.irATimers();
+            }
+            return;
+          }
           cerrarDial();
           abrirFormulario(sub.id);
         }

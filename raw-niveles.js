@@ -1,4 +1,4 @@
-/* RAW Entry — Sistema de Niveles v.8.3 (flechas ←/→ recorren pestañas incl. RAW; HOME=dial)
+/* RAW Entry — Sistema de Niveles v.8.5 (recorrido de flechas incluye Timers)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1256,6 +1256,7 @@
     { id:'btn-activity',  fn:'irAActivity'     },
     { id:'btn-nutricion', fn:'irANutricion'    },
     { id:'btn-notas',     fn:'irANotas'        },
+    { id:'btn-timers',    fn:'irATimers'       },
     { id:'btn-sheets',    fn:'irASheets', arg:'raw' }
   ];
   function _tabActivaIdx(){
@@ -1266,7 +1267,8 @@
     }
     var sec = window._osSeccion || 'home';
     var mapa = { home:'btn-home', logros:'btn-logros', bitacora:'btn-maslow',
-                 activity:'btn-activity', nutricion:'btn-nutricion', notas:'btn-notas' };
+                 activity:'btn-activity', nutricion:'btn-nutricion', notas:'btn-notas',
+                 timers:'btn-timers' };
     var id = mapa[sec] || 'btn-home';
     for(var i=0;i<_TABS.length;i++){ if(_TABS[i].id===id) return i; }
     return 0;

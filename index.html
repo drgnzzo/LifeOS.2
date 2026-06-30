@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <!-- IMPORTANTE: tokens ANTES de raw-app — la cascada y :root necesitan este orden -->
   <link rel="stylesheet" href="raw-tokens.css?v=5106">
-  <link rel="stylesheet" href="raw-app.css?v=810">
+  <link rel="stylesheet" href="raw-app.css?v=850">
 
 </head>
 <body>
@@ -46,7 +46,7 @@
         <div class="hero-icon"><i class="fas fa-diamond"></i></div>
         <div class="hero-brand-txt">
           <div class="hero-title">Life<span>OS</span></div>
-          <div class="hero-sub">v.8.4 · Sheets</div>
+          <div class="hero-sub">v.8.5 · Sheets</div>
         </div>
       </div>
     </div>
@@ -73,6 +73,9 @@
       </button>
       <button class="hud-tab btn-flip" id="btn-notas" data-acc="#FEF3A0" onclick="irANotas()" title="Notas">
         <i class="fas fa-note-sticky"></i><span>Notas</span>
+      </button>
+      <button class="hud-tab btn-flip" id="btn-timers" data-acc="#67E8F9" onclick="irATimers()" title="Timers">
+        <i class="fas fa-stopwatch"></i><span>Timers</span>
       </button>
       <button class="hud-tab btn-flip" id="btn-sheets" data-acc="#A5B4FC" onclick="irASheets('raw')" title="RAW en la web">
         <i class="fas fa-table"></i><span>RAW</span>
@@ -538,6 +541,9 @@
     <!-- NOTAS — sticky notes 5×5 (montado por raw-notas.js) -->
     <div class="board-face panel-notas" id="board-notas" style="overflow:hidden"></div>
 
+    <!-- TIMERS — cronómetros (montado por raw-timers.js) -->
+    <div class="board-face panel-timers" id="board-timers" style="overflow:hidden"></div>
+
   </div><!-- /board-wrap -->
 </div><!-- /app -->
 
@@ -658,16 +664,17 @@
   </div>
 </div>
 
-<script src="raw-core.js?v=820"></script>
-<script src="raw-overlay.js?v=840"></script>
+<script src="raw-core.js?v=850"></script>
+<script src="raw-overlay.js?v=850"></script>
 <script src="raw-overlay-dnd.js?v=7069"></script>
-<script src="raw-dashboard.js?v=800"></script>
+<script src="raw-dashboard.js?v=850"></script>
 <script src="raw-logros.js?v=6068"></script>
 <script src="raw-bitacora.js?v=5189"></script>
 <script src="raw-carousel.js?v=6030"></script>
 <script src="raw-notas.js?v=7020"></script>
-<script src="raw-niveles.js?v=830"></script>
-<script src="raw-coverflow.js?v=800"></script>
+<script src="raw-niveles.js?v=850"></script>
+<script src="raw-coverflow.js?v=850"></script>
+<script src="raw-timers.js?v=850"></script>
 <script src="raw-loading.js?v=7117"></script>
 <script src="raw-007.js?v=7103"></script>
 
