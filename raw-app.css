@@ -2001,11 +2001,13 @@ html.mob .board-face.panel-nutricion .panel-body::-webkit-scrollbar-thumb{
 /* ═══════════════════════════════════════════
    ENTRADA DROPDOWN — selector tipo
 ═══════════════════════════════════════════ */
-.entrada-dropdown{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;display:none;align-items:center;justify-content:center;background:transparent;backdrop-filter:none;padding:0}
+.entrada-dropdown{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9000;display:flex;align-items:center;justify-content:center;background:transparent;backdrop-filter:none;padding:0;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .26s ease,visibility .26s ease,background .26s ease,backdrop-filter .26s ease}
 /* v6.060: blur del fondo reforzado + oscurecido. El formulario RAW es
    el motor de la app — debe flotar nítido sobre el dial difuminado. */
 .entrada-dropdown.show{
-  display:flex;
+  opacity:1;
+  visibility:visible;
+  pointer-events:auto;
   background:rgba(2,2,10,0.78);
   backdrop-filter:blur(16px) saturate(115%);
   -webkit-backdrop-filter:blur(16px) saturate(115%);

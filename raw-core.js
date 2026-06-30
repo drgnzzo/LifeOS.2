@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.13 (subanillos Ver coverflow: Patrimonio/Bancos/Apartado → nivel 1)
+/* RAW Entry — Core v.8.17 (fades: togKard, campos de entrada, form RAW)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -438,7 +438,17 @@ function progDone(){const b=document.getElementById('prog');if(!b)return;b.class
 // ══════════════════════════════════════════
 //  ACORDEONES
 // ══════════════════════════════════════════
-function togKard(id){ const el=document.getElementById(id);if(!el)return;const isOpen=el.style.display==='block';el.style.display=isOpen?'none':'block'; }
+function togKard(id){
+  const el=document.getElementById(id);if(!el)return;
+  const isOpen=(el.style.display!=='none' && el.style.display!=='');
+  // v8.17 — fade suave al desplegar/colapsar el detalle (antes era de golpe).
+  if(window.RawAnim){
+    if(isOpen) window.RawAnim.ocultar(el,{dur:0.18,y:4});
+    else       window.RawAnim.mostrar(el,{dur:0.22,y:4,display:'block'});
+  } else {
+    el.style.display=isOpen?'none':'block';
+  }
+}
 function togSec(hdr){
   const isMob=document.documentElement.classList.contains('mob'); if(!isMob)return;
   const bodyId=hdr.id.replace('-hdr','-body');
@@ -1209,7 +1219,12 @@ function setModoEntrada(modo){
     limpiar(false);
   } else {
     _mostrarCamposBase(false); if(formActions)formActions.style.display='none';
-    const wrap=document.getElementById(modo+'-wrap'); if(wrap)wrap.style.display='block';
+    const wrap=document.getElementById(modo+'-wrap');
+    if(wrap){
+      // v8.17 — fade al aparecer los campos del tipo (antes de golpe).
+      if(window.RawAnim) window.RawAnim.mostrar(wrap,{dur:0.22,y:6,display:'block'});
+      else wrap.style.display='block';
+    }
     _renderTabEntrada(modo);
   }
 }
