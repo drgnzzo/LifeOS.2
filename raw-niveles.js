@@ -549,6 +549,45 @@
   }
 
   // Tras lanzar una transición: resetear medidor y liberar el lock.
+  // v7.118 — Estabilizador final de nivel 0. Corre DESPUÉS de la ventana
+  // del warp (1150ms) y se repite, para tener la última palabra sobre el
+  // layout. Cada pasada: aborta si ya no estamos en niv-0 o si hay algo
+  // expandido (no debería en niv-0); resetea dimensiones residuales de los
+  // paneles; invalida el grid; y reposiciona limpio. Las pasadas escalonadas
+  // (1200/1500/1900ms) cubren el cierre del warp + cualquier cascada tardía.
+  function _sanarNivel0Determinista(){
+    [1200, 1500, 1900].forEach(function(ms){
+      setTimeout(function(){
+        var h = document.documentElement;
+        if(_nivel !== 0) return;                  // ya cambió de nivel
+        if(h.classList.contains('niv-warp')) return; // aún en warp: esperar
+        if(window._hudExpanded) return;           // algo expandido: no tocar
+        // Reset duro de dimensiones residuales en TODOS los paneles.
+        (window._hudPanels || []).forEach(function(hp){
+          if(!hp || !hp.el) return;
+          if(hp.el.classList.contains('hud-expanded')) return;
+          var el = hp.el;
+          el.style.width     = '';
+          el.style.height    = '';
+          el.style.minHeight = '';
+          el.style.maxHeight = '';
+          el.style.transform = '';
+          el.style.clipPath  = '';
+          el._zonaY = undefined;
+          el._zonaH = undefined;
+          var inner = el.querySelector(':scope > [id$="-inner"]');
+          if(inner){ inner.style.minHeight = ''; inner.style.maxHeight = ''; inner.style.transform = ''; }
+        });
+        // Invalidar el grid para que remida la fila top con pantalla quieta.
+        if(window._GRID) window._GRID.medido = false;
+        // Reposicionar limpio.
+        if(typeof window._reposicionarHUD === 'function'){
+          try { window._reposicionarHUD(); } catch(e){}
+        }
+      }, ms);
+    });
+  }
+
   function finTransicion(){
     _medidor = 0;
     _dir = 0;
@@ -563,6 +602,14 @@
       sanearCards();
       setTimeout(sanearCards, 480);
       setTimeout(sanearCards, 780);
+      // v7.118 — SANADOR DETERMINISTA DE NIVEL 0.
+      // El log de la trampa probó que _reposicionarHUD deja el layout BIEN
+      // (user.top 46, patrim 134), pero algo rezagado (cascada/warp/timing)
+      // mueve las cards a Y=822 DESPUÉS. En vez de cazar al culpable, nos
+      // aseguramos de tener la última palabra: tras cerrar la ventana del
+      // warp (1150ms), forzamos reset duro + reposicionamiento limpio, y lo
+      // repetimos un par de veces para ganarle a cualquier código tardío.
+      _sanarNivel0Determinista();
     }
     // Lock generoso: cubre la animación de v6 (~600ms) para que no se
     // encadenen transiciones por inercia del scroll.
