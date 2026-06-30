@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.12 (interceptor genérico de navegación por subanillo .irA)
+/* RAW Entry — Overlay v.8.13 (interceptor cf: navegación a card del coverflow sin cerrar dial)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -6988,11 +6988,30 @@ function _crearDialOverlay(){
           // navega a esa sección en vez de abrir el form RAW. Mecanismo
           // genérico: con esto el dial es un hub de navegación. Los subs de
           // crear/registrar (sin .irA) siguen abriendo su formulario normal.
+          // v8.12/8.13 — SUBANILLO "VER":
+          //  · _dialPreset.irA = 'irAActivity' (etc.) → sección de nivel 2:
+          //    se cierra el dial y se navega.
+          //  · _dialPreset.cf = 'hud-patrimonio' (etc.) → card del coverflow
+          //    (nivel 1): NO se cierra el dial (el coverflow vive en el mismo
+          //    overlay); se expande la card directamente con _hudExpand.
+          if(window._dialPreset && window._dialPreset.cf){
+            var _cardId = window._dialPreset.cf;
+            window._dialPreset = {};
+            var _card = document.getElementById(_cardId);
+            if(_card && typeof window._hudExpand === 'function'){
+              window._hudExpand(_card);
+            }
+            return;
+          }
           if(window._dialPreset && window._dialPreset.irA){
             var _fn = window._dialPreset.irA;
+            var _arg = window._dialPreset.irAArg;
             window._dialPreset = {};
             cerrarDial();
-            if(typeof window[_fn] === 'function') window[_fn]();
+            if(typeof window[_fn] === 'function'){
+              if(_arg !== undefined) window[_fn](_arg);
+              else window[_fn]();
+            }
             return;
           }
           cerrarDial();

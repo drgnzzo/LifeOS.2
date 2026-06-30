@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.12 (subanillos Ver sección: dial como hub de navegación)
+/* RAW Entry — Core v.8.13 (subanillos Ver coverflow: Patrimonio/Bancos/Apartado → nivel 1)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -242,18 +242,26 @@ var _DIAL_ITEMS = [
 
   // ── APARTADO ──
   { id:'apartado', label:'Apartado', accent:'#4ade80',
-    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y-2*k,5.5*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x-8*k,y+5*k);ctx.lineTo(x+8*k,y+5*k);ctx.lineTo(x+6*k,y+10*k);ctx.lineTo(x-6*k,y+10*k);ctx.closePath();ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();}},
+    draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.arc(x,y-2*k,5.5*k,0,Math.PI*2);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();ctx.beginPath();ctx.moveTo(x-8*k,y+5*k);ctx.lineTo(x+8*k,y+5*k);ctx.lineTo(x+6*k,y+10*k);ctx.lineTo(x-6*k,y+10*k);ctx.closePath();ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();},
+    subs:[
+      {id:'apartado', label:'Ver sección', accent:'#c4b5fd', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={cf:'hud-patrimonio'}; }},
+      {id:'apartado', label:'Nuevo', accent:'#4ade80', draw:_icoTexto('➕'),
+       preset:function(){ window._dialPreset={tab:'apartado'}; }},
+    ]},
 
   // ── BANCOS ──
   { id:'bancos', label:'Bancos', accent:'#f59e0b',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x-9*k,y+7*k);ctx.lineTo(x+9*k,y+7*k);ctx.moveTo(x-6*k,y-1*k);ctx.lineTo(x-6*k,y+7*k);ctx.moveTo(x,y-1*k);ctx.lineTo(x,y+7*k);ctx.moveTo(x+6*k,y-1*k);ctx.lineTo(x+6*k,y+7*k);ctx.moveTo(x-9*k,y-1*k);ctx.lineTo(x+9*k,y-1*k);ctx.moveTo(x-10*k,y-6*k);ctx.lineTo(x,y-12*k);ctx.lineTo(x+10*k,y-6*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();},
     subsGen:function(){
+      var ver={id:'bancos', label:'Ver sección', accent:'#f59e0b', draw:_icoTexto('👁'),
+        preset:function(){ window._dialPreset={cf:'hud-patrimonio'}; }};
       var bancos=(window._fijosData||[]).filter(function(f){return f.nombre&&f.nombre!=='P';}).slice(0,5);
-      if(!bancos.length) return null;
-      return bancos.map(function(f){
+      var gen=bancos.map(function(f){
         return {id:'bancos', label:f.nombre, accent:'#f59e0b', draw:_icoTexto(f.nombre.slice(0,4)),
           preset:function(){ window._dialPreset={tab:'bancos', banco:f.nombre}; }};
       });
+      return [ver].concat(gen);
     }},
 
   // ── ENTRENAMIENTO ──
@@ -294,6 +302,8 @@ var _DIAL_ITEMS = [
   { id:'patrimonio', label:'Patrimonio', accent:'#c4b5fd',
     draw:function(ctx,x,y,s,c){var k=s/22;ctx.beginPath();ctx.moveTo(x-10*k,y+8*k);ctx.lineTo(x+10*k,y+8*k);ctx.moveTo(x-6*k,y-1*k);ctx.lineTo(x-6*k,y+8*k);ctx.moveTo(x,y-1*k);ctx.lineTo(x,y+8*k);ctx.moveTo(x+6*k,y-1*k);ctx.lineTo(x+6*k,y+8*k);ctx.moveTo(x-10*k,y-1*k);ctx.lineTo(x+10*k,y-1*k);ctx.moveTo(x-12*k,y-7*k);ctx.lineTo(x,y-13*k);ctx.lineTo(x+12*k,y-7*k);ctx.strokeStyle=c;ctx.lineWidth=2;ctx.lineCap='round';ctx.lineJoin='round';ctx.stroke();},
     subs:[
+      {id:'patrimonio', label:'Ver sección', accent:'#c4b5fd', draw:_icoTexto('👁'),
+       preset:function(){ window._dialPreset={cf:'hud-patrimonio'}; }},
       {id:'patrimonio', label:'Banco',     accent:'#4ade80',  draw:_icoAhorro,
        preset:function(){ window._dialPreset={tab:'patrimonio',tipo:'ahorro'}; }},
       {id:'patrimonio', label:'Efectivo',  accent:'#fbbf24',  draw:_icoEfectivo,
@@ -845,6 +855,30 @@ window.irANutricion = function(){
     });
   }
 };
+
+// v8.13 — NAVEGACIÓN AL COVERFLOW (nivel 1). A diferencia de las secciones
+// de nivel 2 (que usan _osMostrar), las cards del coverflow se centran con
+// window._hudExpand(panelEl). Esta función baja al nivel 1 y centra la card
+// indicada por su id (p.ej. 'hud-patrimonio'). Usada por los subanillos
+// "Ver" de los gajos Patrimonio/Bancos/Apartado.
+window.irACoverflow = function(cardId){
+  // Si estamos en una sección de nivel 2, primero volver a Home (dial/nivel 0)
+  // para que el contexto del coverflow exista.
+  if(window._osSeccion && window._osSeccion !== 'home'){
+    if(typeof _osMostrar === 'function') _osMostrar('home');
+  }
+  var card = document.getElementById(cardId);
+  if(card && typeof window._hudExpand === 'function'){
+    // Pequeño defer: si acabamos de volver a Home, dar un frame para que el
+    // overlay del dial quede montado antes de expandir la card.
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){
+        window._hudExpand(card);
+      });
+    });
+  }
+};
+
 
 // v6.069 — NOTAS. Sección de sticky notes 5×5. El módulo raw-notas.js
 // monta y gestiona todo; aquí solo se enruta y se le pide montar.
