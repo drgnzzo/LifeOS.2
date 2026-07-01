@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.17 (fades: togKard, campos de entrada, form RAW)
+/* RAW Entry — Core v.8.29 (FIX RAW trabado: _osMostrar limpia _pantalla)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -726,6 +726,15 @@ function _osMostrar(seccion){
   if(!_OS_SECCIONES[seccion]) seccion = 'home';
   window._osSeccion = seccion;
   _panelActual = (seccion==='home') ? 'anverso' : _OS_SECCIONES[seccion].board;
+
+  // v8.29 — FIX RAW trabado: si el router muestra una sección que NO es RAW,
+  // limpiar _pantalla. Antes quedaba en 'sheets_raw' al salir de RAW, y la
+  // navegación por flechas seguía creyendo que estabas en RAW → trabado.
+  if(seccion !== 'raw' && typeof window._pantalla === 'string' &&
+     window._pantalla.indexOf('sheets_') === 0){
+    if(typeof _setPantalla === 'function') _setPantalla(seccion === 'home' ? 'anverso' : seccion);
+    else window._pantalla = (seccion === 'home') ? 'anverso' : seccion;
+  }
 
   // v8.6 — Marca en <html> si estamos en una sección de nivel 2 (no-home).
   // Una regla CSS usa 'os-seccion' para ocultar TODOS los hud-pnl (USER,

@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.26 (FIX RAÍZ: remove os-seccion en ocultarSeccionN2 + efectos reactivados)
+/* RAW Entry — Niveles v.8.29 (navegación por flechas reescrita: sin toggles, predecible)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1307,38 +1307,54 @@
   //  navegable; se sigue activando con su botón.)
   // v8.3 — RAW agregada al recorrido (faltaba: con teclas nunca se abría).
   // RAW se invoca con argumento ('raw'), por eso se modela con `arg`.
+  // v8.29 — NAVEGACIÓN POR FLECHAS reescrita para ser predecible.
+  // Problema anterior: dependía de las funciones irA* que hacen TOGGLE
+  // (si ya estás en X, te mandan a home) y de dos fuentes desincronizadas
+  // (_pantalla para RAW, _osSeccion para el resto) → saltos erráticos y RAW
+  // trabado. Solución: una sola fuente de posición y navegar SIEMPRE hacia
+  // el destino (sin toggles), usando el router directo.
   var _TABS = [
-    { id:'btn-home',      fn:'volverAlAnverso' },
-    { id:'btn-logros',    fn:'irALogros'       },
-    { id:'btn-maslow',    fn:'irABitacora'     },
-    { id:'btn-activity',  fn:'irAActivity'     },
-    { id:'btn-nutricion', fn:'irANutricion'    },
-    { id:'btn-notas',     fn:'irANotas'        },
-    { id:'btn-timers',    fn:'irATimers'       },
-    { id:'btn-sheets',    fn:'irASheets', arg:'raw' }
+    { id:'btn-home',      sec:'home'     },
+    { id:'btn-logros',    sec:'logros'   },
+    { id:'btn-maslow',    sec:'bitacora' },
+    { id:'btn-activity',  sec:'activity' },
+    { id:'btn-nutricion', sec:'nutricion'},
+    { id:'btn-notas',     sec:'notas'    },
+    { id:'btn-timers',    sec:'timers'   },
+    { id:'btn-sheets',    sec:'raw'      }
   ];
+
+  // Posición actual: UNA sola detección unificada. RAW se detecta por
+  // _pantalla; el resto por _osSeccion. Si nada coincide, es home (idx 0).
   function _tabActivaIdx(){
-    // La sección activa la marca window._osSeccion ('home','logros',...).
-    // RAW no usa _osSeccion sino _pantalla ('sheets_raw'); se detecta aparte.
     if(typeof window._pantalla === 'string' && window._pantalla.indexOf('sheets_') === 0){
-      for(var k=0;k<_TABS.length;k++){ if(_TABS[k].id==='btn-sheets') return k; }
+      for(var k=0;k<_TABS.length;k++){ if(_TABS[k].sec==='raw') return k; }
     }
     var sec = window._osSeccion || 'home';
-    var mapa = { home:'btn-home', logros:'btn-logros', bitacora:'btn-maslow',
-                 activity:'btn-activity', nutricion:'btn-nutricion', notas:'btn-notas',
-                 timers:'btn-timers' };
-    var id = mapa[sec] || 'btn-home';
-    for(var i=0;i<_TABS.length;i++){ if(_TABS[i].id===id) return i; }
+    for(var i=0;i<_TABS.length;i++){ if(_TABS[i].sec===sec) return i; }
     return 0;
   }
+
+  // Ir a un tab por índice (circular), navegando SIEMPRE al destino.
+  // No usa las funciones toggle: llama al router directo según el tipo.
   function _irATab(idx){
-    // Envolver con módulo para recorrer circularmente.
     var n = _TABS.length;
     idx = ((idx % n) + n) % n;
-    var t = _TABS[idx];
-    var fn = window[t.fn];
-    if(typeof fn === 'function'){ t.arg !== undefined ? fn(t.arg) : fn(); }
+    var destino = _TABS[idx].sec;
+    if(destino === 'raw'){
+      // Entrar a RAW sin toggle: solo si NO estamos ya en RAW.
+      var enRaw = (typeof window._pantalla === 'string' && window._pantalla.indexOf('sheets_') === 0);
+      if(!enRaw && typeof window.irASheets === 'function') window.irASheets('raw');
+    } else if(destino === 'home'){
+      if(typeof window.volverAlAnverso === 'function') window.volverAlAnverso();
+    } else if(typeof window._osMostrar === 'function'){
+      // Router directo: muestra la sección SIN toggle (siempre navega a ella).
+      window._osMostrar(destino);
+      // Algunas secciones necesitan montarse (notas, timers): dispararlo.
+      if(destino === 'notas' && typeof window._notasMontar === 'function') window._notasMontar();
+    }
   }
+
   document.addEventListener('keydown', function(e){
     if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
     if(window.innerWidth < 900) return;
