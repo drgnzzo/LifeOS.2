@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.29 (FIX RAW trabado: _osMostrar limpia _pantalla)
+/* RAW Entry — Core v.8.30 (sección SOS carrusel + SOS en el ciclo de teclas)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -698,12 +698,13 @@ var _OS_SECCIONES = {
   nutricion: { board:'board-nutricion',tab:'btn-nutricion' },
   notas:     { board:'board-notas',    tab:'btn-notas'     },
   timers:    { board:'board-timers',   tab:'btn-timers'    },
+  sos:       { board:'board-sos',      tab:'btn-sos'       },
   sheets:    { board:'board-sheets',   tab:'btn-sheets'    }
 };
 // Mapa sección → data-tab de la tabbar móvil legacy
 var _OS_MOBTAB = {
   home:'entrada', logros:'logros', bitacora:'bitacora',
-  activity:'activity', nutricion:'nutricion', notas:'entrada', sheets:'entrada'
+  activity:'activity', nutricion:'nutricion', notas:'entrada', sos:'entrada', sheets:'entrada'
 };
 
 function _osMarcarTabs(seccion){
@@ -915,6 +916,160 @@ window.irATimers = function(){
   _osMostrar('timers');
   if(typeof window._timersAlEntrar === 'function') window._timersAlEntrar();
 };
+
+// v8.30 — SOS. Sección de emergencia con varios tipos de alerta. Reemplaza
+// al botón único de antes: ahora es una sección navegable (con las flechas
+// ←/→ como carrusel entre los tipos). El botón SOS de la barra abre aquí.
+window.irASOS = function(){
+  if(window._osSeccion === 'sos'){ _osMostrar('home'); return; }
+  _osMostrar('sos');
+  if(typeof window._montarSOS === 'function') window._montarSOS();
+};
+
+// Tipos de SOS disponibles. Cada uno con su mensaje y color. Se navegan
+// como carrusel dentro de la sección.
+window._SOS_TIPOS = [
+  { id:'general',  label:'Ayuda general',   icono:'fa-circle-exclamation', color:'#EF4444',
+    mensaje:'🚨 Necesito ayuda — enviado desde RAW Entry' },
+  { id:'medica',   label:'Emergencia médica', icono:'fa-kit-medical',      color:'#F87171',
+    mensaje:'🚑 Emergencia médica — necesito asistencia' },
+  { id:'seguridad',label:'Seguridad',        icono:'fa-shield-halved',     color:'#FB923C',
+    mensaje:'⚠️ Me siento en peligro — por favor contáctame' },
+  { id:'recoger',  label:'Recógeme',         icono:'fa-car',               color:'#67E8F9',
+    mensaje:'🚗 ¿Pueden venir por mí? Comparto mi ubicación' },
+  { id:'llamada',  label:'Llámame ya',       icono:'fa-phone-volume',      color:'#C4B5FD',
+    mensaje:'📞 Necesito que me llamen lo antes posible' }
+];
+window._sosIdx = 0;
+
+window._montarSOS = function(){
+  var board = document.getElementById('board-sos');
+  if(!board) return;
+  var tipos = window._SOS_TIPOS;
+  board.innerHTML =
+    '<div class="sos-wrap">'+
+      '<div class="sos-header">'+
+        '<div class="sos-header-l">'+
+          '<i class="fas fa-tower-broadcast sos-header-ico"></i>'+
+          '<div>'+
+            '<div class="sos-header-t">CENTRO SOS</div>'+
+            '<div class="sos-header-s">Elige el tipo de alerta · ←/→ para cambiar</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="sos-carrusel" id="sos-carrusel"></div>'+
+      '<div class="sos-dots" id="sos-dots"></div>'+
+      '<div class="sos-msg" id="sos-msg"></div>'+
+    '</div>';
+  _sosInyectarCSS();
+  window._sosRender();
+};
+
+window._sosRender = function(){
+  var tipos = window._SOS_TIPOS;
+  var idx = window._sosIdx;
+  var cont = document.getElementById('sos-carrusel');
+  var dots = document.getElementById('sos-dots');
+  if(!cont) return;
+  var t = tipos[idx];
+  cont.innerHTML =
+    '<div class="sos-card" style="--sos-acc:'+t.color+'">'+
+      '<div class="sos-card-ico"><i class="fas '+t.icono+'"></i></div>'+
+      '<div class="sos-card-label">'+t.label+'</div>'+
+      '<div class="sos-card-msg">'+t.mensaje+'</div>'+
+      '<button class="sos-card-btn" onclick="window._sosEnviar()">'+
+        '<i class="fas fa-paper-plane"></i> Enviar alerta'+
+      '</button>'+
+      '<div class="sos-card-nav">'+
+        '<button class="sos-arrow" onclick="window._sosMover(-1)" title="Anterior">‹</button>'+
+        '<span class="sos-count">'+(idx+1)+' / '+tipos.length+'</span>'+
+        '<button class="sos-arrow" onclick="window._sosMover(1)" title="Siguiente">›</button>'+
+      '</div>'+
+    '</div>';
+  if(dots){
+    dots.innerHTML = tipos.map(function(_,i){
+      return '<span class="sos-dot'+(i===idx?' on':'')+'" onclick="window._sosIr('+i+')"></span>';
+    }).join('');
+  }
+};
+
+window._sosMover = function(dir){
+  var n = window._SOS_TIPOS.length;
+  window._sosIdx = ((window._sosIdx + dir) % n + n) % n;
+  window._sosRender();
+};
+window._sosIr = function(i){ window._sosIdx = i; window._sosRender(); };
+
+window._sosEnviar = function(){
+  var t = window._SOS_TIPOS[window._sosIdx];
+  var msgEl = document.getElementById('sos-msg');
+  if(msgEl){ msgEl.textContent = 'Enviando…'; msgEl.className = 'sos-msg activa'; }
+  function done(ubicacion){
+    if(typeof api !== 'undefined' && api.enviarSOS){
+      api.enviarSOS({mensaje:t.mensaje, ubicacion:ubicacion}).then(function(r){
+        if(msgEl){
+          msgEl.textContent = r.ok ? ('✓ Enviado a '+r.enviados+' contacto(s)') : ('Error: '+r.mensaje);
+          msgEl.className = 'sos-msg ' + (r.ok?'ok':'err');
+        }
+        if(typeof showToast==='function') showToast(r.ok?'🚨 SOS enviado':'Error al enviar SOS', r.ok);
+      }).catch(function(){
+        if(msgEl){ msgEl.textContent='Error al enviar'; msgEl.className='sos-msg err'; }
+      });
+    }
+  }
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(
+      function(pos){ done('https://maps.google.com/?q='+pos.coords.latitude+','+pos.coords.longitude); },
+      function(){ done(''); },
+      {enableHighAccuracy:true,timeout:15000,maximumAge:0});
+  } else done('');
+};
+
+function _sosInyectarCSS(){
+  if(document.getElementById('sos-styles')) return;
+  var st = document.createElement('style');
+  st.id = 'sos-styles';
+  st.textContent = [
+    '.sos-wrap{display:flex;flex-direction:column;height:100%;padding:var(--sp-6);gap:var(--sp-5);box-sizing:border-box}',
+    '.sos-header{display:flex;align-items:center;justify-content:space-between;flex-shrink:0}',
+    '.sos-header-l{display:flex;align-items:center;gap:var(--sp-3)}',
+    '.sos-header-ico{font-size:22px;color:#EF4444;filter:drop-shadow(0 0 8px rgba(239,68,68,.5))}',
+    '.sos-header-t{font-size:var(--fs-lg);font-weight:var(--fw-bold);letter-spacing:.18em;color:var(--hud-text)}',
+    '.sos-header-s{font-size:var(--fs-xs);color:var(--hud-text-dim);letter-spacing:var(--ls-title);margin-top:2px}',
+    '.sos-carrusel{flex:1;display:flex;align-items:center;justify-content:center;min-height:0}',
+    '.sos-card{width:min(420px,90%);border:1px solid color-mix(in srgb,var(--sos-acc) 45%,transparent);'+
+      'background:radial-gradient(circle at 50% 0%,color-mix(in srgb,var(--sos-acc) 10%,transparent),var(--hud-panel-bg));'+
+      'border-radius:var(--rad-lg);padding:var(--sp-6) var(--sp-5);display:flex;flex-direction:column;'+
+      'align-items:center;gap:var(--sp-4);box-shadow:0 0 40px color-mix(in srgb,var(--sos-acc) 20%,transparent),var(--hud-shadow)}',
+    '.sos-card-ico{width:70px;height:70px;border-radius:var(--rad-pill);display:flex;align-items:center;justify-content:center;'+
+      'background:color-mix(in srgb,var(--sos-acc) 15%,transparent);border:2px solid var(--sos-acc);'+
+      'font-size:30px;color:var(--sos-acc);box-shadow:0 0 24px color-mix(in srgb,var(--sos-acc) 40%,transparent);'+
+      'animation:sosPulse 2s ease-in-out infinite}',
+    '@keyframes sosPulse{0%,100%{box-shadow:0 0 24px color-mix(in srgb,var(--sos-acc) 40%,transparent)}50%{box-shadow:0 0 40px color-mix(in srgb,var(--sos-acc) 70%,transparent)}}',
+    '.sos-card-label{font-size:var(--fs-lg);font-weight:var(--fw-bold);color:var(--hud-text);letter-spacing:.04em}',
+    '.sos-card-msg{font-size:var(--fs-sm);color:var(--hud-text-mid);text-align:center;line-height:1.4}',
+    '.sos-card-btn{margin-top:var(--sp-2);padding:12px 28px;border-radius:var(--rad-card);border:none;cursor:pointer;'+
+      'background:var(--sos-acc);color:#0a0a12;font-size:var(--fs-sm);font-weight:var(--fw-bold);letter-spacing:.06em;'+
+      'text-transform:uppercase;display:flex;align-items:center;gap:8px;transition:transform .12s,filter .12s}',
+    '.sos-card-btn:hover{transform:translateY(-1px);filter:brightness(1.1)}',
+    '.sos-card-btn:active{transform:translateY(0)}',
+    '.sos-card-nav{display:flex;align-items:center;gap:var(--sp-4);margin-top:var(--sp-2)}',
+    '.sos-arrow{width:36px;height:36px;border-radius:var(--rad-pill);border:1px solid var(--hud-border);'+
+      'background:var(--hud-panel-bg);color:var(--hud-text);font-size:20px;cursor:pointer;line-height:1;'+
+      'display:flex;align-items:center;justify-content:center;transition:all .15s}',
+    '.sos-arrow:hover{border-color:var(--sos-acc);color:var(--sos-acc)}',
+    '.sos-count{font-size:var(--fs-xs);color:var(--hud-text-dim);font-family:var(--font-mono);min-width:44px;text-align:center}',
+    '.sos-dots{display:flex;justify-content:center;gap:8px;flex-shrink:0}',
+    '.sos-dot{width:8px;height:8px;border-radius:var(--rad-pill);background:var(--hud-text-faint);cursor:pointer;transition:all .15s}',
+    '.sos-dot.on{background:#EF4444;box-shadow:0 0 8px rgba(239,68,68,.6);transform:scale(1.2)}',
+    '.sos-msg{text-align:center;font-size:var(--fs-sm);min-height:18px;flex-shrink:0;transition:color .2s}',
+    '.sos-msg.activa{color:var(--hud-text-dim)}',
+    '.sos-msg.ok{color:var(--hud-ok)}',
+    '.sos-msg.err{color:var(--hud-err)}'
+  ].join('');
+  document.head.appendChild(st);
+}
+
 
 // Layout completo de Nutrición: SIEMPRE muestra todos los componentes (KPIs, macros, agua, semana, items)
 window._renderNutLayoutCompleto = window._renderNutLayoutCompleto || function(d){

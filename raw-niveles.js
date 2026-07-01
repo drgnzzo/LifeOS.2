@@ -1,4 +1,4 @@
-/* RAW Entry — Niveles v.8.29 (navegación por flechas reescrita: sin toggles, predecible)
+/* RAW Entry — Niveles v.8.30 (ciclo de teclas con orden REAL incluyendo SOS + carrusel SOS)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v7.075 — WATCHDOG v2: FONDO CORRECTO EN TODOS LOS NIVELES       ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -1307,28 +1307,27 @@
   //  navegable; se sigue activando con su botón.)
   // v8.3 — RAW agregada al recorrido (faltaba: con teclas nunca se abría).
   // RAW se invoca con argumento ('raw'), por eso se modela con `arg`.
-  // v8.29 — NAVEGACIÓN POR FLECHAS reescrita para ser predecible.
-  // Problema anterior: dependía de las funciones irA* que hacen TOGGLE
-  // (si ya estás en X, te mandan a home) y de dos fuentes desincronizadas
-  // (_pantalla para RAW, _osSeccion para el resto) → saltos erráticos y RAW
-  // trabado. Solución: una sola fuente de posición y navegar SIEMPRE hacia
-  // el destino (sin toggles), usando el router directo.
+  // v8.30 — orden REAL de la barra superior (coincide con index.html):
+  // Home, Logros, Bitácora, Activity, SOS, Nutrición, Notas, Timers, RAW.
+  // Antes faltaba SOS → el ciclo se desincronizaba. La clave 'sec' coincide
+  // con las claves de _OS_SECCIONES (RAW usa 'sheets', no 'raw').
   var _TABS = [
     { id:'btn-home',      sec:'home'     },
     { id:'btn-logros',    sec:'logros'   },
     { id:'btn-maslow',    sec:'bitacora' },
     { id:'btn-activity',  sec:'activity' },
+    { id:'btn-sos',       sec:'sos'      },
     { id:'btn-nutricion', sec:'nutricion'},
     { id:'btn-notas',     sec:'notas'    },
     { id:'btn-timers',    sec:'timers'   },
-    { id:'btn-sheets',    sec:'raw'      }
+    { id:'btn-sheets',    sec:'sheets'   }
   ];
 
   // Posición actual: UNA sola detección unificada. RAW se detecta por
   // _pantalla; el resto por _osSeccion. Si nada coincide, es home (idx 0).
   function _tabActivaIdx(){
     if(typeof window._pantalla === 'string' && window._pantalla.indexOf('sheets_') === 0){
-      for(var k=0;k<_TABS.length;k++){ if(_TABS[k].sec==='raw') return k; }
+      for(var k=0;k<_TABS.length;k++){ if(_TABS[k].sec==='sheets') return k; }
     }
     var sec = window._osSeccion || 'home';
     for(var i=0;i<_TABS.length;i++){ if(_TABS[i].sec===sec) return i; }
@@ -1341,17 +1340,17 @@
     var n = _TABS.length;
     idx = ((idx % n) + n) % n;
     var destino = _TABS[idx].sec;
-    if(destino === 'raw'){
-      // Entrar a RAW sin toggle: solo si NO estamos ya en RAW.
+    if(destino === 'sheets'){
       var enRaw = (typeof window._pantalla === 'string' && window._pantalla.indexOf('sheets_') === 0);
       if(!enRaw && typeof window.irASheets === 'function') window.irASheets('raw');
     } else if(destino === 'home'){
       if(typeof window.volverAlAnverso === 'function') window.volverAlAnverso();
     } else if(typeof window._osMostrar === 'function'){
-      // Router directo: muestra la sección SIN toggle (siempre navega a ella).
       window._osMostrar(destino);
-      // Algunas secciones necesitan montarse (notas, timers): dispararlo.
-      if(destino === 'notas' && typeof window._notasMontar === 'function') window._notasMontar();
+      // Secciones que necesitan montarse al entrar:
+      if(destino === 'notas'  && typeof window._notasMontar === 'function') window._notasMontar();
+      if(destino === 'timers' && typeof window._timersAlEntrar === 'function') window._timersAlEntrar();
+      if(destino === 'sos'    && typeof window._montarSOS === 'function') window._montarSOS();
     }
   }
 
@@ -1365,6 +1364,13 @@
     if(dd && dd.classList.contains('show')) return;
     var pc = document.getElementById('popup-concepto');
     if(pc && pc.classList.contains('show')) return;
+    // v8.30 — dentro de la sección SOS, las flechas mueven el CARRUSEL de
+    // tipos (no cambian de pestaña). Se sale de SOS con las pestañas de arriba.
+    if(window._osSeccion === 'sos' && typeof window._sosMover === 'function'){
+      e.preventDefault();
+      window._sosMover(e.key === 'ArrowRight' ? 1 : -1);
+      return;
+    }
     e.preventDefault();
     var idx = _tabActivaIdx();
     _irATab(idx + (e.key === 'ArrowRight' ? 1 : -1));

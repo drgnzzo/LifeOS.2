@@ -1374,6 +1374,7 @@ html.mob .hero-right{display:none !important}
 .board-face.panel-bitacora,
 .board-face.panel-activity,
 .board-face.panel-nutricion,
+.board-face.panel-sos,
 .board-face.panel-notas{
   transition:opacity .3s ease,transform .3s ease;
 }
@@ -1381,6 +1382,7 @@ html.mob .hero-right{display:none !important}
 .board-face.panel-bitacora:not(.active),
 .board-face.panel-activity:not(.active),
 .board-face.panel-nutricion:not(.active),
+.board-face.panel-sos:not(.active),
 .board-face.panel-notas:not(.active){
   transform:translateY(8px);
 }
@@ -2793,6 +2795,15 @@ html.mob .board-face.anverso.slide-right .os-carousel-dots{
   background:#06060f;
 }
 .board-face.panel-notas.active{transform:none;opacity:1;pointer-events:all}
+
+/* v8.30 — Sección SOS (mismo patrón base que las otras board-face) */
+.board-face.panel-sos{
+  transform:none;opacity:0;pointer-events:none;
+  padding:0;display:flex;flex-direction:column;
+  height:100%;overflow:hidden;
+  background:#0a0608;
+}
+.board-face.panel-sos.active{transform:none;opacity:1;pointer-events:all}
 
 /* Header */
 .notas-header{
