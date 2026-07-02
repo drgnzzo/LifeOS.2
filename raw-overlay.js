@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.35 (MATERIAL v2: bisel + vidrio en cards, breathing con material integrado)
+/* RAW Entry — Overlay v.8.38 (FASE E: Z continuo — parallax individual por estrella)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1131,6 +1131,9 @@ function _crearDialOverlay(){
     var _camTX = 0, _camTY = 0;   // target (-1..1)
     var _camX  = 0, _camY  = 0;   // current (suavizado)
     var _CAM_AMP = 15;            // amplitud en px del desplazamiento (sutil)
+    // v8.38 — FASE E: cámara compartida con drawStars para el parallax POR
+    // ESTRELLA (Z continuo). Se asignan cada frame desde el loop.
+    var _camGX = 0, _camGY = 0;
     var _CAM_LERP = 0.04;         // qué tan rápido persigue (bajo = más suave/flotante)
 
     // Mouse (escritorio): normaliza la posición a [-1,1] desde el centro.
@@ -1165,6 +1168,42 @@ function _crearDialOverlay(){
         }
       } catch(e){}
     };
+
+    /* v8.36 — CONTRA-MOVIMIENTO DIEGÉTICO. El contenido interno de las
+       cards ([id$="-inner"]) flota opuesto a la cámara con un tilt 3D
+       mínimo. Ficha de rendimiento:
+       · corre dentro del frame loop existente (cero loops nuevos)
+       · guard de reposo: si la cámara no cambió, no escribe NADA al DOM
+       · translate3d + rotate = solo composite (GPU), nunca layout/reflow
+       · la lista de inners se cachea (querySelectorAll cada ~7s, no por frame)
+       · en niv-2 / móvil se resetea y descansa */
+    var _ctrInners = null, _ctrRefresco = 0, _ctrLastX = 99, _ctrLastY = 99, _ctrActivo = false;
+    function _ctrMov(){
+      // Guard de reposo: cámara quieta = ni un write al DOM.
+      if(Math.abs(_camX - _ctrLastX) < 0.0015 && Math.abs(_camY - _ctrLastY) < 0.0015) return;
+      _ctrLastX = _camX; _ctrLastY = _camY;
+
+      if(!_ctrInners || --_ctrRefresco <= 0){
+        _ctrInners = document.querySelectorAll('.hud-pnl > [id$="-inner"]');
+        _ctrRefresco = 220;   // re-cachear cada ~220 frames por si el DOM cambió
+      }
+      var tx = (-_camX * 3.5).toFixed(2), ty = (-_camY * 3.5).toFixed(2);
+      var rx = ( _camY * 0.7).toFixed(2), ry = (-_camX * 0.7).toFixed(2);
+      var t = 'perspective(900px) translate3d('+tx+'px,'+ty+'px,0) rotateX('+rx+'deg) rotateY('+ry+'deg)';
+      for(var i = 0; i < _ctrInners.length; i++){
+        _ctrInners[i].style.transform = t;
+      }
+      _ctrActivo = true;
+    }
+    // Al entrar a nivel 2 el frame loop se pausa; limpiar el transform para
+    // que las secciones no hereden un tilt congelado.
+    var _ctrObs = new MutationObserver(function(){
+      if(document.documentElement.classList.contains('niv-2') && _ctrActivo){
+        if(_ctrInners){ for(var i=0;i<_ctrInners.length;i++){ _ctrInners[i].style.transform = ''; } }
+        _ctrActivo = false; _ctrLastX = 99; _ctrLastY = 99;
+      }
+    });
+    _ctrObs.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
@@ -1945,6 +1984,16 @@ function _crearDialOverlay(){
         // que iban al GC). Las coordenadas van directamente en pX, pY.
         var pX = CX + Math.cos(s.theta) * s.r;
         var pY = CY + Math.sin(s.theta) * s.r;
+        // v8.38 — FASE E · Z CONTINUO: parallax POR ESTRELLA. La capa del
+        // canvas ya se traslada 0.85 con la cámara; aquí cada estrella suma
+        // su DELTA individual según profundidad (baseSize): las grandes
+        // ("cercanas", prof→1.3) se desplazan más que la capa, las pequeñas
+        // ("lejanas", prof→0.55) menos → profundidad continua, no 2 planos.
+        // Costo: 2 mult + 2 sumas por estrella. En reposo (cámara quieta)
+        // _camGX/Y son ~0 y el delta se desvanece solo.
+        var _prof = 0.55 + (s.baseSize / 1.9) * 0.75;
+        pX += _camGX * (_prof - 0.85);
+        pY += _camGY * (_prof - 0.85);
         var neb = nebulaIntensityAt(pX, pY);
         var alpha = lifeAlpha * (0.5 + twinkle * 0.45) * neb;
         s._cachedX = pX; s._cachedY = pY;
@@ -2778,6 +2827,16 @@ function _crearDialOverlay(){
       _camY += (_camTY - _camY) * _lerpF;
       var _camPxX = _camX * _CAM_AMP;   // desplazamiento base en px
       var _camPxY = _camY * _CAM_AMP;
+      _camGX = _camPxX; _camGY = _camPxY;   // v8.38: compartir con drawStars
+
+      // v8.36 — FASE C · CONTRA-MOVIMIENTO DIEGÉTICO (firma Metroid Prime).
+      // El cosmos se mueve CON la cámara (parallax); el contenido holográfico
+      // de las cards flota sutilmente EN CONTRA + un tilt 3D mínimo → tres
+      // planos de profundidad: cosmos (lejos) / marcos (medio) / hologramas
+      // (cerca). Solo transform = composite en GPU, cero layout. Los MARCOS
+      // (.hud-pnl) y el dial canvas NO se tocan: el motor de layout los mide
+      // y un transform contaminaría esas mediciones (lección aprendida).
+      _ctrMov();
 
       // v7.031 — FASE 4A: decaer la energía del warp. Dura ~1.5s en
       // apagarse (subido desde 0.9s) — el destello se siente más.
@@ -3486,16 +3545,13 @@ function _crearDialOverlay(){
       '.hud-empty-msg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:28px 16px;color:rgba(220,224,235,0.45)}',
       '.hud-empty-msg span{font-size:10px;font-weight:700;letter-spacing:.10em;text-transform:uppercase;text-align:center}',
       // Breathing glow — sombra que pulsa suavemente (más lento: 5.5s)
-      // v8.35 MATERIAL: el bisel (luz arriba/asiento abajo) y la elevación
-      // van DENTRO del keyframe en ambos estados — el breathing anima
-      // box-shadow completo, así que el material debe viajar con él.
-      '@keyframes hudBreath{0%,100%{box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 0 0 var(--hb-c,rgba(255,255,255,0.0))}50%{box-shadow:var(--mat-bevel),var(--mat-elev-1),0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
+      // v8.36 HOTFIX: revertido a la forma original LIGERA. El material v8.35
+      // (bisel de 4 insets + elevación de 2 capas) DENTRO del keyframe hacía
+      // que el navegador interpolara y repintara sombras multicapa con blur
+      // en 7 cards a 60fps → RAM/GPU disparadas. El material de las cards se
+      // reintroducirá de forma estática y barata en una fase posterior.
+      '@keyframes hudBreath{0%,100%{box-shadow:0 0 0 0 var(--hb-c,rgba(255,255,255,0.0)),inset 0 0 0 0 transparent}50%{box-shadow:0 0 32px 6px var(--hb-c,rgba(255,255,255,0.12)),inset 0 0 14px 0 var(--hb-i,rgba(255,255,255,0.04))}}',
       '.hud-breathing{animation:hudBreath 5.5s ease-in-out infinite}',
-      // v8.35 MATERIAL: highlight de vidrio en el tope de cada card + bisel
-      // para las cards SIN breathing (estado base). background-image se suma
-      // al background-color existente sin pisarlo.
-      '.hud-pnl{background-image:var(--mat-glass-top)}',
-      '.hud-pnl:not(.hud-breathing){box-shadow:var(--mat-bevel),var(--mat-elev-1)}',
       // Perimeter scan principal — pseudo-elemento conic-gradient que rota (sentido horario)
       '@keyframes hudScanRot{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}',
       '@keyframes hudScanRotRev{from{transform:rotate(360deg)}to{transform:rotate(0deg)}}',
