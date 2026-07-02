@@ -1,4 +1,4 @@
-/* RAW Entry — Anim v.8.16 (fade central + vértigo push-in en transición de nivel)
+/* RAW Entry — Anim v.8.44 (countUp: números que computan, lenguaje Hubtown)
    ════════════════════════════════════════════════════════════════════
    Motor de animación central de LifeOS. Construido sobre GSAP (local).
 
@@ -162,4 +162,50 @@
       });
   }
   window.RawAnim.vertigo = vertigo;
+
+  // ════════════════════════════════════════════════════════════════
+  // COUNT-UP (v8.44, lenguaje Hubtown): un número "computa" desde 0
+  // hasta su valor real con desaceleración. Respeta prefijos/sufijos
+  // ($, %, comas). Marca el elemento para no re-animarlo.
+  // ════════════════════════════════════════════════════════════════
+  function countUp(el, dur){
+    if(!el || el.__cu) return;
+    var txt = (el.textContent || '').trim();
+    // extraer el número: $1,234.56 → 1234.56 (conservando formato)
+    var m = txt.match(/^([^\d\-]*)(-?[\d,]+(?:\.\d+)?)(.*)$/);
+    if(!m) return;
+    var fin = parseFloat(m[2].replace(/,/g,''));
+    if(isNaN(fin) || fin === 0) return;
+    var pre = m[1], post = m[3];
+    var dec = (m[2].indexOf('.') >= 0) ? (m[2].split('.')[1]||'').length : 0;
+    var conComas = m[2].indexOf(',') >= 0;
+    el.__cu = 1;
+    dur = dur || 700;
+    if(REDUCE || !HAY_GSAP){ return; }   // sin animación: dejar el valor final
+    var t0 = performance.now();
+    function fmt(v){
+      var s = v.toFixed(dec);
+      if(conComas){
+        var partes = s.split('.');
+        partes[0] = partes[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        s = partes.join('.');
+      }
+      return pre + s + post;
+    }
+    (function paso(t){
+      var p = Math.min(1, (t - t0) / dur);
+      var e = 1 - Math.pow(1 - p, 3);   // desaceleración (aprox curva firma)
+      el.textContent = fmt(fin * e);
+      if(p < 1) requestAnimationFrame(paso);
+      else el.textContent = fmt(fin);
+    })(t0);
+  }
+  window.RawAnim.countUp = countUp;
+
+  // Aplicar a todos los .num dentro de un contenedor (para el expand).
+  window.RawAnim.countUpEn = function(cont){
+    if(!cont) return;
+    var nums = cont.querySelectorAll('.num');
+    for(var i = 0; i < Math.min(nums.length, 24); i++){ countUp(nums[i]); }
+  };
 })();

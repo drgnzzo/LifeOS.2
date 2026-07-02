@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.42 (velocity-glitch RGB-split diegético)
+/* RAW Entry — Overlay v.8.44 (count-up + microcopy centrado + vigilante de expansión)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1178,6 +1178,7 @@ function _crearDialOverlay(){
     // v8.38 — FASE E: cámara compartida con drawStars para el parallax POR
     // ESTRELLA (Z continuo). Se asignan cada frame desde el loop.
     var _camGX = 0, _camGY = 0;
+    var _cuLast = null;   // v8.44: última card expandida (para el count-up)
     var _CAM_LERP = 0.04;         // qué tan rápido persigue (bajo = más suave/flotante)
 
     // Mouse (escritorio): normaliza la posición a [-1,1] desde el centro.
@@ -1268,6 +1269,31 @@ function _crearDialOverlay(){
       }
     });
     _ctrObs.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+
+    /* v8.44 — MICROCOPY DE SISTEMA (lenguaje joseph-san): hint discreto
+       en la esquina inferior derecha, contextual al nivel. Fuente mono,
+       casi invisible. Se actualiza con el mismo observer de clases. */
+    var _hintEl = document.createElement('div');
+    _hintEl.id = 'raw-hint';
+    _hintEl.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:10px;z-index:9490;'+
+      'font-family:"JetBrains Mono",ui-monospace,monospace;font-size:9px;'+
+      'letter-spacing:.16em;color:var(--hud-text-faint,rgba(200,210,220,0.25));'+
+      'pointer-events:none;text-transform:uppercase;transition:opacity .4s ease';
+    document.body.appendChild(_hintEl);
+    function _hintRefrescar(){
+      var h = document.documentElement;
+      if(h.classList.contains('mob')){ _hintEl.style.opacity = '0'; return; }
+      var txt = '';
+      if(h.classList.contains('niv-2'))      txt = '[←/→] Secciones';
+      else if(h.classList.contains('cf-on')) txt = '[←/→] Girar anillo · [Clic] Entrar';
+      else if(h.classList.contains('niv-1')) txt = '[Clic] Card lateral · [←/→] Girar';
+      else                                    txt = '[Clic] Expandir · [←/→] Secciones';
+      _hintEl.textContent = txt;
+      _hintEl.style.opacity = '1';
+    }
+    new MutationObserver(_hintRefrescar)
+      .observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+    _hintRefrescar();
 
     function resize(){
       var dpr = window.devicePixelRatio || 1;
@@ -2923,6 +2949,23 @@ function _crearDialOverlay(){
       // (.hud-pnl) y el dial canvas NO se tocan: el motor de layout los mide
       // y un transform contaminaría esas mediciones (lección aprendida).
       _ctrMov();
+
+      // v8.44 — COUNT-UP al expandir: si cambió la card expandida, animar
+      // sus números (.num) tras un respiro (los datos renderizan async).
+      // Costo: UNA comparación por frame.
+      if(window._hudExpanded !== _cuLast){
+        _cuLast = window._hudExpanded;
+        if(_cuLast && window.RawAnim && window.RawAnim.countUpEn){
+          (function(card){
+            setTimeout(function(){
+              if(window._hudExpanded === card){
+                var cont = card.querySelector('.hud-expanded-content');
+                if(cont) window.RawAnim.countUpEn(cont);
+              }
+            }, 420);
+          })(_cuLast);
+        }
+      }
 
       // v7.031 — FASE 4A: decaer la energía del warp. Dura ~1.5s en
       // apagarse (subido desde 0.9s) — el destello se siente más.

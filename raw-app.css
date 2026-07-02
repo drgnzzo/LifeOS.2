@@ -3053,9 +3053,9 @@ html.mob .notas-grid::-webkit-scrollbar-thumb{background:rgba(254,243,160,0.3);b
 }
 .niv-riel{
   position:relative;
-  width:4px;
+  width:3px;
   height:100%;
-  background:rgba(140,100,220,0.16);
+  background:linear-gradient(180deg,rgba(140,100,220,0.06),rgba(140,100,220,0.20),rgba(140,100,220,0.06));
   border-radius:2px;
   pointer-events:auto;
   cursor:ns-resize;
@@ -3076,26 +3076,27 @@ html.mob .notas-grid::-webkit-scrollbar-thumb{background:rgba(254,243,160,0.3);b
 .niv-stop{
   position:absolute;
   left:50%;
-  width:13px;height:13px;
-  margin-left:-6.5px;margin-top:-6.5px;
+  width:11px;height:11px;
+  margin-left:-5.5px;margin-top:-5.5px;
   border-radius:50%;
   background:rgba(8,6,18,0.95);
-  border:1.5px solid rgba(167,139,250,0.45);
+  border:1.5px solid rgba(167,139,250,0.40);
   cursor:pointer;
   padding:0;
-  transition:all .2s;
+  transition:transform .3s cubic-bezier(.2,0,0,1),border-color .2s,box-shadow .25s;
 }
 .niv-stop:nth-child(2){ top:0%; }    /* nivel 0 */
 .niv-stop:nth-child(3){ top:50%; }   /* nivel 1 */
 .niv-stop:nth-child(4){ top:100%; }  /* nivel 2 */
 .niv-stop:hover{
   border-color:#A78BFA;
+  transform:scale(1.3);
   box-shadow:0 0 10px rgba(167,139,250,0.5);
 }
 .niv-stop.on{
   background:#A78BFA;
   border-color:#C4B5FD;
-  box-shadow:0 0 12px rgba(167,139,250,0.7);
+  box-shadow:0 0 12px rgba(167,139,250,0.7),0 0 0 4px rgba(167,139,250,0.14);
 }
 /* Marcador de posición actual */
 .niv-marcador{
@@ -3145,12 +3146,12 @@ html.mob .notas-grid::-webkit-scrollbar-thumb{background:rgba(254,243,160,0.3);b
   position:relative;
   width:46px;height:46px;
   border-radius:50%;
-  background:rgba(8,6,18,0.97);
+  background:radial-gradient(circle at 38% 30%,rgba(30,22,54,0.98),rgba(8,6,18,0.97));
   border:1.5px solid rgba(167,139,250,0.4);
   display:flex;
   align-items:center;
   justify-content:center;
-  box-shadow:0 0 16px rgba(0,0,0,0.6);
+  box-shadow:var(--mat-bevel),0 0 16px rgba(0,0,0,0.6);
   pointer-events:none;
 }
 .niv-wheel-lvl{
@@ -3162,14 +3163,16 @@ html.mob .notas-grid::-webkit-scrollbar-thumb{background:rgba(254,243,160,0.3);b
 }
 .niv-wheel-hint{
   position:absolute;
-  bottom:-16px;
+  bottom:-17px;
   left:50%;
   transform:translateX(-50%);
+  font-family:'JetBrains Mono',ui-monospace,monospace;
   font-size:8px;
-  font-weight:700;
-  letter-spacing:.18em;
-  color:rgba(200,208,230,0.4);
+  font-weight:600;
+  letter-spacing:.16em;
+  color:var(--hud-text-faint,rgba(200,210,220,0.25));
   pointer-events:none;
+  white-space:nowrap;
 }
 
 
