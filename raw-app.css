@@ -3440,3 +3440,20 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
   box-shadow:var(--mat-bevel),var(--mat-elev-3);
   background-image:var(--mat-glass-top);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   FAUXBORDERS (v9.4) — lenguaje Hubtown: una línea de 1px que se
+   extiende 200vw (el doble de la pantalla) bajo el header de cada
+   sección — el plano parece continuar más allá del viewport.
+═══════════════════════════════════════════════════════════════════ */
+.board-face.panel-activity::after,
+.board-face.panel-bitacora::after,
+.board-face.panel-nutricion::after,
+.board-face.panel-notas::after,
+.board-face.panel-timers::after,
+.board-face.panel-sos::after{
+  content:'';position:absolute;top:54px;left:50%;width:200vw;height:1px;
+  transform:translateX(-50%);
+  background:linear-gradient(90deg,transparent 5%,rgba(213,224,255,0.09) 30%,rgba(213,224,255,0.09) 70%,transparent 95%);
+  pointer-events:none;z-index:0;
+}

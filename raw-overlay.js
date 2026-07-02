@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.9.3 (COSMOS: nebulosa orgánica + motas ámbar cálidas)
+/* RAW Entry — Overlay v.9.4 (texto en arco del dial estilo batcloud)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -7544,6 +7544,44 @@ function _animarSubRing(targetSub){
 
 function _iniciarPulsoCentro(){
   if(_dialRAF) return;
+  /* v9.4 — Texto curvado sobre un arco (batcloud). Cada carácter se coloca
+     y rota siguiendo la tangente del círculo. En la mitad inferior el texto
+     se voltea (radio interior + orden invertido) para legibilidad. Los
+     anchos de carácter se CACHEAN por fuente+texto (measureText solo la
+     primera vez, no por frame). */
+  var _arcoCache = {};
+  function _textoEnArco(ctx, txt, cx, cy, radio, angCentro){
+    var clave = ctx.font + '|' + txt;
+    var anchos = _arcoCache[clave];
+    if(!anchos){
+      anchos = { w: [], total: 0 };
+      for(var i = 0; i < txt.length; i++){
+        var w = ctx.measureText(txt[i]).width;
+        anchos.w.push(w); anchos.total += w;
+      }
+      _arcoCache[clave] = anchos;
+    }
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // ¿Mitad inferior? (en canvas, sin>0 es abajo) → voltear
+    var abajo = Math.sin(angCentro) > 0;
+    var espacio = 1.5;                       // px extra entre letras
+    var angTotal = (anchos.total + espacio * (txt.length - 1)) / radio;
+    var a = angCentro + (abajo ? angTotal / 2 : -angTotal / 2);
+    for(var i = 0; i < txt.length; i++){
+      var da = (anchos.w[i] / 2 + (i ? espacio / 2 : 0)) / radio;
+      a += abajo ? -da : da;
+      var x = cx + Math.cos(a) * radio;
+      var y = cy + Math.sin(a) * radio;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(a + (abajo ? -Math.PI / 2 : Math.PI / 2));
+      ctx.fillText(txt[i], 0, 0);
+      ctx.restore();
+      a += abajo ? -da : da;
+    }
+  }
+
   function loop(ts){
     // v7.071 — frenos: pausa oculto/sin foco + cap 30fps (igual que el cosmos)
     ts = ts || performance.now();
@@ -7678,11 +7716,13 @@ function _dialDraw(){
     ctx.save();
     ctx.font         = 'bold '+(isHov||isAct?13:11)+'px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif';
     ctx.fillStyle    = '#ffffff';
-    ctx.textAlign    = 'center';
-    ctx.textBaseline = 'top';
     ctx.shadowColor  = 'rgba(0,0,0,0.9)';
     ctx.shadowBlur   = 6;
-    ctx.fillText(item.label.toUpperCase(), cx, cy+16);
+    // v9.4 — TEXTO EN ARCO (lenguaje batcloud): la etiqueta viaja sobre la
+    // circunferencia del sector como un instrumento de navegación, letra a
+    // letra siguiendo la tangente. En la mitad inferior se voltea para que
+    // nunca quede de cabeza.
+    _textoEnArco(ctx, item.label.toUpperCase(), dc.CX, dc.CY, rMid + 36, midA);
     ctx.restore();
 
     if(item.subs){
