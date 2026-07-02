@@ -1,4 +1,4 @@
-/* RAW Entry — Core v.8.31 (SOS como tablero, no carrusel)
+/* RAW Entry — Core v.8.34 (Activity: tabla compacta sin corte ni scroll, columnas 400px)
    ╔══════════════════════════════════════════════════════════════════╗
    ║ v6.040 — BOTÓN ACTUALIZAR                                        ║
    ╚══════════════════════════════════════════════════════════════════╝
@@ -2309,11 +2309,11 @@ document.addEventListener('DOMContentLoaded', function(){
         if(!items||!items.length) return '<div style="padding:24px;text-align:center;color:rgba(200,208,230,0.25);font-size:12px">Sin hábitos</div>';
         var sorted = applyHabFilter(items, tipo);
         var h = '<table style="width:100%;border-collapse:collapse">';
-        h += '<tr><th style="text-align:left;padding:6px 16px;font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1">HÁBITO</th>';
+        h += '<tr><th style="text-align:left;padding:6px 10px;font-size:10px;font-weight:600;letter-spacing:.08em;color:rgba(200,208,230,0.45);border-bottom:1px solid rgba(140,100,220,0.14);position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1">HÁBITO</th>';
         dias.forEach(function(d){
           var esH=(d===diaKey);
           h += '<th style="text-align:center;padding:6px 4px;font-size:10px;font-weight:'+(esH?700:600)+';'+
-               'color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid rgba(140,100,220,0.14);min-width:36px;'+
+               'color:'+(esH?c.color:'#7A8499')+';border-bottom:1px solid rgba(140,100,220,0.14);min-width:26px;'+
                'position:sticky;top:0;background:rgba(14,8,28,0.95);z-index:1;'+
                (esH?'text-shadow:0 0 8px '+c.glow:'')+'">'+(DLBL[d]||d)+'</th>';
         });
@@ -2325,14 +2325,14 @@ document.addEventListener('DOMContentLoaded', function(){
           var anyDone = dias.some(function(dia){ return hab.checks&&hab.checks[dia]; });
           h += '<tr class="_hab-row" style="transition:background .15s;cursor:default"'+
                ' onmouseover="this.style.background=\'rgba(25,14,52,0.7)\'" onmouseout="this.style.background=\'transparent\'">'+
-               '<td style="padding:8px 16px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+               '<td style="padding:8px 10px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
                  (hab.sims||hab.bw?'<div style="font-size:10px;font-weight:600;letter-spacing:.10em;color:rgba(200,208,230,0.25);text-transform:uppercase;margin-bottom:1px">'+(hab.sims||hab.bw)+'</div>':'')+
                  '<div style="font-size:13px;font-weight:500;color:'+(allDone?c.color:'#C8D0E0')+';'+
-                 'max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+
+                 'max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+
                  (allDone?'text-shadow:0 0 8px '+c.glow:'')+'">' + hab.nombre+'</div>'+
                '</td>';
           dias.forEach(function(dia){
-            h += '<td style="text-align:center;padding:6px 4px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
+            h += '<td style="text-align:center;padding:6px 2px;border-bottom:1px solid rgba(140,100,220,0.14)">'+
                  chkCircle(hab.fila, dia, hab.checks&&hab.checks[dia], tipo)+'</td>';
           });
           // Botón limpiar fila — solo activo si hay al menos 1 check
@@ -2442,11 +2442,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
       // ── PANEL COL CON SCROLL VERTICAL POR COLUMNA ──
       var colW = {
-        personal:    'flex:2 1 0;min-width:240px',
-        electronics: 'flex:2 1 0;min-width:240px',
-        libro:       'flex:1 1 0;min-width:180px',
-        movie:       'flex:1 1 0;min-width:180px',
-        norut:       'flex:1 1 0;min-width:180px',
+        personal:    'flex:2 1 0;min-width:400px',
+        electronics: 'flex:2 1 0;min-width:400px',
+        libro:       'flex:1 1 0;min-width:170px',
+        movie:       'flex:1 1 0;min-width:170px',
+        norut:       'flex:1 1 0;min-width:170px',
       };
       function panelCol(tipo, inner){
         var c = CAT[tipo];
@@ -2551,7 +2551,7 @@ document.addEventListener('DOMContentLoaded', function(){
       board.innerHTML =
         header +
         // Contenedor principal: flex:1 con min-height:0 para que sus hijos puedan scrollear
-        '<div style="display:flex;gap:8px;padding:8px;flex:1;min-height:0;overflow:hidden;align-items:stretch">'+
+        '<div style="display:flex;gap:8px;padding:8px;flex:1;min-height:0;overflow-x:auto;overflow-y:hidden;align-items:stretch">'+
           '<div style="display:flex;gap:8px;flex:1;min-width:0;align-items:stretch;height:100%">'+
             panelCol('personal',    habTable(d.habitosPersonal||[],    'personal'))+
             panelCol('electronics', habTable(d.habitosElectronics||[], 'electronics'))+

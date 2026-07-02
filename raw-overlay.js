@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.26 (FIX RAÍZ 0x0: quita os-seccion al volver 2→1 + parallax/vértigo reactivados)
+/* RAW Entry — Overlay v.8.34 (HYPERDRIVE Z-3D: proyección de perspectiva real en el warp)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1921,12 +1921,9 @@ function _crearDialOverlay(){
         // en radio. _warpDir +1 las jala al centro (sumergirse), -1 las
         // expulsa hacia afuera (emerger). Es un empujón temporal: cuando
         // _warpEnergia vuelve a 0, las órbitas siguen como siempre.
-        if(warp > 0){
-          s.r += _warpDir * warp * 950 * dt * -1;
-          // -1 porque +dir debe ACERCAR (radio decrece). Re-clamp:
-          if(s.r < 24){ s.r = 24 + Math.random()*40; }
-          if(s.r > MAX_R){ s.r = MAX_R - Math.random()*60; }
-        }
+        // v8.34 — el desplazamiento radial del warp viejo se retira: el motor
+        // Z-3D (abajo) maneja el movimiento del túnel por perspectiva. Cada
+        // estrella mantiene su "carril" (radio/ángulo) y viaja solo en Z.
         if(s.age > s.lifespan){
           s.r = 30 + (MAX_R - 30) * Math.pow(Math.random(), 0.7);
           s.theta = Math.random() * Math.PI * 2;
@@ -1954,34 +1951,54 @@ function _crearDialOverlay(){
         var colHex = s.color + Math.floor(alpha * 220).toString(16).padStart(2, '0');
 
         if(warp > 0.04){
-          // ── HYPERDRIVE (v8.20) — estrella estirada con sensación de
-          // profundidad Z (efecto túnel). Antes el largo era uniforme; ahora
-          // depende de baseSize: las estrellas grandes ("cercanas") se
-          // estiran MUCHO más que las pequeñas ("lejanas") → da el efecto de
-          // venir desde el fondo del túnel hacia ti. Además el factor de
-          // profundidad crece con el radio (las de afuera vienen más lejos).
-          var profZ = 0.45 + (s.baseSize / 1.9) * 0.85;   // 0.45..1.3 según "cercanía"
-          var radioFrac = Math.min(1, s.r / MAX_R);        // las externas vienen de más lejos
-          var depthBoost = 0.7 + radioFrac * 0.9;          // 0.7..1.6
-          var largo = warp * (s.isHub ? 170 : 110) * profZ * depthBoost * (0.6 + twinkle*0.4);
-          var ang = s.theta;
-          var x2 = CX + Math.cos(ang) * (s.r - largo);
-          var y2 = CY + Math.sin(ang) * (s.r - largo);
-          pctx.strokeStyle = colHex;
-          // Las estrellas "cercanas" (grandes) también más gruesas al estirar.
-          pctx.lineWidth = rad * (1.0 + profZ * 0.6);
+          // ══ HYPERDRIVE Z-3D (v8.34) — profundidad REAL con perspectiva ══
+          // Cada estrella recibe una coordenada Z virtual (s._wz). Durante el
+          // warp, Z decrece → la estrella VIENE HACIA TI. La posición en
+          // pantalla se proyecta con perspectiva (factor = 1/z): al fondo se
+          // ve pequeña y cerca del centro; al acercarse crece y escapa hacia
+          // los bordes acelerando — el túnel 3D de verdad (como Three.js,
+          // pero con una división por estrella). El trazo va de la posición
+          // actual a la posición con el Z de hace un instante (cola de
+          // perspectiva real, no un largo inventado).
+          if(s._wz === undefined){
+            // Entrar al túnel: repartir en profundidad [0.35 .. 2.8]
+            s._wz = 0.35 + Math.random() * 2.45;
+          }
+          var _dzVel = (0.85 + (s.baseSize/1.9) * 0.5) * warp;   // cercanas algo más rápidas
+          var _zPrev = s._wz;
+          s._wz += (_warpDir > 0 ? -1 : 1) * _dzVel * dt * 2.2;   // sumergirse: z decrece
+          // Reciclaje del túnel: al pasar la cámara renace al fondo (y viceversa)
+          if(s._wz < 0.18){ s._wz = 2.6 + Math.random()*0.5; _zPrev = s._wz; }
+          if(s._wz > 3.1){ s._wz = 0.2 + Math.random()*0.2;  _zPrev = s._wz; }
+
+          var _f  = 1 / s._wz;      // factor de perspectiva actual
+          var _fp = 1 / _zPrev;     // factor de hace un instante (para la cola)
+          var _dirX = Math.cos(s.theta), _dirY = Math.sin(s.theta);
+          var _px1 = CX + _dirX * s.r * _f,  _py1 = CY + _dirY * s.r * _f;   // cabeza
+          var _px2 = CX + _dirX * s.r * _fp, _py2 = CY + _dirY * s.r * _fp;  // cola
+          // La cola mínima garantiza trazo visible incluso recién nacida.
+          if(Math.abs(_px1-_px2) + Math.abs(_py1-_py2) < 2){ _px2 = _px1 - _dirX*2; _py2 = _py1 - _dirY*2; }
+
+          // Alpha y grosor según cercanía: lejos tenue y fino, cerca brillante y grueso.
+          var _cercania = Math.min(1, _f / 2.2);
+          var alphaZ = alpha * (0.35 + _cercania * 0.85);
+          if(alphaZ > 1) alphaZ = 1;
+          pctx.strokeStyle = s.color + Math.floor(alphaZ * 235).toString(16).padStart(2, '0');
+          pctx.lineWidth = Math.max(0.6, rad * _f * 0.8);
           pctx.lineCap = 'round';
-          if(s.isHub || s.baseSize > 1.4){
+          if((s.isHub || s.baseSize > 1.4) && _cercania > 0.5){
             pctx.shadowColor = s.color;
             pctx.shadowBlur = 6 + warp * 10;
           } else {
             pctx.shadowBlur = 0;
           }
           pctx.beginPath();
-          pctx.moveTo(pX, pY);
-          pctx.lineTo(x2, y2);
+          pctx.moveTo(_px2, _py2);
+          pctx.lineTo(_px1, _py1);
           pctx.stroke();
         } else {
+          // Al salir del warp, limpiar la Z para el próximo salto.
+          if(s._wz !== undefined) s._wz = undefined;
           // ── Estrella normal: punto (motor original, sin tocar) ──
           pctx.fillStyle = colHex;
           // v7.065 OPT — umbral baseSize subido de 1.4 a 1.55. Las
