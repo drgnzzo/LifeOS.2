@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.9.1 (fila superior v9: USER solo identidad, Stats sin duplicados, patrón --acc)
+/* RAW Entry — Overlay v.9.3 (COSMOS: nebulosa orgánica + motas ámbar cálidas)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1165,6 +1165,43 @@ function _crearDialOverlay(){
       }
     }
 
+    /* v9.3 — MOTAS ÁMBAR (lenguaje joseph-san): unas pocas partículas
+       DORADAS y CÁLIDAS flotando muy cerca de la cámara, subiendo lento
+       como polvo iluminado. El contraste de temperatura (ámbar cálido
+       sobre cosmos frío teal/violeta) da vida sin competir con las
+       estrellas. 22 motas = costo despreciable. */
+    var _motas = [];
+    (function(){
+      for(var i = 0; i < 22; i++){
+        _motas.push({
+          x: Math.random(), y: Math.random(),
+          vx: (Math.random() - 0.5) * 6, vy: -3 - Math.random() * 5,
+          r: 0.7 + Math.random() * 1.3,
+          ph: Math.random() * Math.PI * 2,
+          tw: 0.4 + Math.random() * 0.8,
+          prof: 1.15 + Math.random() * 0.5
+        });
+      }
+    })();
+    function _motasDibujar(dt){
+      for(var i = 0; i < _motas.length; i++){
+        var m = _motas[i];
+        m.x += (m.vx * dt) / W; m.y += (m.vy * dt) / H;
+        m.ph += m.tw * dt;
+        if(m.y < -0.02){ m.y = 1.02; m.x = Math.random(); }
+        if(m.x < -0.02) m.x = 1.02; else if(m.x > 1.02) m.x = -0.02;
+        var px = m.x * W + _camGX * (m.prof - 0.85);
+        var py = m.y * H + _camGY * (m.prof - 0.85);
+        var a = 0.16 + 0.22 * (Math.sin(m.ph) + 1) / 2;
+        pctx.fillStyle = 'rgba(252,211,77,' + a.toFixed(2) + ')';
+        pctx.beginPath(); pctx.arc(px, py, m.r, 0, 6.2832); pctx.fill();
+        if(m.r > 1.6){
+          pctx.fillStyle = 'rgba(245,158,11,' + (a * 0.25).toFixed(2) + ')';
+          pctx.beginPath(); pctx.arc(px, py, m.r * 2.6, 0, 6.2832); pctx.fill();
+        }
+      }
+    }
+
     /* v8.19 — CÁMARA VIRTUAL · smooth parallax / camera movement.
        Una "cámara" con dos ejes (camX, camY) en rango ~[-1,1]. El TARGET lo
        fija el mouse (escritorio) o el giroscopio (móvil); el valor CURRENT
@@ -1337,12 +1374,29 @@ function _crearDialOverlay(){
       }
     }
 
+    var _nebT = 0;
     function updateNebula(dt){
-      nebulaBlobs.forEach(function(b){
-        b.x += b.vx * dt;
-        b.y += b.vy * dt;
-        if(b.x < 0 || b.x > W) b.vx *= -1;
-        if(b.y < 0 || b.y > H) b.vy *= -1;
+      // v9.3 — DRIFT ORGÁNICO: antes los blobs rebotaban en los bordes
+      // (vx *= -1, ping-pong mecánico). Ahora cada blob oscila alrededor
+      // de un ancla con DOS ondas de frecuencias no armónicas (pseudo-ruido
+      // suave y barato) y el ancla deriva lentísimo con wrap continuo.
+      // El brillo estelar que modula la nebulosa ahora "respira" orgánico.
+      _nebT += dt;
+      nebulaBlobs.forEach(function(b, i){
+        if(b._of1 === undefined){
+          b._ax = b.x; b._ay = b.y;
+          b._of1 = 0.05 + (i % 5) * 0.013;
+          b._of2 = 0.083 + (i % 7) * 0.011;
+          b._oa1 = 30 + (i % 4) * 18;
+          b._oa2 = 22 + (i % 3) * 14;
+          b._ph1 = i * 2.399; b._ph2 = i * 1.713;
+        }
+        b._ax += b.vx * dt * 0.4;
+        b._ay += b.vy * dt * 0.4;
+        if(b._ax < -80) b._ax = W + 80; else if(b._ax > W + 80) b._ax = -80;
+        if(b._ay < -80) b._ay = H + 80; else if(b._ay > H + 80) b._ay = -80;
+        b.x = b._ax + Math.sin(_nebT * b._of1 + b._ph1) * b._oa1;
+        b.y = b._ay + Math.sin(_nebT * b._of2 + b._ph2) * b._oa2;
         b.phase += dt * 0.3;
       });
     }
@@ -3049,6 +3103,7 @@ function _crearDialOverlay(){
 
       // 10) Estrellas
       drawStars(dt);
+      _motasDibujar(dt);
       if(_ondas.length) _ondasDibujar();
 
       // 10b) v5.201: HALOS LEJANOS (objetos cósmicos con aro)
@@ -3792,23 +3847,13 @@ function _crearDialOverlay(){
       // El resto del panel (.hud-sim-content con las 9 needs del Sim) se
       // conserva intacto. El listener de click sobre #hud-megatabs queda
       // inerte porque el elemento está oculto.
-      '.hud-megatabs{display:none !important}',
-      '.hud-megatab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;'+
-        'padding:4px 6px;border-radius:8px 8px 0 0;background:transparent;border:1px solid transparent;border-bottom:0;'+
-        'cursor:pointer;font-family:inherit;font-weight:800;font-size:8.5px;letter-spacing:.08em;text-transform:uppercase;'+
-        'color:rgba(220,224,235,0.55);transition:all .18s;flex:1;min-width:0;position:relative;top:1px}',
-      '.hud-megatab i{font-size:11px;color:rgba(220,224,235,0.65);transition:color .18s}',
-      '.hud-megatab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}',
-      '.hud-megatab:hover{background:rgba(255,255,255,0.04);color:rgba(220,224,235,0.85)}',
-      '.hud-megatab:hover i{color:var(--tc)}',
-      '.hud-megatab.active{background:var(--tc-bg);border-color:var(--tc-bd);'+
-        'box-shadow:0 -2px 12px var(--tc-glow),inset 0 -2px 0 var(--tc);color:var(--tc);text-shadow:0 0 6px var(--tc-glow)}',
-      '.hud-megatab.active i{color:var(--tc);filter:drop-shadow(0 0 4px var(--tc))}',
+      // v9.1 — CSS de megatabs RETIRADO (código muerto: siempre ocultos)
       '.hud-sim-content{padding:0}',
       // v5.117: header inline + grid en misma fila horizontal
       '.hud-sim-row-compact{display:flex;align-items:center;gap:10px;padding:4px 12px 4px}',
       '.hud-sim-h-inline{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:0;border-right:1px solid rgba(255,255,255,0.08);padding-right:10px;min-height:32px}',
-      '.hud-sim-h-inline i{font-size:12px;flex-shrink:0}',
+      '.hud-sim-h-inline i{font-size:12px;flex-shrink:0;color:var(--acc,#A78BFA);filter:drop-shadow(0 0 4px var(--acc,#A78BFA))}',
+      '.hud-sim-h-txt .t{color:var(--acc,#A78BFA)}',
       '.hud-sim-h-txt{display:flex;flex-direction:column;gap:1px;min-width:0}',
       '.hud-sim-h-txt .t{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;text-shadow:0 0 8px rgba(167,139,250,0.40);white-space:nowrap}',
       '.hud-sim-h-txt .meta{font-size:7.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.45);white-space:nowrap}',
@@ -4081,42 +4126,18 @@ function _crearDialOverlay(){
   _pSim.classList.add('hud-pnl');
   _pSim.style.animationDelay = '0.4s';
   _pSim.style.borderRadius = '14px';
-
-  // Definición de tabs (botones del Hero + ESTADO DEL SIM como tab activo por defecto)
-  var _SIM_TABS = [
-    {id:'sim',       label:'Estado del Sim', icon:'fa-heart-pulse',  color:'#A78BFA', target:null},
-    {id:'home',      label:'Home',           icon:'fa-house',        color:'#94A3B8', target:'volverAlAnverso'},
-    {id:'logros',    label:'Logros',         icon:'fa-trophy',       color:'#FACC15', target:'irALogros'},
-    {id:'bitacora',  label:'Bitácora',       icon:'fa-book-open',    color:'#C084FC', target:'irABitacora'},
-    {id:'activity',  label:'Activity',       icon:'fa-bolt',         color:'#FB923C', target:'irAActivity'},
-    {id:'sos',       label:'SOS',            icon:'fa-circle-exclamation', color:'#EF4444', target:'activarSOS'},
-    {id:'nutricion', label:'Nutrición',      icon:'fa-leaf',         color:'#4ADE80', target:'irANutricion'},
-    {id:'raw',       label:'RAW',            icon:'fa-table',        color:'#A5B4FC', target:'irASheets'},
-    {id:'refresh',   label:'Actualizar',     icon:'fa-rotate-right', color:'#94A3B8', target:'refreshTodo'},
-  ];
-
+  // v9.1 — LIMPIEZA: los "megatabs" se RETIRAN por completo. Eran código
+  // muerto: se construían, registraban listeners… y estaban ocultos por
+  // CSS (display:none !important) desde que llegó la navegación por
+  // niveles. La card del Sim queda con su único propósito real: las
+  // 9 needs con su header, en el sistema --acc.
   document.getElementById('hud-sim-band-inner').innerHTML =
-    // Renglón 1: tabs horizontales
-    '<div class="hud-megatabs" id="hud-megatabs">'+
-      _SIM_TABS.map(function(t, idx){
-        var active = (t.id === 'sim') ? ' active' : '';
-        return '<button class="hud-megatab'+active+'" '+
-          'data-tab-id="'+t.id+'" '+
-          'data-tab-target="'+(t.target||'')+'" '+
-          'style="--tc:'+t.color+';--tc-bg:'+_rgba(t.color,0.12)+';--tc-bd:'+_rgba(t.color,0.40)+';--tc-glow:'+_rgba(t.color,0.30)+'">'+
-            '<i class="fas '+t.icon+'"></i>'+
-            '<span>'+t.label+'</span>'+
-        '</button>';
-      }).join('')+
-    '</div>'+
-    // Renglón 2: contenido del tab activo (por defecto Sim)
-    // v5.117: header inline + needs grid en MISMA fila horizontal para reducir altura
-    '<div class="hud-sim-content">'+
+    '<div class="hud-sim-content" style="--acc:#A78BFA">'+
       '<div class="hud-sim-row-compact">'+
         '<div class="hud-sim-h-inline">'+
-          '<i class="fas fa-heart-pulse" style="color:#A78BFA;filter:drop-shadow(0 0 4px '+_rgba('#A78BFA',0.55)+')"></i>'+
+          '<i class="fas fa-heart-pulse"></i>'+
           '<div class="hud-sim-h-txt">'+
-            '<span class="t" style="color:#A78BFA">Estado del Sim</span>'+
+            '<span class="t">Estado del Sim</span>'+
             '<span class="meta">9 needs</span>'+
           '</div>'+
         '</div>'+
@@ -4125,31 +4146,6 @@ function _crearDialOverlay(){
     '</div>';
   if(typeof renderSimsBandSimsStyle === 'function') renderSimsBandSimsStyle('hud-sim-band-grid');
 
-  // Listeners de los tabs
-  // v7.060 — en móvil hud-megatabs no existe (las cards son shells vacíos)
-  var _megaTabs = document.getElementById('hud-megatabs');
-  if(_megaTabs) _megaTabs.addEventListener('click', function(e){
-    var tab = e.target.closest('.hud-megatab');
-    if(!tab) return;
-    var id = tab.dataset.tabId;
-    var target = tab.dataset.tabTarget;
-    if(id === 'sim'){
-      document.querySelectorAll('.hud-megatab').forEach(function(t){ t.classList.remove('active'); });
-      tab.classList.add('active');
-      return;
-    }
-    // P-3c: Otros tabs → cerrar dial con fade-out, LUEGO navegar.
-    if(target && typeof window[target] === 'function'){
-      // Cerrar el dial primero con su animación
-      if(typeof cerrarDial === 'function') cerrarDial();
-      // Esperar el fade-out (~290ms) y entonces navegar
-      setTimeout(function(){
-        try { window[target](); } catch(e){}
-      }, 300);
-    }
-  });
-
-  // ── _pStats (top-right): Energía / Racha / Créditos en 3 cells ──
   var _pStats = _mkFloatPanel('hud-stats','#FBBF24','rgba(251,191,36,0.15)');
   document.body.appendChild(_pStats);
   _pStats.classList.add('hud-pnl');
