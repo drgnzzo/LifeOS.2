@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.8.44 (count-up + microcopy centrado + vigilante de expansión)
+/* RAW Entry — Overlay v.9.0 (CARDS v9: sistema --acc unificado, jerarquía nueva, cero inline disperso)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -3858,24 +3858,30 @@ function _crearDialOverlay(){
       '.hud-stats-sep{width:1px;height:18px;background:rgba(255,255,255,0.10);flex-shrink:0}',
       // bottom cards (mision, logro, nivel)
       // v5.117: bottom cards compactas (padding 13px→9px, ico 42→34)
-      '.hud-card{display:flex;align-items:center;gap:10px;padding:8px 12px}',
-      '.hud-card-ico{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:9px}',
-      '.hud-card-ico-hex{width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%)}',
-      '.hud-card-ico-hex span{font-size:13px;font-weight:800;color:#fff}',
-      '.hud-card-ico i{font-size:14px}',
-      '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}',
-      '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:6px}',
-      // v5.192: letter-spacing .14->.05em + nowrap. "NIVEL SIGUIENTE" /
-      // "MISION DIARIA" caben sin apretar y nunca rompen a 2 lineas.
-      '.hud-card-l{font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;white-space:nowrap}',
-      '.hud-card-r{font-size:10.5px;font-weight:800;font-family:JetBrains Mono,monospace;white-space:nowrap}',
-      // v5.192: fuente 10.5->9.5px para que subtitulos largos
-      // ("Completa 3 habitos hoy", "Recompensas desbloqueadas") quepan
-      // completos en la card. Ellipsis se conserva como red de seguridad.
-      '.hud-card-sub{font-size:9.5px;font-weight:600;color:rgba(220,224,235,0.62);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-      '.hud-card-bar{height:5px;background:rgba(255,255,255,0.10);border-radius:999px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);box-shadow:inset 0 1px 2px rgba(0,0,0,0.40)}',
-      '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s ease;min-width:1px}',
-      '.hud-card-end{font-size:10px;font-weight:800;letter-spacing:.06em;flex-shrink:0;font-family:JetBrains Mono,monospace;white-space:nowrap}',
+      /* ══ SISTEMA DE CARDS v9 — patrón --acc ═══════════════════════
+         Cada card declara UNA variable --acc (su acento) en su raíz y
+         TODO deriva de ella: icono, valores, barras. Jerarquía clara:
+         label discreto → valor prominente (mono) → sub tenue. */
+      '.hud-card{display:flex;align-items:center;gap:12px;padding:10px 14px;--acc:#A78BFA}',
+      '.hud-card-ico,.hud-card-ico-hex{width:36px;height:36px;display:flex;align-items:center;justify-content:center;flex-shrink:0;'+
+        'background:radial-gradient(circle at 38% 30%,color-mix(in srgb,var(--acc) 24%,transparent),color-mix(in srgb,var(--acc) 6%,transparent));'+
+        'border:1px solid color-mix(in srgb,var(--acc) 55%,transparent);'+
+        'box-shadow:0 0 14px color-mix(in srgb,var(--acc) 25%,transparent),inset 0 1px 0 color-mix(in srgb,var(--acc) 30%,transparent)}',
+      '.hud-card-ico{border-radius:10px}',
+      '.hud-card-ico-hex{clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);border-radius:0}',
+      '.hud-card-ico i{font-size:14px;color:var(--acc);filter:drop-shadow(0 0 5px var(--acc))}',
+      '.hud-card-ico-hex span{font-size:14px;font-weight:800;color:#fff;font-family:JetBrains Mono,monospace;text-shadow:0 0 8px var(--acc)}',
+      '.hud-card-c{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}',
+      '.hud-card-h{display:flex;align-items:center;justify-content:space-between;gap:8px}',
+      // Label: discreto, SIN color de acento (el acento va en valores/iconos)
+      '.hud-card-l{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;color:rgba(220,224,235,0.50)}',
+      // Valor: mono, prominente, CON el acento
+      '.hud-card-r{font-size:11.5px;font-weight:800;font-family:JetBrains Mono,monospace;font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--acc)}',
+      '.hud-card-sub{font-size:10px;font-weight:500;color:rgba(220,224,235,0.55);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+      '.hud-card-bar{height:4px;background:rgba(255,255,255,0.08);border-radius:999px;overflow:hidden;box-shadow:inset 0 1px 2px rgba(0,0,0,0.45)}',
+      '.hud-card-bar > div{height:100%;width:0;border-radius:999px;transition:width .8s cubic-bezier(.2,0,0,1);min-width:1px;'+
+        'background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 75%,transparent),var(--acc));box-shadow:0 0 6px color-mix(in srgb,var(--acc) 50%,transparent)}',
+      '.hud-card-end{font-size:10.5px;font-weight:800;letter-spacing:.04em;flex-shrink:0;font-family:JetBrains Mono,monospace;white-space:nowrap;color:var(--acc);text-shadow:0 0 6px color-mix(in srgb,var(--acc) 40%,transparent)}',
       // track
       '.hud-track{display:flex;align-items:center;gap:18px;padding:14px 20px;height:100%;box-sizing:border-box}',
       '.hud-track-cur{display:flex;align-items:center;gap:10px;flex-shrink:0}',
@@ -4346,22 +4352,19 @@ function _crearDialOverlay(){
   _pTrack.classList.add('hud-pnl');
   _pTrack.style.animationDelay = '1.0s';
   _pTrack.style.borderRadius = '14px';
-  // Track con más contraste: borde más sólido + glow ambiental visible
-  _pTrack.style.border = '1.5px solid rgba(167,139,250,0.55)';
-  _pTrack.style.boxShadow = '0 8px 32px rgba(0,0,0,0.65),0 0 28px rgba(167,139,250,0.30),inset 0 1px 0 rgba(167,139,250,0.40)';
+  // v9.0 — los overrides inline de border/boxShadow se RETIRAN: pisaban el
+  // material v2 (bisel+elevación). El material del sistema manda.
   document.getElementById('hud-track-inner').innerHTML =
-    '<div class="hud-card">'+
-      '<div class="hud-card-ico-hex" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 16px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
-        '<span id="_hud-track-nivel">1</span>'+
-      '</div>'+
+    '<div class="hud-card" style="--acc:#A78BFA">'+
+      '<div class="hud-card-ico-hex"><span id="_hud-track-nivel">1</span></div>'+
       '<div class="hud-card-c">'+
         '<div class="hud-card-h">'+
-          '<span class="hud-card-l" style="color:#A78BFA;text-shadow:0 0 6px '+_rgba('#A78BFA',0.40)+'">Nivel actual</span>'+
-          '<span id="_hud-track-xp" class="hud-card-r" style="color:#A78BFA">0 / 1,000 XP</span>'+
+          '<span class="hud-card-l">Nivel actual</span>'+
+          '<span id="_hud-track-xp" class="hud-card-r">0 / 1,000 XP</span>'+
         '</div>'+
         '<div id="_hud-track-stops" class="hud-track-stops-inline"></div>'+
       '</div>'+
-      '<span class="hud-card-end" style="color:#A78BFA;text-shadow:0 0 6px '+_rgba('#A78BFA',0.40)+'"><i class="fas fa-trophy"></i></span>'+
+      '<span class="hud-card-end"><i class="fas fa-trophy"></i></span>'+
     '</div>';
 
   // ── _pMision: Misión Diaria (bottom-left) ──
@@ -4371,19 +4374,17 @@ function _crearDialOverlay(){
   _pMision.style.animationDelay = '1.4s';
   _pMision.style.borderRadius = '14px';
   document.getElementById('hud-mision-inner').innerHTML =
-    '<div class="hud-card">'+
-      '<div class="hud-card-ico" style="background:'+_rgba('#22D3EE',0.14)+';border:1px solid '+_rgba('#22D3EE',0.45)+';box-shadow:0 0 12px '+_rgba('#22D3EE',0.30)+'">'+
-        '<i class="fas fa-bullseye" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
-      '</div>'+
+    '<div class="hud-card" style="--acc:#22D3EE">'+
+      '<div class="hud-card-ico"><i class="fas fa-bullseye"></i></div>'+
       '<div class="hud-card-c">'+
         '<div class="hud-card-h">'+
-          '<span class="hud-card-l" style="color:#22D3EE;text-shadow:0 0 6px '+_rgba('#22D3EE',0.40)+'">Misión Diaria</span>'+
-          '<span id="_hud-mision-progreso" class="hud-card-r" style="color:#22D3EE">0/3</span>'+
+          '<span class="hud-card-l">Misión Diaria</span>'+
+          '<span id="_hud-mision-progreso" class="hud-card-r">0/3</span>'+
         '</div>'+
         '<span id="_hud-mision-label" class="hud-card-sub">Completa 3 hábitos hoy</span>'+
-        '<div class="hud-card-bar"><div id="_hud-mision-bar" style="background:linear-gradient(90deg,#22D3EE,#67E8F9);box-shadow:0 0 6px '+_rgba('#22D3EE',0.55)+'"></div></div>'+
+        '<div class="hud-card-bar"><div id="_hud-mision-bar"></div></div>'+
       '</div>'+
-      '<span id="_hud-mision-recompensa" class="hud-card-end" style="color:#FACC15;text-shadow:0 0 6px '+_rgba('#FACC15',0.40)+'">+50 XP</span>'+
+      '<span id="_hud-mision-recompensa" class="hud-card-end" style="--acc:#FACC15">+50 XP</span>'+
     '</div>';
 
   // ── _pLogro: Logro Reciente (bottom-center) ──
@@ -4393,17 +4394,15 @@ function _crearDialOverlay(){
   _pLogro.style.animationDelay = '1.7s';
   _pLogro.style.borderRadius = '14px';
   document.getElementById('hud-logro-inner').innerHTML =
-    '<div class="hud-card">'+
-      '<div class="hud-card-ico" style="background:'+_rgba('#FACC15',0.14)+';border:1px solid '+_rgba('#FACC15',0.45)+';box-shadow:0 0 12px '+_rgba('#FACC15',0.30)+'">'+
-        '<i class="fas fa-star" style="color:#FACC15;filter:drop-shadow(0 0 4px #FACC15)"></i>'+
-      '</div>'+
+    '<div class="hud-card" style="--acc:#FACC15">'+
+      '<div class="hud-card-ico"><i class="fas fa-star"></i></div>'+
       '<div class="hud-card-c">'+
         '<div class="hud-card-h">'+
-          '<span class="hud-card-l" style="color:#FACC15;text-shadow:0 0 6px '+_rgba('#FACC15',0.40)+'">Logro reciente</span>'+
-          '<span id="_hud-logro-pct" class="hud-card-r" style="color:#FACC15">0%</span>'+
+          '<span class="hud-card-l">Logro reciente</span>'+
+          '<span id="_hud-logro-pct" class="hud-card-r">0%</span>'+
         '</div>'+
         '<span id="_hud-logro-titulo" class="hud-card-sub">—</span>'+
-        '<div class="hud-card-bar"><div id="_hud-logro-bar" style="background:linear-gradient(90deg,#FACC15,#FCD34D);box-shadow:0 0 6px '+_rgba('#FACC15',0.55)+'"></div></div>'+
+        '<div class="hud-card-bar"><div id="_hud-logro-bar"></div></div>'+
       '</div>'+
     '</div>';
 
@@ -4414,20 +4413,18 @@ function _crearDialOverlay(){
   _pNivel.style.animationDelay = '2.0s';
   _pNivel.style.borderRadius = '14px';
   document.getElementById('hud-nivel-inner').innerHTML =
-    '<div class="hud-card">'+
-      '<div class="hud-card-ico-hex" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 14px '+_rgba('#A78BFA',0.45)+',inset 0 0 8px '+_rgba('#A78BFA',0.18)+'">'+
-        '<span id="_hud-nivel-num">2</span>'+
-      '</div>'+
+    '<div class="hud-card" style="--acc:#A78BFA">'+
+      '<div class="hud-card-ico-hex"><span id="_hud-nivel-num">2</span></div>'+
       '<div class="hud-card-c">'+
-        '<span class="hud-card-l" style="color:#A78BFA;text-shadow:0 0 6px '+_rgba('#A78BFA',0.40)+'">Nivel siguiente</span>'+
-        '<div style="display:flex;align-items:baseline;gap:8px;font-family:JetBrains Mono,monospace">'+
-          '<span id="_hud-nivel-xp" style="font-size:13px;font-weight:800;color:#A78BFA;text-shadow:0 0 8px '+_rgba('#A78BFA',0.45)+'">+1,000 XP</span>'+
-          '<span style="color:rgba(255,255,255,0.18)">|</span>'+
-          '<span id="_hud-nivel-bonus" style="font-size:12px;font-weight:700;color:#22D3EE;text-shadow:0 0 6px '+_rgba('#22D3EE',0.40)+'">+$250</span>'+
+        '<span class="hud-card-l">Nivel siguiente</span>'+
+        '<div style="display:flex;align-items:baseline;gap:8px">'+
+          '<span id="_hud-nivel-xp" class="hud-card-r" style="font-size:13px">+1,000 XP</span>'+
+          '<span style="color:rgba(255,255,255,0.16)">|</span>'+
+          '<span id="_hud-nivel-bonus" class="hud-card-r" style="--acc:#22D3EE;font-size:12px">+$250</span>'+
         '</div>'+
-        '<span class="hud-card-sub" style="font-size:10px;color:rgba(220,224,235,0.50)">Recompensas desbloqueadas</span>'+
+        '<span class="hud-card-sub">Recompensas desbloqueadas</span>'+
       '</div>'+
-      '<i class="fas fa-gift" style="font-size:20px;color:#A78BFA;flex-shrink:0;filter:drop-shadow(0 0 6px '+_rgba('#A78BFA',0.55)+')"></i>'+
+      '<i class="fas fa-gift" style="font-size:18px;color:var(--acc,#A78BFA);flex-shrink:0;filter:drop-shadow(0 0 6px rgba(167,139,250,0.5))"></i>'+
     '</div>';
 
   _pUser._side='top-left';     _pUser._order=0;
