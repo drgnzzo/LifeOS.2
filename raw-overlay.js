@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.9.0 (CARDS v9: sistema --acc unificado, jerarquía nueva, cero inline disperso)
+/* RAW Entry — Overlay v.9.1 (fila superior v9: USER solo identidad, Stats sin duplicados, patrón --acc)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -3831,10 +3831,8 @@ function _crearDialOverlay(){
       '.hud-stats-l{font-size:7.5px;font-weight:800;letter-spacing:.10em;text-transform:uppercase;color:rgba(220,224,235,0.45)}',
       // ── RIBBON STYLES (v5.115): USER y Stats en una sola fila compacta ──
       // ── STACK (v5.116): USER+Stats fusionados en _pUser (2 renglones) ──
-      '.hud-user-stack{display:flex;flex-direction:column;height:100%;box-sizing:border-box}',
-      '.hud-user-stack > .hud-user-ribbon, .hud-user-stack > .hud-stats-ribbon{flex:1;min-height:0}',
-      '.hud-user-stack-sep{height:1px;background:rgba(255,255,255,0.06);margin:0 12px;flex-shrink:0}',
-      '.hud-user-ribbon{display:flex;align-items:center;gap:8px;padding:8px 12px;height:100%;box-sizing:border-box;min-height:0}',
+      // v9.0 — _pUser de un solo renglón (identidad+XP), centrado vertical.
+      '.hud-user-solo{display:flex;align-items:center;gap:10px;padding:10px 14px;height:100%;box-sizing:border-box}',
       '.hud-user-av-sm{width:22px;height:22px;display:flex;align-items:center;justify-content:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);flex-shrink:0}',
       '.hud-user-name-sm{font-size:12px;font-weight:800;letter-spacing:.06em;color:#fff;flex-shrink:0}',
       '.hud-user-niv-sm{font-size:9px;font-weight:700;color:rgba(167,139,250,0.85);letter-spacing:.05em;background:rgba(167,139,250,0.14);border:1px solid rgba(167,139,250,0.40);padding:2px 6px;border-radius:4px;flex-shrink:0}',
@@ -3843,15 +3841,16 @@ function _crearDialOverlay(){
       '.hud-user-bar-sm > div{height:100%;border-radius:999px;transition:width .8s ease}',
       '.hud-user-xp-sm{font-size:9px;font-weight:700;color:rgba(220,224,235,0.65);font-family:JetBrains Mono,monospace;white-space:nowrap;flex-shrink:0}',
       '.hud-stats-ribbon{display:flex;align-items:center;justify-content:space-around;gap:6px;padding:8px 12px;height:100%;box-sizing:border-box;min-height:0}',
-      '.hud-stats-cell-sm{display:flex;align-items:center;gap:6px;min-width:0;flex:1;justify-content:center}',
-      '.hud-stats-cell-sm i{font-size:12px;flex-shrink:0}',
+      '.hud-stats-cell-sm{display:flex;align-items:center;gap:7px;min-width:0;flex:1;justify-content:center;--acc:#FBBF24}',
+      '.hud-stats-cell-sm i{font-size:12px;flex-shrink:0;color:var(--acc);filter:drop-shadow(0 0 4px var(--acc))}',
+      '.hud-stats-cell-sm .hud-stats-v-sm{color:var(--acc)}',
       // v5.216 — botón "Abrir Sheet" del topBar.
       '.hud-sheet-btn{display:flex;align-items:center;gap:6px;flex-shrink:0;cursor:pointer;'+
         'background:rgba(74,222,128,0.08);border:1px solid rgba(74,222,128,0.28);'+
         'border-radius:8px;padding:5px 10px;transition:all 160ms;font-family:inherit}',
       '.hud-sheet-btn:hover{background:rgba(74,222,128,0.16);border-color:rgba(74,222,128,0.5);'+
         'box-shadow:0 0 10px rgba(74,222,128,0.25)}',
-      '.hud-sheet-btn i{font-size:12px;flex-shrink:0}',
+      '.hud-sheet-btn i{font-size:12px;flex-shrink:0;color:#4ADE80;filter:drop-shadow(0 0 4px #4ADE80)}',
       '.hud-stats-v-sm{font-size:13px;font-weight:800;line-height:1;font-family:JetBrains Mono,monospace;white-space:nowrap;flex-shrink:0}',
       '.hud-stats-v-sm .max{opacity:.45;font-weight:700;font-size:8px;margin-left:1px}',
       '.hud-stats-l-sm{font-size:7.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(220,224,235,0.50);white-space:nowrap;flex-shrink:0}',
@@ -4059,49 +4058,18 @@ function _crearDialOverlay(){
   _pUser.classList.add('hud-pnl');
   _pUser.style.animationDelay = '0s';
   _pUser.style.borderRadius = '14px';
+  // v9.0 — _pUser: SOLO identidad + progresión. El ribbon de stats que
+  // vivía aquí DUPLICABA _pStats (con los mismos IDs repetidos en el DOM,
+  // dejando uno muerto). Ahora cada card tiene un propósito único.
   document.getElementById('hud-user-inner').innerHTML =
-    '<div class="hud-user-stack">'+
-      // RENGLÓN 1: USER ribbon
-      '<div class="hud-user-ribbon">'+
-        '<div class="hud-user-av-sm" style="background:radial-gradient(circle,'+_rgba('#A78BFA',0.22)+','+_rgba('#A78BFA',0.05)+');border:1.5px solid #A78BFA;box-shadow:0 0 12px '+_rgba('#A78BFA',0.45)+',inset 0 0 6px '+_rgba('#A78BFA',0.18)+'">'+
-          '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 6px #A78BFA;font-size:11px"></i>'+
-        '</div>'+
-        '<span class="hud-user-name-sm">USER</span>'+
-        '<span class="hud-user-niv-sm">Nv<span id="_hud-user-nivel">1</span></span>'+
-        '<div class="hud-user-bar-sm"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,#A78BFA,#C084FC);box-shadow:0 0 6px '+_rgba('#A78BFA',0.55)+'"></div></div>'+
-        '<span class="hud-user-xp-sm" id="_hud-user-xp">0/1,000</span>'+
+    '<div class="hud-user-solo" style="--acc:#A78BFA">'+
+      '<div class="hud-user-av-sm" style="background:radial-gradient(circle at 38% 30%,color-mix(in srgb,var(--acc) 24%,transparent),color-mix(in srgb,var(--acc) 6%,transparent));border:1.5px solid var(--acc);box-shadow:0 0 12px color-mix(in srgb,var(--acc) 40%,transparent)">'+
+        '<i class="fas fa-user" style="color:#fff;text-shadow:0 0 6px var(--acc);font-size:11px"></i>'+
       '</div>'+
-      // SEPARADOR
-      '<div class="hud-user-stack-sep"></div>'+
-      // RENGLÓN 2: Stats ribbon (Energía / Racha / Créditos)
-      '<div class="hud-stats-ribbon">'+
-        '<div class="hud-stats-cell-sm">'+
-          '<i class="fas fa-bolt" style="color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
-          '<span class="hud-stats-v-sm" style="color:#FBBF24"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
-          '<span class="hud-stats-l-sm">Energía</span>'+
-        '</div>'+
-        '<div class="hud-stats-sep"></div>'+
-        '<div class="hud-stats-cell-sm">'+
-          '<i class="fas fa-fire" style="color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
-          '<span class="hud-stats-v-sm" style="color:#FB923C"><span id="_hud-racha-dias">—</span><span class="max">d</span></span>'+
-          '<span class="hud-stats-l-sm">Racha</span>'+
-        '</div>'+
-        '<div class="hud-stats-sep"></div>'+
-        '<div class="hud-stats-cell-sm">'+
-          '<i class="fas fa-gem" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
-          '<span id="_hud-creditos" class="hud-stats-v-sm" style="color:#22D3EE">—</span>'+
-          '<span class="hud-stats-l-sm">Créditos</span>'+
-        '</div>'+
-        '<div class="hud-stats-sep"></div>'+
-        // v5.216 — botón directo al Google Sheet. Abre la hoja en pestaña
-        // nueva, fuera de la web. Usa irASheet() de raw-core.js (que ya
-        // tiene la URL real con fallback).
-        '<button class="hud-sheet-btn" title="Abrir el Google Sheet directamente" '+
-          'onclick="if(typeof irASheet===&quot;function&quot;){irASheet();}else{window.open(&quot;https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit&quot;,&quot;_blank&quot;);}">'+
-          '<i class="fas fa-table-cells" style="color:#4ADE80;filter:drop-shadow(0 0 4px #4ADE80)"></i>'+
-          '<span class="hud-stats-l-sm" style="color:#4ADE80">Sheet</span>'+
-        '</button>'+
-      '</div>'+
+      '<span class="hud-user-name-sm">USER</span>'+
+      '<span class="hud-user-niv-sm">Nv<span id="_hud-user-nivel">1</span></span>'+
+      '<div class="hud-user-bar-sm"><div id="_hud-user-xpbar" style="background:linear-gradient(90deg,color-mix(in srgb,var(--acc) 80%,transparent),var(--acc));box-shadow:0 0 6px color-mix(in srgb,var(--acc) 50%,transparent)"></div></div>'+
+      '<span class="hud-user-xp-sm" id="_hud-user-xp">0/1,000</span>'+
     '</div>';
 
   // ── _pSim (top-center): MEGA-CARD con 2 renglones ──
@@ -4187,28 +4155,32 @@ function _crearDialOverlay(){
   _pStats.classList.add('hud-pnl');
   _pStats.style.animationDelay = '0.8s';
   _pStats.style.borderRadius = '14px';
+  // v9.0 — celdas con el patrón --acc + el botón Sheet vive aquí.
   document.getElementById('hud-stats-inner').innerHTML =
     '<div class="hud-stats-ribbon">'+
-      // Energía
-      '<div class="hud-stats-cell-sm">'+
-        '<i class="fas fa-bolt" style="color:#FBBF24;filter:drop-shadow(0 0 4px #FBBF24)"></i>'+
-        '<span class="hud-stats-v-sm" style="color:#FBBF24"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
+      '<div class="hud-stats-cell-sm" style="--acc:#FBBF24">'+
+        '<i class="fas fa-bolt"></i>'+
+        '<span class="hud-stats-v-sm"><span id="_hud-energia">—</span><span class="max">/100</span></span>'+
         '<span class="hud-stats-l-sm">Energía</span>'+
       '</div>'+
       '<div class="hud-stats-sep"></div>'+
-      // Racha
-      '<div class="hud-stats-cell-sm">'+
-        '<i class="fas fa-fire" style="color:#FB923C;filter:drop-shadow(0 0 4px #FB923C)"></i>'+
-        '<span class="hud-stats-v-sm" style="color:#FB923C"><span id="_hud-racha-dias">—</span><span class="max">d</span></span>'+
+      '<div class="hud-stats-cell-sm" style="--acc:#FB923C">'+
+        '<i class="fas fa-fire"></i>'+
+        '<span class="hud-stats-v-sm"><span id="_hud-racha-dias">—</span><span class="max">d</span></span>'+
         '<span class="hud-stats-l-sm">Racha</span>'+
       '</div>'+
       '<div class="hud-stats-sep"></div>'+
-      // Créditos
-      '<div class="hud-stats-cell-sm">'+
-        '<i class="fas fa-gem" style="color:#22D3EE;filter:drop-shadow(0 0 4px #22D3EE)"></i>'+
-        '<span id="_hud-creditos" class="hud-stats-v-sm" style="color:#22D3EE">—</span>'+
+      '<div class="hud-stats-cell-sm" style="--acc:#22D3EE">'+
+        '<i class="fas fa-gem"></i>'+
+        '<span id="_hud-creditos" class="hud-stats-v-sm">—</span>'+
         '<span class="hud-stats-l-sm">Créditos</span>'+
       '</div>'+
+      '<div class="hud-stats-sep"></div>'+
+      '<button class="hud-sheet-btn" title="Abrir el Google Sheet directamente" '+
+        'onclick="if(typeof irASheet===&quot;function&quot;){irASheet();}else{window.open(&quot;https://docs.google.com/spreadsheets/d/15T14Hb7tvmv24ZAaC3su1NRtDwVS6-dWbJGxQYUGP1o/edit&quot;,&quot;_blank&quot;);}">'+
+        '<i class="fas fa-table-cells"></i>'+
+        '<span class="hud-stats-l-sm" style="color:#4ADE80">Sheet</span>'+
+      '</button>'+
     '</div>';
 
   // ══════════════════════════════════════
