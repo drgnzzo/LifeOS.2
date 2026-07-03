@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.9.8 (id dial-canvas para transiciones diegéticas)
+/* RAW Entry — Overlay v.9.9 (director de transiciones: animaciones en TODO cambio de nivel)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -1307,6 +1307,34 @@ function _crearDialOverlay(){
       }
     });
     _ctrObs.observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
+
+    /* v9.9 — DIRECTOR DE TRANSICIONES: las animaciones diegéticas del dial
+       se disparan en CUALQUIER cambio de nivel (tabs, clics, scroll), no
+       solo cuando hay warp — antes estaban ancladas a niv-warp y la mayoría
+       de las rutas de navegación lo saltan. Clases de un solo uso que se
+       retiran al terminar (transform final = identidad, geometría limpia). */
+    var _nivPrev = 0;
+    function _nivelActual(){
+      var h = document.documentElement.classList;
+      if(h.contains('niv-2')) return 2;
+      if(h.contains('niv-1')) return 1;
+      return 0;
+    }
+    new MutationObserver(function(){
+      var n = _nivelActual();
+      if(n === _nivPrev) return;
+      var bajando = n > _nivPrev;
+      _nivPrev = n;
+      var cv = document.getElementById('dial-canvas');
+      if(!cv) return;
+      cv.classList.remove('dial-anim-down','dial-anim-up');
+      void cv.offsetWidth;   // reiniciar la animación
+      cv.classList.add(bajando ? 'dial-anim-down' : 'dial-anim-up');
+      cv.addEventListener('animationend', function fin(){
+        cv.classList.remove('dial-anim-down','dial-anim-up');
+        cv.removeEventListener('animationend', fin);
+      });
+    }).observe(document.documentElement, { attributes:true, attributeFilter:['class'] });
 
     /* v8.44 — MICROCOPY DE SISTEMA (lenguaje joseph-san): hint discreto
        en la esquina inferior derecha, contextual al nivel. Fuente mono,

@@ -3030,12 +3030,11 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
    está de frente. La conexión conceptual se VE. */
 @keyframes dialAbatir{
   0%  { transform:perspective(1100px) rotateX(0deg)   scale(1);    filter:none; }
-  45% { transform:perspective(1100px) rotateX(64deg)  scale(.82);  filter:brightness(1.5); }
+  45% { transform:perspective(1100px) rotateX(76deg)  scale(.74);  filter:brightness(1.9); }
   100%{ transform:perspective(1100px) rotateX(0deg)   scale(1);    filter:none; }
 }
-html.niv-warp.niv-1 #dial-canvas,
-html.niv-warp.niv-2 #dial-canvas{
-  animation:dialAbatir .95s cubic-bezier(.2,0,0,1) both;
+#dial-canvas.dial-anim-down{
+  animation:dialAbatir .9s cubic-bezier(.2,0,0,1) both;
   transform-origin:50% 60%;
 }
 /* 1→0 · EMERGER: el dial se levanta del plano de vuelta a vista cenital */
@@ -3043,8 +3042,8 @@ html.niv-warp.niv-2 #dial-canvas{
   0%  { transform:perspective(1100px) rotateX(-52deg) scale(.86); opacity:.4; filter:brightness(1.6); }
   100%{ transform:perspective(1100px) rotateX(0deg)   scale(1);   opacity:1;  filter:none; }
 }
-html.niv-warp.niv-0 #dial-canvas{
-  animation:dialEmerger .85s cubic-bezier(.2,0,0,1) both;
+#dial-canvas.dial-anim-up{
+  animation:dialEmerger .8s cubic-bezier(.2,0,0,1) both;
   transform-origin:50% 60%;
 }
 
@@ -3053,7 +3052,7 @@ html.niv-warp.niv-0 #dial-canvas{
    estaba la card central del anillo) mientras se enciende como
    proyección holográfica — flicker de encendido incluido. */
 @keyframes boardEmerge{
-  0%  { transform:scale(.90) translateY(14px); opacity:0; }
+  0%  { transform:scale(.82) translateY(26px); opacity:0; }
   38% { opacity:.85; }
   46% { opacity:.55; }   /* flicker de proyección encendiéndose */
   54% { opacity:.95; }
@@ -3061,7 +3060,7 @@ html.niv-warp.niv-0 #dial-canvas{
   100%{ transform:scale(1) translateY(0); opacity:1; }
 }
 html.niv-2 .board-face{
-  animation:boardEmerge .6s cubic-bezier(.2,0,0,1) both;
+  animation:boardEmerge .72s cubic-bezier(.2,0,0,1) both;
 }
 
 /* ── NIVEL 2 · TRATAMIENTO HOLOGRÁFICO (Iron Man / visor Prime) ────
