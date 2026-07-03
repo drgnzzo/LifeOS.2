@@ -1,4 +1,4 @@
-/* RAW Entry — Overlay v.9.6 (FIX: _textoEnArco al scope correcto — el dial vuelve)
+/* RAW Entry — Overlay v.9.8 (id dial-canvas para transiciones diegéticas)
    ───────────────────────────────────────────────────────────────────
    v7.119 — El sistema _GRID/_medirFilaTop que el handoff daba por hecho
    NUNCA estaba en este archivo (solo referencias muertas en raw-niveles).
@@ -930,6 +930,7 @@ function _crearDialOverlay(){
   _dialOverlay.id = 'dial-overlay';
 
   _dialCanvas = document.createElement('canvas');
+  _dialCanvas.id = 'dial-canvas';   // v9.8: ancla CSS para el pitch de camara
   _dialCanvas.width  = _DC.W;
   _dialCanvas.height = _DC.H;
   _dialCanvas.style.cssText = 'display:block;cursor:pointer;width:min(580px,40vw);height:min(580px,40vw);position:relative;pointer-events:auto;z-index:5';

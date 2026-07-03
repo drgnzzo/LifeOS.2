@@ -3012,3 +3012,75 @@ html:not(.mob).hud-listo .hud-pnl:nth-child(n+10) { transition-delay:.54s, .54s;
   background:linear-gradient(90deg,transparent 5%,rgba(213,224,255,0.09) 30%,rgba(213,224,255,0.09) 70%,transparent 95%);
   pointer-events:none;z-index:0;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TRANSICIONES DIEGÉTICAS (v9.8) — los elementos se TRANSFORMAN entre
+   niveles, no aparecen. Lenguaje Metroid Prime / Iron Man HUD.
+
+   Seguridad de geometría: las animaciones del dial empiezan Y TERMINAN
+   en transform identidad (0%→100% = none computado). El motor de layout
+   solo mide FUERA del warp (regla del sistema), y al terminar cada
+   animación no queda ningún transform residual que contamine medidas.
+═══════════════════════════════════════════════════════════════════ */
+
+/* ── 0→1 · EL DIAL SE ABATE (pitch de cámara) ─────────────────────
+   El dial ES el anillo visto desde arriba. Al bajar a nivel 1, la
+   "cámara" desciende al plano del anillo: el dial gira en X (se abate
+   hacia la horizontal), se hunde… y aterriza — donde el coverflow ya
+   está de frente. La conexión conceptual se VE. */
+@keyframes dialAbatir{
+  0%  { transform:perspective(1100px) rotateX(0deg)   scale(1);    filter:none; }
+  45% { transform:perspective(1100px) rotateX(64deg)  scale(.82);  filter:brightness(1.5); }
+  100%{ transform:perspective(1100px) rotateX(0deg)   scale(1);    filter:none; }
+}
+html.niv-warp.niv-1 #dial-canvas,
+html.niv-warp.niv-2 #dial-canvas{
+  animation:dialAbatir .95s cubic-bezier(.2,0,0,1) both;
+  transform-origin:50% 60%;
+}
+/* 1→0 · EMERGER: el dial se levanta del plano de vuelta a vista cenital */
+@keyframes dialEmerger{
+  0%  { transform:perspective(1100px) rotateX(-52deg) scale(.86); opacity:.4; filter:brightness(1.6); }
+  100%{ transform:perspective(1100px) rotateX(0deg)   scale(1);   opacity:1;  filter:none; }
+}
+html.niv-warp.niv-0 #dial-canvas{
+  animation:dialEmerger .85s cubic-bezier(.2,0,0,1) both;
+  transform-origin:50% 60%;
+}
+
+/* ── 1→2 · LA SECCIÓN EMERGE DE LA CARD ───────────────────────────
+   La pantalla completa no "aparece": crece desde el centro (donde
+   estaba la card central del anillo) mientras se enciende como
+   proyección holográfica — flicker de encendido incluido. */
+@keyframes boardEmerge{
+  0%  { transform:scale(.90) translateY(14px); opacity:0; }
+  38% { opacity:.85; }
+  46% { opacity:.55; }   /* flicker de proyección encendiéndose */
+  54% { opacity:.95; }
+  62% { opacity:.75; }
+  100%{ transform:scale(1) translateY(0); opacity:1; }
+}
+html.niv-2 .board-face{
+  animation:boardEmerge .6s cubic-bezier(.2,0,0,1) both;
+}
+
+/* ── NIVEL 2 · TRATAMIENTO HOLOGRÁFICO (Iron Man / visor Prime) ────
+   Las secciones son PROYECCIONES: scanlines CRT tenues barriendo todo
+   el plano + un barrido de luz diagonal al entrar. */
+html.niv-2 .app::after{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:400;
+  background:repeating-linear-gradient(0deg,
+    rgba(213,224,255,0.016) 0px, rgba(213,224,255,0.016) 1px,
+    transparent 1px, transparent 4px);
+  mix-blend-mode:screen;
+}
+@keyframes holoSweep{
+  0%  { transform:translateX(-130%) skewX(-18deg); }
+  100%{ transform:translateX(230%)  skewX(-18deg); }
+}
+html.niv-2 .app::before{
+  content:'';position:fixed;top:0;bottom:0;width:34vw;left:0;
+  pointer-events:none;z-index:401;
+  background:linear-gradient(90deg,transparent,rgba(167,139,250,0.05),rgba(213,224,255,0.07),rgba(167,139,250,0.05),transparent);
+  animation:holoSweep 1.1s cubic-bezier(.2,0,0,1) .15s both;
+}
