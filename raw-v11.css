@@ -1,0 +1,288 @@
+
+/* ═══════════════════════════════════════════════════════════════════
+   LifeOS v10 — CAPA 0d
+   FUENTE CANÓNICA: lifeos-v10-proto.html + spec literal del usuario.
+   · Nivel 1/2 = sistema de cards CSS DEL PROTO (350×450, PASO 34°,
+     holoIn/holoOut exactos, sec-lado, recal, cámara sin yaw).
+   · Three = lo que CSS no puede: esfera ÚNICA real (el hub ES su
+     casquete), dial 3D, morph gajo→card SOLO durante transición
+     (mesh y cards jamás coexisten visibles).
+   ═══════════════════════════════════════════════════════════════════ */
+:root{
+  --hud-bg-base:#020810;
+  --hud-panel-bg:rgba(10,7,22,.90);
+  --hud-form-bg:rgba(12,10,24,.97);
+  --hud-border:rgba(140,100,220,.20); --hud-border-hov:rgba(167,139,250,.40);
+  --hud-text:#f0f4f8; --hud-text-mid:rgba(220,220,240,.75);
+  --hud-text-dim:rgba(200,210,220,.45); --hud-text-faint:rgba(200,210,220,.25);
+  --font-ui:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Inter,Arial,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,"SF Mono",Menlo,monospace;
+  --fs-2xs:9px; --fs-sm:13px;
+  --fw-num:700; --fw-bold:800;
+  --ls-label:.12em; --ls-title:.06em;
+  --rad-card:8px; --rad-lg:12px;
+  --mat-bevel:inset 0 1px 0 rgba(255,255,255,.07),inset 0 -1px 0 rgba(0,0,0,.45),
+    inset 1px 0 0 rgba(255,255,255,.02),inset -1px 0 0 rgba(0,0,0,.18);
+  --mat-elev-1:0 2px 8px rgba(0,0,0,.45),0 8px 28px rgba(0,0,0,.35);
+  --mat-elev:0 4px 14px rgba(0,0,0,.5),0 16px 44px rgba(0,0,0,.42);
+  --glass:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.01) 30%,transparent 55%);
+  --ease:cubic-bezier(.2,0,0,1);
+  --acc:#A78BFA;
+}
+@keyframes hudCornerPulse{0%,100%{opacity:.45}50%{opacity:.95}}
+.hud-corners{position:relative}
+.hud-corners::before,.hud-corners::after{content:'';position:absolute;
+  width:8px;height:8px;pointer-events:none;z-index:2;
+  animation:hudCornerPulse 4s ease-in-out infinite}
+.hud-corners::before{top:0;left:0;
+  border-top:1.5px solid var(--pc-accent,var(--hud-border-hov));
+  border-left:1.5px solid var(--pc-accent,var(--hud-border-hov))}
+.hud-corners::after{bottom:0;right:0;
+  border-bottom:1.5px solid var(--pc-accent,var(--hud-border-hov));
+  border-right:1.5px solid var(--pc-accent,var(--hud-border-hov));
+  animation-delay:2s}
+
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:var(--hud-bg-base);
+  font-family:var(--font-ui);color:var(--hud-text)}
+#gl{position:fixed;inset:0;z-index:1;display:block}
+/* TELÓN de inmersión: en nivel 2 cubre el mundo 3D con fade —
+   solo existen la card y los rótulos (más robusto que transicionar
+   la opacidad del canvas WebGL, que el compositor congela) */
+#telon{position:fixed;inset:0;z-index:35;background:var(--hud-bg-base);
+  opacity:0;pointer-events:none;transition:opacity .5s var(--ease)}
+html.en-exp #telon{opacity:1}
+
+/* ── labels del dial (anclas proyectadas por Three, solo nivel 0) ── */
+#anclas{position:fixed;inset:0;z-index:8;pointer-events:none;overflow:hidden}
+.ancla{position:absolute;left:0;top:0;will-change:transform;pointer-events:none}
+.ancla-inner{transform:translate(-50%,-50%);display:flex;flex-direction:column;
+  align-items:center;gap:3px;text-align:center}
+.lbl .ico{font-size:21px;color:var(--c);filter:drop-shadow(0 0 9px var(--c))}
+.lbl .t{font-family:var(--font-mono);font-size:var(--fs-2xs);font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--hud-text-mid);
+  text-shadow:0 0 10px color-mix(in srgb,var(--c) 55%,transparent)}
+.lbl{transition:opacity .45s var(--ease)}
+#lbl-raw .t{font-family:var(--font-ui);font-size:19px;letter-spacing:.14em;
+  color:#C4B5FD;text-shadow:0 0 18px rgba(167,139,250,.8)}
+
+/* ═══ NIVEL 1 · CARRUSEL CSS — DEL PROTO, LITERAL ═══
+   #visor{perspective:1200px} · #mundo{translateZ(1100px)} (cámara fija,
+   JAMÁS gira yaw) · nodos: rotateY(rel*34°) translateZ(-780px)        */
+#visor{position:fixed;inset:0;z-index:10;perspective:1200px;perspective-origin:50% 50%;
+  pointer-events:none}
+#mundoCSS{position:absolute;left:50%;top:50%;transform-style:preserve-3d;
+  transform:translateZ(860px)}
+.nodo{position:absolute;left:-150px;top:-225px;width:300px;height:450px;
+  transform-style:preserve-3d;cursor:pointer;
+  transition:opacity .45s var(--ease),transform .85s var(--ease)}
+html:not(.en-anillo) .nodo{opacity:0 !important;pointer-events:none}
+html.en-anillo .nodo{pointer-events:auto}
+.nodo .lift{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .34s var(--ease)}
+html.en-anillo .nodo.expandida .lift{transform:translateZ(60px) scale(1.1)}
+.nodo.expandida .card{border-width:1.5px}
+.nodo .lift::after{content:'';position:absolute;inset:0;border-radius:16px;
+  background:rgba(8,7,16,.55);transform:translateZ(-1px);pointer-events:none}
+.nodo .card{position:absolute;inset:0;border-radius:16px;
+  background:rgba(14,12,26,.86);background-image:var(--glass);
+  border:1px solid color-mix(in srgb,var(--c) 45%,transparent);
+  box-shadow:var(--mat-bevel),var(--mat-elev),0 0 26px color-mix(in srgb,var(--c) 18%,transparent);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  padding:0 26px;overflow:hidden;
+  transition:box-shadow .3s,border-color .3s}
+.nodo:hover .card{border-color:var(--c);
+  box-shadow:var(--mat-bevel),var(--mat-elev),0 0 44px color-mix(in srgb,var(--c) 40%,transparent)}
+.nodo .ico{width:52px;height:52px;border-radius:14px;display:flex;
+  align-items:center;justify-content:center;font-size:22px;
+  background:radial-gradient(circle at 38% 30%,color-mix(in srgb,var(--c) 26%,transparent),transparent);
+  border:1px solid color-mix(in srgb,var(--c) 55%,transparent);color:var(--c);
+  filter:drop-shadow(0 0 8px var(--c))}
+.nodo .t{font-size:15px;font-weight:800;letter-spacing:.08em;color:var(--c)}
+.nodo .s{font-size:10px;color:var(--hud-text-dim);letter-spacing:.05em}
+.nodo .div{width:100%;height:1px;margin:8px 0 4px;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--c) 40%,transparent),transparent)}
+.nodo .m{width:100%;display:flex;justify-content:space-between;align-items:baseline;
+  font-family:var(--font-mono)}
+.nodo .m span{font-size:8px;font-weight:800;letter-spacing:.14em;
+  color:var(--hud-text-faint);text-transform:uppercase}
+.nodo .m b{font-size:12px;font-weight:700;color:var(--hud-text-mid)}
+/* KEYFRAMES EXACTOS DEL PROTO */
+@keyframes holoOut{
+  0%  {clip-path:inset(0 0 0 0);opacity:1;filter:none;transform:translateY(0)}
+  30% {filter:brightness(1.6)}
+  100%{clip-path:inset(100% 0 0 0);opacity:0;filter:brightness(2);transform:translateY(160px)}}
+html.holo-out .nodo .lift{animation:holoOut .6s var(--ease) var(--dly,0s) both !important}
+@keyframes holoIn{
+  0%  {clip-path:inset(100% 0 0 0);opacity:0;filter:brightness(2.4) saturate(1.6)}
+  12% {opacity:1}
+  55% {filter:brightness(1.7) saturate(1.3)}
+  70% {clip-path:inset(0 0 0 0)}
+  78% {filter:brightness(1.15)}
+  86% {filter:brightness(1.5)}    /* chispazo de estabilización */
+  100%{clip-path:inset(0 0 0 0);filter:none}}
+html.en-anillo .nodo .card{animation:holoIn .75s var(--ease) calc(var(--dly,0s) + .16s) both}
+/* LA BARRA EMISORA: el riel de luz del que nace cada card en nivel 1.
+   Vive entre el planeta y la card; se enciende ANTES que la card y
+   se apaga al ir a nivel 0 o 2. */
+.nodo .barra{position:absolute;left:9%;right:9%;bottom:-36px;height:5px;
+  border-radius:3px;pointer-events:none;opacity:0;
+  background:linear-gradient(90deg,transparent,var(--c) 22%,var(--c) 78%,transparent);
+  box-shadow:0 0 16px var(--c),0 0 42px color-mix(in srgb,var(--c) 45%,transparent)}
+@keyframes barIn{
+  0%{opacity:0;transform:scaleX(.15);filter:brightness(2.6)}
+  45%{opacity:1;filter:brightness(1.9)}
+  100%{opacity:.9;transform:scaleX(1);filter:none}}
+@keyframes barOut{
+  0%{opacity:.9}30%{opacity:1;filter:brightness(1.8)}
+  100%{opacity:0;transform:scaleX(.2);filter:brightness(2.2)}}
+@keyframes barVive{from{box-shadow:0 0 14px var(--c),0 0 36px color-mix(in srgb,var(--c) 38%,transparent)}
+  to{box-shadow:0 0 20px var(--c),0 0 52px color-mix(in srgb,var(--c) 55%,transparent)}}
+html.en-anillo .nodo .barra{
+  animation:barIn .5s var(--ease) var(--dly,0s) both,
+            barVive 3.2s ease-in-out calc(var(--dly,0s) + .6s) infinite alternate}
+html.holo-out .nodo .barra{animation:barOut .55s var(--ease) calc(var(--dly,0s) + .22s) both !important}
+html.en-exp .nodo .barra,html.sec-out .nodo .barra{opacity:0 !important;animation:none !important}
+/* cards LEJANAS (±2, asomadas ~20%): solo el cuerpo del holograma —
+   sin barra (se apilaban con las de ±1) y sin contenido en la franja */
+.nodo.lejana .barra{opacity:0 !important;animation:none !important}
+.nodo .card .ico,.nodo .card .t,.nodo .card .s,.nodo .card .div,.nodo .card .m{
+  transition:opacity .35s var(--ease)}
+.nodo.lejana .card .ico,.nodo.lejana .card .t,.nodo.lejana .card .s,
+.nodo.lejana .card .div,.nodo.lejana .card .m{opacity:0}
+/* VIDA HOLOGRÁFICA en reposo (diegética, sin parpadeos):
+   flotación lenta + barrido de escaneo + respiración del borde */
+@keyframes cardFlota{from{transform:translateY(0)}to{transform:translateY(-5px)}}
+@keyframes cardBreath{
+  from{box-shadow:var(--mat-bevel),var(--mat-elev),0 0 22px color-mix(in srgb,var(--c) 14%,transparent)}
+  to{box-shadow:var(--mat-bevel),var(--mat-elev),0 0 40px color-mix(in srgb,var(--c) 30%,transparent)}}
+html.en-anillo .nodo .card{animation:holoIn .75s var(--ease) calc(var(--dly,0s) + .16s) both,
+  cardBreath 4s ease-in-out calc(var(--dly,0s) + 1s) infinite alternate,
+  cardFlota 5.6s ease-in-out var(--dly,0s) infinite alternate}
+
+/* ═══ NIVEL 2 · SECCIÓN — DEL PROTO ═══ */
+#seccion{position:fixed;inset:0;z-index:40;display:none;
+  padding:56px 5vw 40px;overflow:auto;
+  background:radial-gradient(ellipse at 50% 40%,rgba(20,16,40,.6),transparent 70%)}
+html.en-exp #seccion{display:flex;align-items:center;justify-content:center;
+  animation:secOn .55s var(--ease) both}
+html.sec-out #seccion{display:flex;align-items:center;justify-content:center;
+  animation:secOff .45s var(--ease) both}
+@keyframes secOff{
+  0%{transform:none;opacity:1}
+  28%{opacity:.6}36%{opacity:.9}44%{opacity:.45}   /* flicker de apagado */
+  100%{transform:scale(.30) translateY(4vh);opacity:0}}  /* SE REINSERTA en la card */
+@keyframes secOn{
+  0%{transform:scale(.86) translateY(20px);opacity:0}
+  40%{opacity:.9}48%{opacity:.55}56%{opacity:1}
+  100%{transform:none;opacity:1}}
+#seccion .panel{max-width:1100px;margin:0 auto;border-radius:18px;
+  background:var(--hud-form-bg);background-image:var(--glass);
+  border:1px solid color-mix(in srgb,var(--sc,#A78BFA) 40%,transparent);
+  box-shadow:var(--mat-bevel),var(--mat-elev);padding:28px 34px;
+  min-height:76vh;width:min(1150px,92vw);
+  position:relative;overflow:hidden;--pc-accent:var(--sc,#A78BFA)}
+#seccion .panel::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(213,224,255,.02) 0 1px,transparent 1px 4px)}
+html.en-exp .nodo{opacity:0 !important;pointer-events:none !important}
+html.en-exp .nodo .card,html.en-exp .nodo .barra{animation-play-state:paused !important}
+/* en sec-out el carrusel REGRESA (fade .45s) mientras el panel se
+   encoge sobre la card frontal: la reinserción se ve, no se adivina */
+html.sec-out .nodo{pointer-events:none !important}
+.sec-lado{position:fixed;top:50%;transform:translateY(-50%);z-index:46;
+  writing-mode:vertical-rl;text-orientation:mixed;cursor:pointer;
+  font-family:var(--font-mono);font-size:12px;font-weight:800;
+  letter-spacing:.34em;color:var(--lc,#666);opacity:.55;
+  padding:14px 8px;transition:opacity .2s;user-select:none}
+.sec-lado:hover{opacity:1}
+.sec-lado .fl{font-size:14px;opacity:.7}
+#sec-izq{left:10px}
+#sec-der{right:10px}
+html:not(.en-exp) .sec-lado{display:none}
+@keyframes panelRecal{
+  0%{opacity:1;transform:none}
+  25%{opacity:.35;transform:translateX(var(--dir,10px))}
+  40%{opacity:.6}48%{opacity:.3}
+  100%{opacity:1;transform:none}}
+#seccion .panel.recal{animation:panelRecal .5s var(--ease)}
+#seccion h1{font-size:22px;letter-spacing:.1em;color:var(--sc,#A78BFA);overflow:hidden}
+#seccion h1 span{display:block;animation:reveal .6s var(--ease) .1s both}
+@keyframes reveal{from{transform:translateY(115%)}to{transform:none}}
+#seccion .meta{font-family:var(--font-mono);font-size:10px;color:var(--hud-text-dim);
+  letter-spacing:.2em;margin-top:6px}
+
+/* ── CHIPS HUD (nivel 0) ── */
+.hudfila{position:fixed;left:50%;transform:translateX(-50%);z-index:30;
+  display:flex;gap:14px;pointer-events:none;
+  transition:opacity .5s var(--ease),transform .5s var(--ease)}
+#hud-top{top:46px}
+#hud-bot{bottom:40px}
+html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
+.hchip{min-width:172px;padding:10px 16px;border-radius:var(--rad-card);
+  background:var(--hud-panel-bg);background-image:var(--glass);
+  border:1px solid color-mix(in srgb,var(--a) 40%,transparent);
+  box-shadow:var(--mat-bevel),var(--mat-elev-1);
+  display:flex;flex-direction:column;gap:3px}
+.hchip .l{font-size:var(--fs-2xs);font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--hud-text-dim)}
+.hchip .v{font-family:var(--font-mono);font-size:var(--fs-sm);
+  font-weight:var(--fw-num);color:var(--a)}
+
+/* ── HUD fijo ── */
+.hud{position:fixed;z-index:60;font-family:var(--font-mono);
+  font-size:10px;letter-spacing:.16em;color:var(--hud-text-faint);
+  text-transform:uppercase;pointer-events:none}
+#hint{left:50%;bottom:12px;transform:translateX(-50%)}
+#estado{right:18px;top:14px;text-align:right;color:rgba(167,139,250,.5)}
+#marca{left:18px;top:14px;color:var(--hud-text);font-family:var(--font-ui);
+  font-size:14px;font-weight:var(--fw-bold);letter-spacing:var(--ls-title)}
+#marca b{color:#8B5CF6}
+#fps{left:18px;bottom:12px;color:rgba(167,139,250,.35)}
+
+/* ═══ v11 — BOOT (loading honesto: visual puro, JAMÁS toca la API) ═══ */
+#boot{position:fixed;inset:0;z-index:100;background:var(--hud-bg-base);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;transition:opacity .55s var(--ease)}
+#boot.off{opacity:0;pointer-events:none}
+#boot .bmarca{font-family:var(--font-ui);font-size:22px;font-weight:var(--fw-bold);
+  letter-spacing:.14em;color:var(--hud-text)}
+#boot .bmarca b{color:#8B5CF6}
+#boot .bspin{font-family:var(--font-mono);font-size:20px;color:#A78BFA;
+  text-shadow:0 0 14px rgba(167,139,250,.7);min-height:24px}
+@keyframes bootPulse{0%,100%{opacity:.5}50%{opacity:1}}
+#boot .blinea{font-family:var(--font-mono);font-size:9px;letter-spacing:.3em;
+  color:var(--hud-text-dim);text-transform:uppercase;animation:bootPulse 1.6s ease-in-out infinite}
+
+/* ═══ v11 — CUERPO DE SECCIÓN (nivel 2, dentro del panel canon) ═══ */
+#sec-cuerpo{margin-top:16px;max-height:calc(76vh - 128px);overflow:auto;
+  font-family:var(--font-mono);scrollbar-width:thin;
+  scrollbar-color:color-mix(in srgb,var(--sc,#A78BFA) 35%,transparent) transparent}
+.v11-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:14px}
+.v11-kpi{padding:14px 16px;border-radius:var(--rad-card);
+  background:rgba(14,12,26,.6);background-image:var(--glass);
+  border:1px solid color-mix(in srgb,var(--sc,#A78BFA) 25%,transparent);
+  box-shadow:var(--mat-bevel)}
+.v11-kpi .l{font-size:var(--fs-2xs);font-weight:var(--fw-bold);
+  letter-spacing:var(--ls-label);text-transform:uppercase;color:var(--hud-text-dim)}
+.v11-kpi .v{font-size:19px;font-weight:var(--fw-num);color:var(--sc,#A78BFA);
+  margin-top:4px;font-variant-numeric:tabular-nums}
+.v11-kpi .s{font-size:9px;color:var(--hud-text-faint);margin-top:2px}
+.v11-fila{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:8px 10px;border-bottom:1px solid rgba(140,100,220,.08);font-size:12px}
+.v11-fila:hover{background:rgba(140,100,220,.05)}
+.v11-fila .fecha{color:var(--hud-text-faint);font-size:10px;white-space:nowrap}
+.v11-fila .txt{flex:1;color:var(--hud-text-mid);overflow:hidden;text-overflow:ellipsis}
+.v11-fila .num{color:var(--sc,#A78BFA);font-weight:var(--fw-num);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.v11-fila .tag{font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  color:color-mix(in srgb,var(--sc,#A78BFA) 70%,#fff);white-space:nowrap}
+.v11-sub{font-size:10px;font-weight:var(--fw-bold);letter-spacing:.2em;
+  text-transform:uppercase;color:var(--hud-text-dim);margin:16px 0 6px}
+.v11-checks{display:flex;gap:5px}
+.v11-dot{width:14px;height:14px;border-radius:4px;font-size:7px;line-height:14px;
+  text-align:center;color:var(--hud-text-faint);
+  border:1px solid rgba(140,100,220,.18);background:rgba(255,255,255,.02)}
+.v11-dot.on{background:color-mix(in srgb,var(--sc,#A78BFA) 55%,transparent);
+  border-color:var(--sc,#A78BFA);color:#fff;
+  box-shadow:0 0 8px color-mix(in srgb,var(--sc,#A78BFA) 60%,transparent)}
+.v11-vacio{padding:30px;text-align:center;color:var(--hud-text-faint);
+  font-size:11px;letter-spacing:.2em;text-transform:uppercase}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#020810">
+<title>LifeOS v11 · ESCENA</title>
+<link rel="stylesheet" href="raw-v11.css?v=1100">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="anclas"></div>
+<div id="visor"><div id="mundoCSS"></div></div>
+<div id="telon"></div>
+<div id="boot"><div class="bmarca">LIFE<b>OS</b></div>
+  <div class="bspin" id="boot-spin">⠋</div>
+  <div class="blinea" id="boot-linea">INICIALIZANDO ESCENA</div></div>
+<div id="seccion"><div class="panel hud-corners">
+  <h1><span id="sec-t">—</span></h1>
+  <div class="meta">PROYECCIÓN HOLOGRÁFICA · ESC PARA EMERGER · [←/→] SECTOR</div>
+  <div id="sec-cuerpo"></div>
+</div></div>
+<div class="sec-lado" id="sec-izq"><span class="fl">◀</span> —</div>
+<div class="sec-lado" id="sec-der">— <span class="fl">▶</span></div>
+<div class="hudfila" id="hud-top">
+  <div class="hchip" style="--a:#A78BFA"><span class="l" id="chip-user-l">USER · Nv 1</span><span class="v" id="chip-user">0 / 1,000 XP</span></div>
+  <div class="hchip" style="--a:#C4B5FD"><span class="l">Estado del Sim</span><span class="v" id="chip-sim">9 needs · OK</span></div>
+  <div class="hchip" style="--a:#8FA6F8"><span class="l">Energía · Racha · Créditos</span><span class="v" id="chip-erc">— · — · —</span></div>
+</div>
+<div class="hudfila" id="hud-bot">
+  <div class="hchip" style="--a:#A78BFA"><span class="l">Nivel actual</span><span class="v" id="chip-nivel">1 · 0/1,000</span></div>
+  <div class="hchip" style="--a:#9BB0FA"><span class="l">Misión diaria</span><span class="v" id="chip-mision">0 / 3</span></div>
+  <div class="hchip" style="--a:#C4B5FD"><span class="l">Logro reciente</span><span class="v" id="chip-logro">—</span></div>
+  <div class="hchip" style="--a:#B49DF9"><span class="l">Nivel siguiente</span><span class="v" id="chip-signivel">+1,000 XP</span></div>
+</div>
+<div class="hud" id="marca">LIFE<b>OS</b> <span style="font-size:9px;opacity:.5">v11.0 · ESCENA</span></div>
+<div class="hud" id="estado">NIVEL 0 · ÓRBITA</div>
+<div class="hud" id="hint">[RUEDA/↓] SUMERGIR · [CLIC] SECTOR</div>
+<div class="hud" id="fps">— fps</div>
+<script src="three.min.js?v=1100"></script>
+<script src="raw-escena.js?v=1100"></script>
+</body>
+</html>
