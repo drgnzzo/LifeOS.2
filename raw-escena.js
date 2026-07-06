@@ -1,7 +1,8 @@
-/* LifeOS v11.0 — raw-escena.js · MOTOR v10 (byte-idéntico al proto
-   CAPA 0d) + integración dual (app real / standalone).
-   Requiere three.min.js antes. En app real: cargar AL FINAL,
-   después de todos los raw-*.js. */
+/* LifeOS v11.1 — raw-escena.js
+   MOTOR v10 (mecánica canon intacta; única sustitución: DATOS de SEC,
+   que con la app presente son los sectores reales de _DIAL_ITEMS)
+   + fusión: iconos reales, centro RAW, subanillos como acciones,
+   paneles de inmersión. Cargar AL FINAL, tras todos los raw-*.js. */
 
 'use strict';
 /* ═══ ESTADO ÚNICO ═══ */
@@ -14,15 +15,32 @@ var giroMundo = 0;                             /* rotación de la esfera al gira
 var nivel = 0, idx = 0, enTransicion = false;
 
 /* PALETA CANÓNICA del proto (literal) */
-var SEC = [
-  { id:'patrimonio', t:'PATRIMONIO', s:'Saldos y apartados', ico:'◆', c:'#9BB0FA' },
-  { id:'financiero', t:'FINANCIERO', s:'Ingresos y flujo',   ico:'$', c:'#8FA6F8' },
-  { id:'variables',  t:'VARIABLES',  s:'Gastos variables',   ico:'≈', c:'#B49DF9' },
-  { id:'fijos',      t:'FIJOS',      s:'Pagos recurrentes',  ico:'▣', c:'#7C9EF5' },
-  { id:'necesidades',t:'NECESIDADES',s:'Estado del sim',     ico:'♥', c:'#A78BFA' },
-  { id:'bitacora',   t:'BITÁCORA',   s:'Pensamientos',       ico:'✎', c:'#C4B5FD' },
-  { id:'activity',   t:'ACTIVITY',   s:'Hábitos y logros',   ico:'⚡', c:'#8B87F0' }
-];
+var SEC = (function(){
+  /* v11.1 — DATOS del dial. Con la app real presente, los sectores son
+     los de _DIAL_ITEMS (el dial de SIEMPRE: mismos ids, labels, colores
+     y acciones). Sin app (standalone), el set canon del proto.
+     La MECÁNICA del motor no cambia: N, ángulos y coreografía se
+     derivan de la longitud, como ya hacía el canon. */
+  var DEF = [
+    { id:'patrimonio', t:'PATRIMONIO', s:'Saldos y apartados', ico:'\u25C6', c:'#9BB0FA' },
+    { id:'financiero', t:'FINANCIERO', s:'Ingresos y flujo',   ico:'$', c:'#8FA6F8' },
+    { id:'variables',  t:'VARIABLES',  s:'Gastos variables',   ico:'\u2248', c:'#B49DF9' },
+    { id:'fijos',      t:'FIJOS',      s:'Pagos recurrentes',  ico:'\u25A3', c:'#7C9EF5' },
+    { id:'necesidades',t:'NECESIDADES',s:'Estado del sim',     ico:'\u2665', c:'#A78BFA' },
+    { id:'bitacora',   t:'BIT\u00C1CORA',   s:'Pensamientos',       ico:'\u270E', c:'#C4B5FD' },
+    { id:'activity',   t:'ACTIVITY',   s:'H\u00E1bitos y logros',   ico:'\u26A1', c:'#8B87F0' }
+  ];
+  if(typeof window._DIAL_ITEMS === 'undefined' || !window._DIAL_ITEMS.length) return DEF;
+  var SUBT = { activity:'H\u00e1bitos y registro', apartado:'Metas de ahorro',
+    bancos:'Cuentas y bancos', entrenamiento:'Fuerza / cardio / m\u00e1s',
+    nutricion:'Comidas del d\u00eda', patrimonio:'Saldos y apartados',
+    pensamiento:'Bit\u00e1cora mental', persona:'Interacciones',
+    timer:'Cron\u00f3metros', editar:'Editar registros', salud:'Citas y s\u00edntomas' };
+  return window._DIAL_ITEMS.map(function(it){
+    return { id:it.id, t:String(it.label||it.id).toUpperCase(),
+             s:SUBT[it.id]||'', ico:'', c:it.accent||'#A78BFA', _item:it };
+  });
+})();
 var N = SEC.length, PASO = 24, RADIO = 780;    /* canon del carrusel CSS */
 
 /* ═══ curva firma ═══ */
@@ -536,115 +554,160 @@ estado();
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   LifeOS v11.0 — INTEGRACIÓN (apéndice; el motor de arriba es
-   byte-idéntico al proto canónico v10 CAPA 0d).
-   MODO DUAL:
-   · APP REAL (index.html): detecta _OS_SECCIONES → usa api/calculadoras
-     existentes de raw-core/raw-overlay, envuelve _osMostrar (home =
-     motor, sin dial viejo) y desvía bitácora/activity a sus boards
-     reales con formularios.
-   · STANDALONE (index-v11.html): api/calcs vienen de raw-escena-api.js.
-   Reglas: api.getX SIN envolver · motor SIN editar · hooks por fuera.
+   LifeOS v11.1 — FUSIÓN: el dial de la app con la mecánica del proto.
+   · UN solo dial: sectores reales (_DIAL_ITEMS), iconos canvas reales,
+     centro RAW clickeable → abrirFormulario('nueva').
+   · Paneles HUD de siempre (USER, banda Sim, misión/nivel/logro): los
+     pinta el overlay como siempre; aquí NO se duplica nada.
+   · Subanillos del dial viejo → acciones en la card del sector
+     (nivel 1), con el MISMO despacho: timer / cf / irA / formulario.
+   · Motor: mecánica intacta (única sustitución: los DATOS de SEC).
    ═══════════════════════════════════════════════════════════════════ */
 var APP_REAL = (typeof window._OS_SECCIONES !== 'undefined');
 if(APP_REAL) document.documentElement.classList.add('app-real');
 
-/* ═══ BOOT (solo si existe el nodo — standalone; la app real ya
-   tiene su loading en raw-loading.js) ═══ */
+/* ═══ BOOT (solo standalone: la app real usa raw-loading.js) ═══ */
 (function(){
   var b=document.getElementById('boot');
   if(!b) return;
-  var braille=['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
+  var braille=['\u280B','\u2819','\u2839','\u2838','\u283C','\u2834','\u2826','\u2827','\u2807','\u280F'];
   var el=document.getElementById('boot-spin'),k=0;
   var iv=setInterval(function(){el.textContent=braille[k++%braille.length]},70);
-  var lineas=['INICIALIZANDO ESCENA','PROYECTANDO DIAL','ENLAZANDO HOLOGRAMAS'];
-  var lEl=document.getElementById('boot-linea'),lk=0;
-  var ivL=setInterval(function(){lk++;if(lk<lineas.length)lEl.textContent=lineas[lk]},520);
   var t0=performance.now();
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     var falta=Math.max(0,1400-(performance.now()-t0));
     setTimeout(function(){
-      b.classList.add('off');clearInterval(iv);clearInterval(ivL);
+      b.classList.add('off');clearInterval(iv);
       setTimeout(function(){if(b.parentNode)b.parentNode.removeChild(b)},600);
     },falta);
   })});
 })();
 
-/* ═══ COUNT-UP (patrón v8-v9) ═══ */
 function _fmtNum(v){return Math.round(v).toLocaleString('es-MX')}
 function _fmtMXN(v){return '$' + Math.round(v).toLocaleString('es-MX')}
 function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function countUpTexto(el,target,fmt,sufijo){
   if(!el)return;fmt=fmt||_fmtNum;sufijo=sufijo||'';
-  if(!isFinite(target)){el.textContent='—';return}
+  if(!isFinite(target)){el.textContent='\u2014';return}
   tween(900,function(e){el.textContent=fmt(target*e)+sufijo});
 }
 
-function _distribuirGetAll(d){
-  if(d.activityCheck) window._actData          = d.activityCheck;
-  if(d.logros)        window._logrosData        = d.logros;
-  if(d.pensamientos)  window._pensamientosData  = d.pensamientos;
-  if(d.relaciones)    window._relacionesData    = d.relaciones;
-  if(d.salud)         window._saludData         = d.salud;
-  window._capa1Data = d;
+/* ═══ ICONOS REALES — pintar item.draw() del dial de siempre en las
+   anclas del dial 3D y en las cards (escritura DOM única) ═══ */
+function _pintarIconosReales(){
+  if(!APP_REAL) return;
+  var anclasIcos=document.querySelectorAll('#anclas .ancla .ico');
+  SEC.forEach(function(s,i){
+    if(!s._item||typeof s._item.draw!=='function')return;
+    function canvasIco(px,grosorGlow){
+      var cv=document.createElement('canvas');cv.width=px;cv.height=px;
+      var ctx=cv.getContext('2d');
+      ctx.shadowColor=s.c;ctx.shadowBlur=grosorGlow;
+      try{s._item.draw(ctx,px/2,px/2,px*0.8,s.c);}catch(e){}
+      cv.style.cssText='width:'+(px/2)+'px;height:'+(px/2)+'px;display:block;margin:0 auto';
+      return cv;
+    }
+    if(anclasIcos[i]){anclasIcos[i].textContent='';anclasIcos[i].appendChild(canvasIco(52,6));}
+    var cardIco=nodos[i].querySelector('.card .ico');
+    if(cardIco){cardIco.textContent='';cardIco.appendChild(canvasIco(72,8));}
+  });
 }
 
-/* ═══ CHIPS HUD — misma info del HOME v9 (calculadoras originales) ═══ */
-function poblarChips(){
-  if(typeof _calcXPNivel!=='function')return;   /* aún no cargan los módulos */
-  var x=_calcXPNivel(),rc=_calcRachaCreditos(),mi=_calcMisionDiaria(),
-      lg=_calcLogroReciente(),ns=_calcNivelSiguiente(),needs=_calcSimsNeeds();
-  var userL=document.getElementById('chip-user-l');
-  if(userL)userL.textContent='USER · Nv '+x.nivel;
-  var userV=document.getElementById('chip-user');
-  if(userV)countUpTexto(userV,x.xpActual,_fmtNum,' / '+_fmtNum(x.xpMeta)+' XP');
-  var keys=Object.keys(needs),act=0,suma=0;
-  keys.forEach(function(k){suma+=needs[k];if(needs[k]>0)act++});
-  var prom=Math.round(suma/keys.length);
-  var simV=document.getElementById('chip-sim');
-  if(simV)simV.textContent=act+'/'+keys.length+' needs · '+(prom<30?'LOW':'OK');
-  var ercV=document.getElementById('chip-erc');
-  if(ercV)countUpTexto(ercV,rc.creditos,function(v){
-    return rc.energia+' · '+rc.racha+'d · '+_fmtNum(v)});
-  var nivV=document.getElementById('chip-nivel');
-  if(nivV)countUpTexto(nivV,x.xpActual,function(v){
-    return x.nivel+' · '+_fmtNum(v)+'/'+_fmtNum(x.xpMeta)});
-  var misV=document.getElementById('chip-mision');
-  if(misV)misV.textContent=mi.hechos+' / '+mi.total;
-  var logV=document.getElementById('chip-logro');
-  if(logV){var t=lg.titulo||'—';if(t.length>18)t=t.slice(0,17)+'…';
-    logV.textContent=t+(lg.avance?' · '+lg.avance+'%':'')}
-  var sigV=document.getElementById('chip-signivel');
-  if(sigV)countUpTexto(sigV,ns.xpFalta,function(v){return '+'+_fmtNum(v)+' XP'});
+/* ═══ CENTRO RAW — el núcleo abre el formulario RAW, como siempre ═══ */
+function _conectarCentroRAW(){
+  var lbl=document.getElementById('lbl-raw');
+  if(!lbl||!APP_REAL)return;
+  lbl.addEventListener('click',function(e){
+    if(nivel!==0||enTransicion)return;
+    e.stopPropagation();
+    if(typeof abrirFormulario==='function'){
+      window._dialPreset={};
+      abrirFormulario('nueva');
+    }
+  });
 }
 
-/* ═══ CARDS + GAJOS CON ESTADO ═══ */
-function _metricasSector(d){
+/* ═══ SUBANILLOS → ACCIONES EN LA CARD (mismo despacho del dial viejo:
+   timer especial / cf / irA / abrirFormulario) ═══ */
+function _despacharSub(sub){
+  window._dialPreset={};
+  if(typeof sub.preset==='function')sub.preset();
+  var p=window._dialPreset||{};
+  if(p.tab==='timer'){
+    var acc=p.accion;window._dialPreset={};
+    if(acc==='nuevo'){ if(typeof window._abrirFormTimer==='function')window._abrirFormTimer(''); }
+    else { if(typeof window.irATimers==='function')window.irATimers(); }
+    return;
+  }
+  if(p.cf){ window._dialPreset={}; irNivel(2); return; }   /* card coverflow → inmersión del motor */
+  if(p.irA){
+    var fn=p.irA,arg=p.irAArg;window._dialPreset={};
+    if(typeof window[fn]==='function'){ if(arg!==undefined)window[fn](arg); else window[fn](); }
+    return;
+  }
+  if(typeof abrirFormulario==='function')abrirFormulario(sub.id);
+}
+function _montarSubsEnCards(){
+  if(!APP_REAL)return;
+  SEC.forEach(function(s,i){
+    var card=nodos[i].querySelector('.card');
+    if(!card)return;
+    var prev=card.querySelector('.v11-subs');
+    if(prev&&prev.parentNode)prev.parentNode.removeChild(prev);
+    var it=s._item;if(!it)return;
+    var subs;
+    if(it.accionEspecial){
+      subs=[{label:'ABRIR EDITOR',accent:s.c,_especial:true}];
+    } else if(it.subsGen){
+      /* v11.1 — resolver FRESCO en cada montaje (el dial viejo lo hacía
+         al abrir): con cache temprano, bancos quedaba sin sus cuentas */
+      try{var gen=it.subsGen();subs=(gen&&gen.length)?gen:(it.subs||[]);}
+      catch(e){subs=it.subs||[]}
+      it._subsResueltos=subs;
+    } else {
+      subs=it.subs||[];
+    }
+    if(!subs.length)return;
+    var cont=document.createElement('div');
+    cont.className='v11-subs';
+    subs.forEach(function(sub){
+      var b=document.createElement('button');
+      b.className='v11-sub-btn';
+      b.style.setProperty('--sc',sub.accent||s.c);
+      b.textContent=sub.label;
+      b.addEventListener('click',function(e){
+        e.stopPropagation();
+        if(enTransicion||nivel!==1||i!==idx)return;
+        if(sub._especial){ if(typeof _abrirEditarOverlay==='function')_abrirEditarOverlay(); return; }
+        _despacharSub(sub);
+      });
+      cont.appendChild(b);
+    });
+    card.appendChild(cont);
+  });
+}
+
+/* ═══ MÉTRICAS por sector real → filas de la card + gajos con estado ═══ */
+function _metricasSectorReal(d){
   var m={};
+  function pon(id,reg,ult,n){m[id]={reg:reg,ult:ult,n:n||0}}
   try{var p=d.patrimonio||{};var pi=((p.banco&&p.banco.items)||[]).length+
     ((p.fisico&&p.fisico.items)||[]).length+((p.inversion&&p.inversion.items)||[]).length;
-    m.patrimonio={reg:pi,ult:_fmtMXN(p.total||0),n:pi};}catch(e){}
-  try{var f=(d.financieroAvanzado&&d.financieroAvanzado.metricas)||{};
-    var meses=((d.datosMes&&d.datosMes.meses)||[]).length;
-    m.financiero={reg:meses,ult:_fmtMXN(f.saldoActual||0),n:meses};}catch(e){}
-  try{var gr=(d.gastos&&d.gastos.grupos)||[];var gi=0,ultF='—';
-    gr.forEach(function(g){(g.items||[]).forEach(function(it){gi++;if(it.fecha)ultF=it.fecha})});
-    m.variables={reg:gi,ult:ultF,n:gi};}catch(e){}
-  try{var fj=d.fijos||[];var tot=0;
-    fj.forEach(function(x){tot+=(typeof x.monto==='number'?x.monto:0)});
-    m.fijos={reg:fj.length,ult:_fmtMXN(tot),n:fj.length};}catch(e){}
-  try{var nv=(d.necesidades&&d.necesidades.niveles)||[];
-    m.necesidades={reg:nv.length,ult:String((d.necesidades&&d.necesidades.periodo)||'—').slice(0,14),n:nv.length};}catch(e){}
-  try{var pe=(d.pensamientos&&d.pensamientos.items)||[];
-    m.bitacora={reg:pe.length,ult:(pe[0]&&String(pe[0].fecha||'—').slice(0,10))||'—',n:pe.length};}catch(e){}
-  try{var a=d.activityCheck||{};var hp=(a.habitosPersonal||[]),he=(a.habitosElectronics||[]);
-    var diaKey=['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
-    var hoy=hp.concat(he).filter(function(h){return h.checks&&h.checks[diaKey]}).length;
-    m.activity={reg:hp.length+he.length,ult:hoy+' hoy',n:hp.length+he.length};}catch(e){}
+    pon('patrimonio',pi,_fmtMXN(p.total||0),pi);
+    pon('bancos',((p.banco&&p.banco.items)||[]).length,_fmtMXN((p.banco||{}).saldo||0),((p.banco&&p.banco.items)||[]).length);
+    var f=p.fondo||{};pon('apartado',(f.avance||0),(f.avance||0)+'%',f.avance?1:0);}catch(e){}
+  try{var pe=(d.pensamientos||{}).items||[];
+    pon('pensamiento',pe.length,(pe[0]&&String(pe[0].fecha||'\u2014').slice(0,10))||'\u2014',pe.length);}catch(e){}
+  try{var a=d.activityCheck||{};var hp=a.habitosPersonal||[],he=a.habitosElectronics||[];
+    var dk=['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
+    var hoy=hp.concat(he).filter(function(h){return h.checks&&h.checks[dk]}).length;
+    pon('activity',hp.length+he.length,hoy+' hoy',hp.length+he.length);}catch(e){}
+  try{var sal=(d.salud||{}).items||[];pon('salud',sal.length,(sal[0]&&String(sal[0].fecha||'\u2014').slice(0,10))||'\u2014',sal.length);}catch(e){}
+  try{var rel=(d.relaciones||{}).items||[];pon('persona',rel.length,(rel[0]&&String(rel[0].ultimaVez||'\u2014').slice(0,10))||'\u2014',rel.length);}catch(e){}
   return m;
 }
 function poblarCards(d){
-  var mets=_metricasSector(d);
+  var mets=_metricasSectorReal(d);
   var maxN=1;SEC.forEach(function(s){var mm=mets[s.id];if(mm&&mm.n>maxN)maxN=mm.n});
   var intens=[];
   SEC.forEach(function(s,i){
@@ -652,11 +715,11 @@ function poblarCards(d){
     var bs=nodos[i].querySelectorAll('.card .m b');
     if(bs.length>=3){
       if(mm){countUpTexto(bs[0],mm.reg);bs[1].textContent=mm.ult;bs[2].textContent='OK';}
-      else{bs[0].textContent='—';bs[1].textContent='—';bs[2].textContent='—';}
+      else{bs[0].textContent='\u2014';bs[1].textContent='\u2014';bs[2].textContent='OK';}
     }
-    intens.push(mm?Math.min(1,mm.n/maxN):0);
+    intens.push(mm?Math.min(1,mm.n/maxN):.25);
   });
-  for(var i=0;i<N;i++){   /* escritura ÚNICA, no por frame */
+  for(var i=0;i<N;i++){
     gajoMeshes[i].material.emissiveIntensity=.12+.26*intens[i];
     gajoMeshes[i].children[0].material.opacity=.55+.35*intens[i];
   }
@@ -666,114 +729,67 @@ function _marcarSync(txt){
     if(bs.length>=3)bs[2].textContent=txt});
 }
 
-/* ═══ SECCIONES v11 en el panel del motor (sectores SIN board real) ═══ */
-var DIAS7=['L','M','W','J','V','S','D'];
+/* ═══ NIVEL 2 (inmersión del motor) — panel por sector real ═══ */
 function _r11Filas(html){return html||'<div class="v11-vacio">SIN REGISTROS</div>'}
-var _v11Render={
-  bitacora:function(d){
-    var it=((d.pensamientos||{}).items)||[];
-    return _r11Filas(it.map(function(p){
-      return '<div class="v11-fila"><span class="fecha">'+_esc(String(p.fecha||'').slice(0,10))+'</span>'+
-        '<span class="txt">'+_esc(p.texto)+'</span>'+
-        (p.categoria?'<span class="tag">'+_esc(p.categoria)+'</span>':'')+
-        (p.energia!=null?'<span class="num">'+p.energia+'</span>':'')+'</div>';
-    }).join(''));
-  },
-  activity:function(d){
-    var a=d.activityCheck||{};
-    function tabla(arr,dias){
-      return arr.map(function(h){
-        var dots=dias.map(function(dk){
-          return '<span class="v11-dot'+(h.checks&&h.checks[dk]?' on':'')+'">'+dk+'</span>'}).join('');
-        return '<div class="v11-fila"><span class="txt">'+_esc(h.nombre)+'</span>'+
-          '<span class="v11-checks">'+dots+'</span></div>';
-      }).join('');
-    }
-    return '<div class="v11-sub">HÁBITOS PERSONALES · SEMANA</div>'+_r11Filas(tabla(a.habitosPersonal||[],DIAS7))+
-      '<div class="v11-sub">ELECTRONICS · L–V</div>'+_r11Filas(tabla(a.habitosElectronics||[],['L','M','W','J','V']));
-  },
-  patrimonio:function(d){
-    var p=d.patrimonio||{};
-    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
-    var f=p.fondo||{};
-    return '<div class="v11-grid">'+
-      kpi('TOTAL',_fmtMXN(p.total||0))+
-      kpi('BANCO',_fmtMXN((p.banco||{}).saldo||0),((p.banco||{}).pct||0)+'%')+
-      kpi('FÍSICO',_fmtMXN((p.fisico||{}).saldo||0),((p.fisico||{}).pct||0)+'%')+
-      kpi('INVERSIÓN',_fmtMXN((p.inversion||{}).saldo||0),'rend. '+_fmtMXN((p.inversion||{}).rendimientoTotal||0))+
-      kpi('FONDO EMERGENCIA',(f.avance||0)+'%',(f.meses||0)+' meses · '+_esc(f.salud||''))+
-      '</div>'+
-      '<div class="v11-sub">CUENTAS</div>'+
-      _r11Filas((((p.banco||{}).items)||[]).concat(((p.fisico||{}).items)||[]).map(function(it){
-        return '<div class="v11-fila"><span class="txt">'+_esc(it.nombre||it.concepto||'—')+'</span>'+
-          '<span class="num">'+_fmtMXN(it.monto||it.saldo||0)+'</span></div>';}).join(''));
-  },
-  financiero:function(d){
-    var f=d.financieroAvanzado||{};var h=f.hoy||{},s=f.semana||{},m=f.mes||{},mt=f.metricas||{};
-    function kpi(l,v,ss){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(ss?'<div class="s">'+ss+'</div>':'')+'</div>'}
-    return '<div class="v11-grid">'+
-      kpi('SALDO ACTUAL',_fmtMXN(mt.saldoActual||0))+
-      kpi('HOY',_fmtMXN(h.balance||0),'+'+_fmtMXN(h.ingresos||0)+' / -'+_fmtMXN(h.egresos||0))+
-      kpi('SEMANA',_fmtMXN(s.balance||0),'+'+_fmtMXN(s.ingresos||0)+' / -'+_fmtMXN(s.egresos||0))+
-      kpi('MES',_fmtMXN(m.excedente||0),'+'+_fmtMXN(m.ingresos||0)+' / -'+_fmtMXN(m.egresos||0))+
-      kpi('RUNWAY',(mt.runwayDias!=null?mt.runwayDias+' días':'—'),'gasto/día '+_fmtMXN(mt.gastoPorDiaPromedio||0))+
-      kpi('AHORRO',(mt.porcentajeAhorro!=null?mt.porcentajeAhorro+'%':'—'),
-        (m.proyeccion?'proy. excedente '+_fmtMXN(m.proyeccion.excedente||0):''))+
-      '</div>';
-  },
-  variables:function(d){
-    var gr=((d.gastos||{}).grupos)||[];
-    return _r11Filas(gr.map(function(g){
-      return '<div class="v11-sub">'+_esc(g.concepto)+'</div>'+
-        (g.items||[]).map(function(it){
-          return '<div class="v11-fila"><span class="txt">'+_esc(it.clave)+'</span>'+
-            '<span class="fecha">'+_esc(it.fecha||'')+'</span>'+
-            '<span class="tag">'+_esc(it.pagado||'')+'</span>'+
-            '<span class="num">'+(it.monto!=null?_fmtMXN(it.monto):'—')+'</span></div>';
-        }).join('');
-    }).join(''));
-  },
-  fijos:function(d){
-    var fj=d.fijos||[];
-    return _r11Filas(fj.map(function(x){
-      return '<div class="v11-fila"><span class="txt">'+_esc(x.nombre)+'</span>'+
-        '<span class="fecha">'+_esc(x.fecha||'')+'</span>'+
-        '<span class="num">'+(typeof x.monto==='number'?_fmtMXN(x.monto):'—')+'</span></div>';
-    }).join(''));
-  },
-  necesidades:function(d){
-    var ne=d.necesidades||{};var nv=ne.niveles||[];
-    function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
-    return (ne.periodo?'<div class="v11-sub">PERIODO · '+_esc(ne.periodo)+'</div>':'')+
-      '<div class="v11-grid">'+nv.map(function(n){
-        return kpi('NIVEL '+_esc(n.key),_fmtMXN(n.total||0),
-          ((n.conceptos||[]).length)+' conceptos')}).join('')+'</div>';
+function _panelPatrimonio(d){
+  var p=d.patrimonio||{};
+  function kpi(l,v,s){return '<div class="v11-kpi"><div class="l">'+l+'</div><div class="v">'+v+'</div>'+(s?'<div class="s">'+s+'</div>':'')+'</div>'}
+  var f=p.fondo||{};
+  return '<div class="v11-grid">'+
+    kpi('TOTAL',_fmtMXN(p.total||0))+
+    kpi('BANCO',_fmtMXN((p.banco||{}).saldo||0),((p.banco||{}).pct||0)+'%')+
+    kpi('F\u00cdSICO',_fmtMXN((p.fisico||{}).saldo||0),((p.fisico||{}).pct||0)+'%')+
+    kpi('INVERSI\u00d3N',_fmtMXN((p.inversion||{}).saldo||0),'rend. '+_fmtMXN((p.inversion||{}).rendimientoTotal||0))+
+    kpi('FONDO EMERGENCIA',(f.avance||0)+'%',(f.meses||0)+' meses \u00b7 '+_esc(f.salud||''))+
+    '</div><div class="v11-sub">CUENTAS</div>'+
+    _r11Filas((((p.banco||{}).items)||[]).concat(((p.fisico||{}).items)||[]).map(function(it){
+      return '<div class="v11-fila"><span class="txt">'+_esc(it.nombre||it.concepto||'\u2014')+'</span>'+
+        '<span class="num">'+_fmtMXN(it.monto||it.saldo||0)+'</span></div>';}).join(''));
+}
+function _panelBitacora(d){
+  var it=((d.pensamientos||{}).items)||[];
+  return _r11Filas(it.map(function(p){
+    return '<div class="v11-fila"><span class="fecha">'+_esc(String(p.fecha||'').slice(0,10))+'</span>'+
+      '<span class="txt">'+_esc(p.texto)+'</span>'+
+      (p.categoria?'<span class="tag">'+_esc(p.categoria)+'</span>':'')+
+      (p.energia!=null?'<span class="num">'+p.energia+'</span>':'')+'</div>';
+  }).join(''));
+}
+function _panelActivity(d){
+  var a=d.activityCheck||{};var DIAS7=['L','M','W','J','V','S','D'];
+  function tabla(arr,dias){
+    return arr.map(function(h){
+      var dots=dias.map(function(dk){
+        return '<span class="v11-dot'+(h.checks&&h.checks[dk]?' on':'')+'">'+dk+'</span>'}).join('');
+      return '<div class="v11-fila"><span class="txt">'+_esc(h.nombre)+'</span>'+
+        '<span class="v11-checks">'+dots+'</span></div>';
+    }).join('');
   }
+  return '<div class="v11-sub">H\u00c1BITOS PERSONALES \u00b7 SEMANA</div>'+_r11Filas(tabla(a.habitosPersonal||[],DIAS7))+
+    '<div class="v11-sub">ELECTRONICS \u00b7 L\u2013V</div>'+_r11Filas(tabla(a.habitosElectronics||[],['L','M','W','J','V']));
+}
+var _v11Panel={
+  patrimonio:_panelPatrimonio, bancos:_panelPatrimonio, apartado:_panelPatrimonio,
+  pensamiento:_panelBitacora, activity:_panelActivity
 };
 function _v11RenderSeccion(i){
   var cu=document.getElementById('sec-cuerpo');
   if(!cu)return;
   var d=window._capa1Data;
-  if(!d){cu.innerHTML='<div class="v11-vacio">SINCRONIZANDO…</div>';return}
-  var fn=_v11Render[SEC[i].id];
-  cu.innerHTML=fn?fn(d):'<div class="v11-vacio">SECCIÓN EN CONSTRUCCIÓN</div>';
+  if(!d){cu.innerHTML='<div class="v11-vacio">SINCRONIZANDO\u2026</div>';return}
+  var fn=_v11Panel[SEC[i].id];
+  cu.innerHTML=fn?fn(d):'<div class="v11-vacio">USA LAS ACCIONES DE LA CARD (NIVEL 1)</div>';
   cu.scrollTop=0;
 }
 
-/* ═══ HOOKS — extienden por FUERA; el motor queda intacto ═══ */
-/* Sectores con board REAL en la app (formularios completos) */
-var _V11_BOARDS = { bitacora:'bitacora', activity:'activity' };
+/* ═══ HOOKS por fuera (motor intacto) ═══ */
 function _v11BoardAbierto(){
   return document.documentElement.classList.contains('os-seccion');
 }
 (function(){
   var _irNivelMotor=irNivel,_girarAMotor=girarA;
   irNivel=function(n){
-    if(APP_REAL&&_v11BoardAbierto())return;      /* board real abierto: motor en pausa */
-    if(APP_REAL&&n===2&&nivel===1&&_V11_BOARDS[SEC[idx].id]){
-      _osMostrar(_V11_BOARDS[SEC[idx].id]);      /* desviar a la sección REAL */
-      return;
-    }
+    if(APP_REAL&&_v11BoardAbierto())return;   /* board real abierto: motor en pausa */
     var prev=nivel;
     _irNivelMotor(n);
     if(nivel===2&&prev!==2)_v11RenderSeccion(idx);
@@ -785,53 +801,46 @@ function _v11BoardAbierto(){
   };
 })();
 
-/* ═══ APP REAL: home = motor (el dial viejo NO se abre) ═══ */
 if(APP_REAL)(function(){
+  /* Router: ADITIVO (el flujo home de siempre corre tal cual — paneles,
+     tabs, clases; el disco 2D queda oculto por CSS). Solo se añade:
+     al volver a home desde una board, el motor emerge al anillo. */
   var _osMostrarBase=_osMostrar;
   _osMostrar=function(seccion){
-    if(!_OS_SECCIONES[seccion])seccion='home';
-    if(seccion==='home'){
-      /* rutina home SIN abrirDial: boards fuera, clases, tabs — y el
-         motor recibe el control (regresa al anillo si venías de board) */
-      window._osSeccion='home';
-      document.documentElement.classList.remove('os-seccion');
-      document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){
-        f.classList.remove('active')});
-      var b=document.getElementById('board-anverso');
-      if(b)b.classList.add('slide-right');
-      document.documentElement.classList.remove('niv-1','niv-2','niv-warp');
-      document.documentElement.classList.add('niv-0');
-      if(typeof _osMarcarTabs==='function')_osMarcarTabs('home');
-      var dd=document.getElementById('entrada-dropdown');
-      if(dd){dd.classList.remove('show');dd.style.display='none';}
-      if(typeof nivel!=='undefined'&&nivel===2)irNivel(1);
-      return;
+    _osMostrarBase(seccion);
+    if((!_OS_SECCIONES[seccion]||seccion==='home')&&typeof nivel!=='undefined'&&nivel===2){
+      irNivel(1);
     }
-    _osMostrarBase(seccion);   /* secciones reales tal cual (dial jamás visible → cerrarDial no corre) */
   };
   window._osMostrar=_osMostrar;
-  /* Teclas: con un board real abierto, el motor NO debe comerse las
-     flechas (inputs/textareas) ni Escape. Captura antes que el motor. */
+  /* Con board abierta, el motor no debe comerse flechas/Escape */
   window.addEventListener('keydown',function(e){
     if(!_v11BoardAbierto())return;
     if(['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Escape'].indexOf(e.key)<0)return;
-    e.stopPropagation();                          /* el listener del motor no lo ve */
+    e.stopPropagation();
     if(e.key==='Escape'&&!(e.target&&/input|textarea|select/i.test(e.target.tagName))){
       _osMostrar('home');
     }
   },true);
 })();
 
-/* ═══ ARRANQUE: getAll directa (el cache del servidor absorbe la doble
-   llamada con el refreshTodo de la app; ~200ms en cache-hit) ═══ */
+/* ═══ ARRANQUE ═══ */
+_pintarIconosReales();
+_conectarCentroRAW();
+_montarSubsEnCards();
 function cargarDatosCapa1(){
   api.getAll().then(function(d){
     if(!d||d.ok===false){_marcarSync('ERR');console.error('getAll:',d&&d.error);return}
-    _distribuirGetAll(d);
-    poblarChips();
+    if(d.activityCheck) window._actData         = d.activityCheck;
+    if(d.logros)        window._logrosData       = d.logros;
+    if(d.pensamientos)  window._pensamientosData = d.pensamientos;
+    if(d.relaciones)    window._relacionesData   = d.relaciones;
+    if(d.salud)         window._saludData        = d.salud;
+    window._capa1Data = d;
     poblarCards(d);
+    _montarSubsEnCards();          /* subsGen (bancos) ya con datos */
     if(nivel===2)_v11RenderSeccion(idx);
-  }).catch(function(e){_marcarSync('ERR');console.error('getAll falló:',e)});
+  }).catch(function(e){_marcarSync('ERR');console.error('getAll fall\u00f3:',e)});
 }
 window.refrescarCapa1=cargarDatosCapa1;
 cargarDatosCapa1();

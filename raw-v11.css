@@ -238,7 +238,7 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
 #marca b{color:#8B5CF6}
 #fps{left:18px;bottom:12px;color:rgba(167,139,250,.35)}
 
-/* ═══ v11 — BOOT (loading honesto: visual puro, JAMÁS toca la API) ═══ */
+/* ═══ v11.1 — BOOT (solo standalone) ═══ */
 #boot{position:fixed;inset:0;z-index:100;background:var(--hud-bg-base);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;transition:opacity .55s var(--ease)}
@@ -248,11 +248,8 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
 #boot .bmarca b{color:#8B5CF6}
 #boot .bspin{font-family:var(--font-mono);font-size:20px;color:#A78BFA;
   text-shadow:0 0 14px rgba(167,139,250,.7);min-height:24px}
-@keyframes bootPulse{0%,100%{opacity:.5}50%{opacity:1}}
-#boot .blinea{font-family:var(--font-mono);font-size:9px;letter-spacing:.3em;
-  color:var(--hud-text-dim);text-transform:uppercase;animation:bootPulse 1.6s ease-in-out infinite}
 
-/* ═══ v11 — CUERPO DE SECCIÓN (nivel 2, dentro del panel canon) ═══ */
+/* ═══ v11.1 — CUERPO DE SECCIÓN (nivel 2) ═══ */
 #sec-cuerpo{margin-top:16px;max-height:calc(76vh - 128px);overflow:auto;
   font-family:var(--font-mono);scrollbar-width:thin;
   scrollbar-color:color-mix(in srgb,var(--sc,#A78BFA) 35%,transparent) transparent}
@@ -268,7 +265,6 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
 .v11-kpi .s{font-size:9px;color:var(--hud-text-faint);margin-top:2px}
 .v11-fila{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
   padding:8px 10px;border-bottom:1px solid rgba(140,100,220,.08);font-size:12px}
-.v11-fila:hover{background:rgba(140,100,220,.05)}
 .v11-fila .fecha{color:var(--hud-text-faint);font-size:10px;white-space:nowrap}
 .v11-fila .txt{flex:1;color:var(--hud-text-mid);overflow:hidden;text-overflow:ellipsis}
 .v11-fila .num{color:var(--sc,#A78BFA);font-weight:var(--fw-num);
@@ -287,15 +283,34 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
 .v11-vacio{padding:30px;text-align:center;color:var(--hud-text-faint);
   font-size:11px;letter-spacing:.2em;text-transform:uppercase}
 
-/* ═══ v11.0 — OVERRIDES APP REAL (html.app-real; no afectan standalone) ═══ */
-html.app-real #hud-top{top:calc(var(--hero-h,58px) + 14px)}
-/* con un board real abierto (os-seccion), el motor se oculta por completo
-   — solo el canvas #gl queda vivo como fondo bajo la board */
-html.os-seccion #visor,html.os-seccion #anclas,html.os-seccion #hud-top,
-html.os-seccion #hud-bot,html.os-seccion #estado,html.os-seccion #hint,
-html.os-seccion #fps,html.os-seccion #seccion,html.os-seccion .sec-lado{display:none !important}
-/* .app (z:2, pantalla completa, transparente) NO debe robar los clics del
-   motor en home; el hero y los popups abiertos siguen interactivos */
+/* ═══ v11.1 — SUBANILLOS → ACCIONES EN LA CARD (nivel 1) ═══ */
+.v11-subs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
+  margin-top:12px;padding-top:10px;border-top:1px solid rgba(140,100,220,.14)}
+.v11-sub-btn{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.08em;
+  text-transform:uppercase;padding:5px 9px;border-radius:8px;cursor:pointer;
+  color:color-mix(in srgb,var(--sc,#A78BFA) 80%,#fff);
+  background:color-mix(in srgb,var(--sc,#A78BFA) 12%,transparent);
+  border:1px solid color-mix(in srgb,var(--sc,#A78BFA) 35%,transparent);
+  transition:background .25s var(--ease),box-shadow .25s var(--ease)}
+.v11-sub-btn:hover{background:color-mix(in srgb,var(--sc,#A78BFA) 26%,transparent);
+  box-shadow:0 0 12px color-mix(in srgb,var(--sc,#A78BFA) 35%,transparent)}
+
+/* ═══ v11.1 — APP REAL: UN SOLO DIAL ═══ */
+/* El disco 2D del dial viejo se OCULTA (el motor 3D es el dial). Los
+   paneles HUD del overlay (USER, banda Sim, misión/nivel/logro) quedan. */
+html.app-real #dial-canvas,html.app-real #dial-ambient{display:none !important}
+/* El overlay pierde su fondo opaco y deja pasar los clics al motor;
+   sus paneles siguen interactivos. */
+html.app-real #dial-overlay{background:transparent !important;pointer-events:none !important}
+html.app-real #dial-overlay > *{pointer-events:auto}
+/* Centro RAW del motor: clickeable */
+html.app-real #lbl-raw{pointer-events:auto;cursor:pointer}
+/* Con una board real abierta, el motor se esconde (el canvas #gl queda
+   de fondo vivo) */
+html.os-seccion #visor,html.os-seccion #anclas,html.os-seccion #estado,
+html.os-seccion #hint,html.os-seccion #fps,html.os-seccion #seccion,
+html.os-seccion .sec-lado{display:none !important}
+/* .app (transparente, pantalla completa) no roba clics del motor en home */
 @media(min-width:900px){
   html.app-real:not(.os-seccion) .app{pointer-events:none}
   html.app-real .app .hero,

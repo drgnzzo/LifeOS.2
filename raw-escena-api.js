@@ -1,7 +1,4 @@
-/* LifeOS v11 — raw-escena-api.js (SOLO para index-v11.html standalone).
-   En index.html REAL este archivo NO se carga: api y calculadoras ya
-   existen (raw-core.js / raw-overlay.js). Cargarlo ahí duplicaría
-   `const api` → SyntaxError. */
+/* LifeOS v11 — raw-escena-api.js (SOLO standalone index-v11.html). */
 const API_URL = 'https://script.google.com/macros/s/AKfycbzeJOsUXaMqDzCBu2MHsvFa01Jf96CUEoScH9cF_SWIfokWrwmcyKIwC_TCPhCAHPUrWg/exec';
 
 const EN_GAS = (function(){
