@@ -1,4 +1,4 @@
-/* LifeOS v11.1 — raw-escena.js
+/* LifeOS v11.2 — raw-escena.js
    MOTOR v10 (mecánica canon intacta; única sustitución: DATOS de SEC,
    que con la app presente son los sectores reales de _DIAL_ITEMS)
    + fusión: iconos reales, centro RAW, subanillos como acciones,
@@ -554,7 +554,7 @@ estado();
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   LifeOS v11.1 — FUSIÓN: el dial de la app con la mecánica del proto.
+   LifeOS v11.2 — FUSIÓN: el dial de la app con la mecánica del proto.
    · UN solo dial: sectores reales (_DIAL_ITEMS), iconos canvas reales,
      centro RAW clickeable → abrirFormulario('nueva').
    · Paneles HUD de siempre (USER, banda Sim, misión/nivel/logro): los
@@ -627,8 +627,13 @@ function _conectarCentroRAW(){
   });
 }
 
-/* ═══ SUBANILLOS → ACCIONES EN LA CARD (mismo despacho del dial viejo:
-   timer especial / cf / irA / abrirFormulario) ═══ */
+/* ═══ SUBANILLO EN EL DIAL (nivel 0) — el de siempre, con el MISMO
+   despacho del dial viejo: timer especial / cf / irA / abrirFormulario.
+   Mecánica del proto respetada: el clic enfoca el sector (girarA canon
+   del motor, intacto); al reposar el giro, el subanillo se despliega
+   alrededor del dial como ganancia de luz (nada aparece de golpe).
+   Cero medición de DOM durante animaciones: solo con enTransicion
+   en falso. ═══ */
 function _despacharSub(sub){
   window._dialPreset={};
   if(typeof sub.preset==='function')sub.preset();
@@ -639,7 +644,7 @@ function _despacharSub(sub){
     else { if(typeof window.irATimers==='function')window.irATimers(); }
     return;
   }
-  if(p.cf){ window._dialPreset={}; irNivel(2); return; }   /* card coverflow → inmersión del motor */
+  if(p.cf){ window._dialPreset={}; irNivel(1); tween(700,function(){},function(){irNivel(2)}); return; }
   if(p.irA){
     var fn=p.irA,arg=p.irAArg;window._dialPreset={};
     if(typeof window[fn]==='function'){ if(arg!==undefined)window[fn](arg); else window[fn](); }
@@ -647,45 +652,88 @@ function _despacharSub(sub){
   }
   if(typeof abrirFormulario==='function')abrirFormulario(sub.id);
 }
-function _montarSubsEnCards(){
-  if(!APP_REAL)return;
-  SEC.forEach(function(s,i){
-    var card=nodos[i].querySelector('.card');
-    if(!card)return;
-    var prev=card.querySelector('.v11-subs');
-    if(prev&&prev.parentNode)prev.parentNode.removeChild(prev);
-    var it=s._item;if(!it)return;
-    var subs;
-    if(it.accionEspecial){
-      subs=[{label:'ABRIR EDITOR',accent:s.c,_especial:true}];
-    } else if(it.subsGen){
-      /* v11.1 — resolver FRESCO en cada montaje (el dial viejo lo hacía
-         al abrir): con cache temprano, bancos quedaba sin sus cuentas */
-      try{var gen=it.subsGen();subs=(gen&&gen.length)?gen:(it.subs||[]);}
-      catch(e){subs=it.subs||[]}
-      it._subsResueltos=subs;
-    } else {
-      subs=it.subs||[];
-    }
-    if(!subs.length)return;
-    var cont=document.createElement('div');
-    cont.className='v11-subs';
-    subs.forEach(function(sub){
-      var b=document.createElement('button');
-      b.className='v11-sub-btn';
-      b.style.setProperty('--sc',sub.accent||s.c);
-      b.textContent=sub.label;
-      b.addEventListener('click',function(e){
-        e.stopPropagation();
-        if(enTransicion||nivel!==1||i!==idx)return;
-        if(sub._especial){ if(typeof _abrirEditarOverlay==='function')_abrirEditarOverlay(); return; }
-        _despacharSub(sub);
-      });
-      cont.appendChild(b);
-    });
-    card.appendChild(cont);
-  });
+var _srEl=null,_srIdx=-1,_srPoll=null;
+function _cerrarSubring(){
+  _srIdx=-1;
+  if(_srPoll){clearInterval(_srPoll);_srPoll=null;}
+  if(_srEl){
+    var el=_srEl;_srEl=null;
+    el.classList.remove('on');
+    setTimeout(function(){if(el.parentNode)el.parentNode.removeChild(el)},450);
+  }
 }
+function _subsDe(it){
+  if(it.accionEspecial)return [{label:'ABRIR EDITOR',accent:'#a5b4fc',_especial:true}];
+  if(it.subsGen){
+    try{var gen=it.subsGen();if(gen&&gen.length){it._subsResueltos=gen;return gen;}}catch(e){}
+  }
+  return it._subsResueltos||it.subs||[];
+}
+function _abrirSubring(i){
+  _cerrarSubring();
+  if(!APP_REAL||nivel!==0)return;
+  var it=SEC[i]&&SEC[i]._item;if(!it)return;
+  var subs=_subsDe(it);if(!subs.length)return;
+  /* ángulo del gajo: posición proyectada de su ancla (lectura Única,
+     con la escena en reposo) */
+  var anclaEls=document.querySelectorAll('#anclas .ancla');
+  var a=anclaEls[i];if(!a)return;
+  var m=/translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(a.style.transform||'');
+  var W=innerWidth,H=innerHeight,cx=W/2,cy=H/2;
+  var ang=m?Math.atan2(parseFloat(m[2])-cy,parseFloat(m[1])-cx):-Math.PI/2;
+  var R=Math.min(W,H)*.36;
+  var cont=document.createElement('div');
+  cont.id='v11-anillo';
+  var paso=.22;
+  subs.forEach(function(sub,k){
+    var b=document.createElement('button');
+    b.className='v11-sub-btn';
+    b.style.setProperty('--sc',sub.accent||SEC[i].c);
+    b.textContent=sub.label;
+    var aK=ang+(k-(subs.length-1)/2)*paso;
+    b.style.left=Math.round(cx+R*Math.cos(aK))+'px';
+    b.style.top=Math.round(cy+R*Math.sin(aK))+'px';
+    b.style.transitionDelay=(k*45)+'ms';
+    b.addEventListener('click',function(e){
+      e.stopPropagation();
+      var s2=sub;_cerrarSubring();
+      if(s2._especial){ if(typeof _abrirEditarOverlay==='function')_abrirEditarOverlay(); return; }
+      _despacharSub(s2);
+    });
+    cont.appendChild(b);
+  });
+  document.body.appendChild(cont);
+  _srEl=cont;_srIdx=i;
+  requestAnimationFrame(function(){requestAnimationFrame(function(){cont.classList.add('on')})});
+}
+/* clic en gajo (fase de captura: corre ANTES del listener del motor, que
+   hace su girarA canon). Al reposar el giro, se despliega el subanillo. */
+if(APP_REAL)(function(){
+  var rayo=null,pt=null;
+  window.addEventListener('click',function(e){
+    if(_v11BoardAbierto())return;
+    if(e.target&&e.target.closest&&e.target.closest('#v11-anillo'))return;
+    if(nivel!==0){_cerrarSubring();return}
+    if(enTransicion)return;
+    if(!rayo){rayo=new THREE.Raycaster();pt=new THREE.Vector2();}
+    pt.x=(e.clientX/innerWidth)*2-1;pt.y=-(e.clientY/innerHeight)*2+1;
+    rayo.setFromCamera(pt,camera);
+    var hit=rayo.intersectObjects(gajoMeshes,false);
+    if(!hit.length){_cerrarSubring();return}
+    var i=hit[0].object.userData.i;
+    _cerrarSubring();
+    var intentos=0;
+    _srPoll=setInterval(function(){
+      intentos++;
+      if(nivel!==0){clearInterval(_srPoll);_srPoll=null;return}
+      if(!enTransicion){clearInterval(_srPoll);_srPoll=null;_abrirSubring(i);}
+      else if(intentos>40){clearInterval(_srPoll);_srPoll=null;}
+    },80);
+  },true);
+  window.addEventListener('keydown',function(e){
+    if(e.key==='Escape'&&_srEl&&nivel===0){e.stopPropagation();_cerrarSubring();}
+  },true);
+})();
 
 /* ═══ MÉTRICAS por sector real → filas de la card + gajos con estado ═══ */
 function _metricasSectorReal(d){
@@ -717,7 +765,7 @@ function poblarCards(d){
       if(mm){countUpTexto(bs[0],mm.reg);bs[1].textContent=mm.ult;bs[2].textContent='OK';}
       else{bs[0].textContent='\u2014';bs[1].textContent='\u2014';bs[2].textContent='OK';}
     }
-    intens.push(mm?Math.min(1,mm.n/maxN):.25);
+    intens.push(mm?Math.max(.5,Math.min(1,mm.n/maxN)):.5);
   });
   for(var i=0;i<N;i++){
     gajoMeshes[i].material.emissiveIntensity=.12+.26*intens[i];
@@ -790,6 +838,7 @@ function _v11BoardAbierto(){
   var _irNivelMotor=irNivel,_girarAMotor=girarA;
   irNivel=function(n){
     if(APP_REAL&&_v11BoardAbierto())return;   /* board real abierto: motor en pausa */
+    if(typeof _cerrarSubring==='function')_cerrarSubring();
     var prev=nivel;
     _irNivelMotor(n);
     if(nivel===2&&prev!==2)_v11RenderSeccion(idx);
@@ -827,7 +876,6 @@ if(APP_REAL)(function(){
 /* ═══ ARRANQUE ═══ */
 _pintarIconosReales();
 _conectarCentroRAW();
-_montarSubsEnCards();
 function cargarDatosCapa1(){
   api.getAll().then(function(d){
     if(!d||d.ok===false){_marcarSync('ERR');console.error('getAll:',d&&d.error);return}
@@ -838,7 +886,6 @@ function cargarDatosCapa1(){
     if(d.salud)         window._saludData        = d.salud;
     window._capa1Data = d;
     poblarCards(d);
-    _montarSubsEnCards();          /* subsGen (bancos) ya con datos */
     if(nivel===2)_v11RenderSeccion(idx);
   }).catch(function(e){_marcarSync('ERR');console.error('getAll fall\u00f3:',e)});
 }

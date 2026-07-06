@@ -283,9 +283,12 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
 .v11-vacio{padding:30px;text-align:center;color:var(--hud-text-faint);
   font-size:11px;letter-spacing:.2em;text-transform:uppercase}
 
-/* ═══ v11.1 — SUBANILLOS → ACCIONES EN LA CARD (nivel 1) ═══ */
-.v11-subs{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;
-  margin-top:12px;padding-top:10px;border-top:1px solid rgba(140,100,220,.14)}
+/* ═══ v11.2 — SUBANILLO EN EL DIAL (nivel 0), como el de siempre ═══ */
+#v11-anillo{position:fixed;inset:0;z-index:26;pointer-events:none}
+#v11-anillo .v11-sub-btn{position:absolute;transform:translate(-50%,-50%) scale(.6);
+  opacity:0;pointer-events:auto;
+  transition:opacity .35s var(--ease),transform .45s var(--ease)}
+#v11-anillo.on .v11-sub-btn{opacity:1;transform:translate(-50%,-50%) scale(1)}
 .v11-sub-btn{font-family:var(--font-mono);font-size:8.5px;letter-spacing:.08em;
   text-transform:uppercase;padding:5px 9px;border-radius:8px;cursor:pointer;
   color:color-mix(in srgb,var(--sc,#A78BFA) 80%,#fff);
@@ -298,7 +301,8 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
 /* ═══ v11.1 — APP REAL: UN SOLO DIAL ═══ */
 /* El disco 2D del dial viejo se OCULTA (el motor 3D es el dial). Los
    paneles HUD del overlay (USER, banda Sim, misión/nivel/logro) quedan. */
-html.app-real #dial-canvas,html.app-real #dial-ambient{display:none !important}
+html.app-real #dial-canvas,html.app-real #dial-ambient,
+html.app-real #dial-blur-disc,html.app-real #dial-particles{display:none !important}
 /* El overlay pierde su fondo opaco y deja pasar los clics al motor;
    sus paneles siguen interactivos. */
 html.app-real #dial-overlay{background:transparent !important;pointer-events:none !important}
