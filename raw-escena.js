@@ -1,7 +1,7 @@
-/* LifeOS v11.0 — raw-escena.js
-   MOTOR DE ESCENA v10 (canon, byte-idéntico al proto CAPA 0d)
-   + capa de datos reales + secciones nivel 2.
-   Requiere: three.min.js cargado antes. DOM de index-v11.html. */
+/* LifeOS v11.0 — raw-escena.js · MOTOR v10 (byte-idéntico al proto
+   CAPA 0d) + integración dual (app real / standalone).
+   Requiere three.min.js antes. En app real: cargar AL FINAL,
+   después de todos los raw-*.js. */
 
 'use strict';
 /* ═══ ESTADO ÚNICO ═══ */
@@ -536,271 +536,24 @@ estado();
 
 
 /* ═══════════════════════════════════════════════════════════════════
-   LifeOS v11 — CAPA DE DATOS + SECCIONES REALES (apéndice al motor)
-   El motor de escena de arriba es BYTE-IDÉNTICO al proto canónico
-   v10 CAPA 0d. Esta capa: NO edita el motor; lo extiende por fuera
-   (hooks sobre irNivel/girarA) — regla anti whack-a-mole.
-   · api.* rescatada TAL CUAL de raw-core.js — JAMÁS envolver api.getX
-   · calculadoras HUD verbatim de raw-overlay.js v9 (misma info)
-   · loading honesto: visual, SIN tocar la API
+   LifeOS v11.0 — INTEGRACIÓN (apéndice; el motor de arriba es
+   byte-idéntico al proto canónico v10 CAPA 0d).
+   MODO DUAL:
+   · APP REAL (index.html): detecta _OS_SECCIONES → usa api/calculadoras
+     existentes de raw-core/raw-overlay, envuelve _osMostrar (home =
+     motor, sin dial viejo) y desvía bitácora/activity a sus boards
+     reales con formularios.
+   · STANDALONE (index-v11.html): api/calcs vienen de raw-escena-api.js.
+   Reglas: api.getX SIN envolver · motor SIN editar · hooks por fuera.
    ═══════════════════════════════════════════════════════════════════ */
+var APP_REAL = (typeof window._OS_SECCIONES !== 'undefined');
+if(APP_REAL) document.documentElement.classList.add('app-real');
 
-/* ── API HÍBRIDA — TAL CUAL raw-core.js v8.41 ── */
-const API_URL = 'https://script.google.com/macros/s/AKfycbzeJOsUXaMqDzCBu2MHsvFa01Jf96CUEoScH9cF_SWIfokWrwmcyKIwC_TCPhCAHPUrWg/exec';
-
-const EN_GAS = (function(){
-  try { return typeof google!=='undefined'&&typeof google.script!=='undefined'&&typeof google.script.run!=='undefined'; }
-  catch(e){ return false; }
-})();
-
-function gasRun(fn,...args){
-  return new Promise((resolve,reject)=>{
-    const runner=google.script.run.withSuccessHandler(resolve).withFailureHandler(e=>{console.error(fn,e);reject(e);});
-    if(typeof runner[fn]==='function') runner[fn](...args);
-    else reject(new Error('Función no encontrada: '+fn));
-  });
-}
-async function apiGet(action,params={}){
-  const url=new URL(API_URL);
-  url.searchParams.set('action',action);
-  Object.entries(params).forEach(([k,v])=>url.searchParams.set(k,v));
-  const r=await fetch(url); return r.json();
-}
-async function apiPost(action,data={}){
-  const r=await fetch(API_URL,{method:'POST',body:JSON.stringify({action,...data})});
-  return r.json();
-}
-
-const api = {
-  getAll:               ()=>EN_GAS?gasRun('getAll'):apiGet('getAll'),
-  getSaldoDia:          (f)=>EN_GAS?gasRun('getSaldoDia',f):apiGet('getSaldoDia',{fecha:f}),
-  getListaEstructura:   ()=>EN_GAS?gasRun('getListaEstructura'):apiGet('getListaEstructura'),
-  insertarEnRAW:        (d)=>EN_GAS?gasRun('insertarEnRAW',d):apiPost('insertarEnRAW',{data:d}),
-  actualizarFijo:       (fila,monto)=>EN_GAS?gasRun('actualizarFijo',fila,monto):apiPost('actualizarFijo',{fila,monto}),
-  agregarALista:        (colIndex,valor)=>EN_GAS?gasRun('agregarALista',colIndex,valor):apiPost('agregarALista',{colIndex,valor}),
-  marcarLogro:          (fila,val)=>EN_GAS?gasRun('marcarLogro',fila,val):apiPost('marcarLogro',{fila,val}),
-  getFijos:             ()=>EN_GAS?gasRun('getFijos'):apiGet('getFijos'),
-  getDatosMes:          ()=>EN_GAS?gasRun('getDatosMes'):apiGet('getDatosMes'),
-  getGastos:            ()=>EN_GAS?gasRun('getGastos'):apiGet('getGastos'),
-  getLogros:            ()=>EN_GAS?gasRun('getLogros'):apiGet('getLogros'),
-  getActivityCheck:     ()=>EN_GAS?gasRun('getActivityCheck'):apiGet('getActivityCheck'),
-  cargarActivityChecks: (semana)=>EN_GAS?gasRun('cargarActivityChecks',semana):apiGet('cargarActivityChecks',{semana}),
-  guardarActivityChecks:(semana,checks)=>EN_GAS?gasRun('guardarActivityChecks',semana,checks):apiPost('guardarActivityChecks',{semana,checks}),
-  guardarEnBancos:      (nombre,monto,fecha)=>EN_GAS?gasRun('guardarEnBancos',nombre,monto,fecha):apiPost('guardarEnBancos',{nombre,monto,fecha}),
-  getFilaPorId:         (id)=>EN_GAS?gasRun('getFilaPorId',id):apiGet('getFilaPorId',{id}),
-  editarFilaRAW:        (fila,datos)=>EN_GAS?gasRun('editarFilaRAW',fila,datos):apiPost('editarFilaRAW',{fila,datos}),
-  getPensamientos:      ()=>EN_GAS?gasRun('getPensamientos'):apiGet('getPensamientos'),
-  guardarPensamiento:   (d)=>EN_GAS?gasRun('guardarPensamiento',d):apiPost('guardarPensamiento',{datos:d}),
-  getRelaciones:        ()=>EN_GAS?gasRun('getRelaciones'):apiGet('getRelaciones'),
-  guardarInteraccion:   (d)=>EN_GAS?gasRun('guardarInteraccion',d):apiPost('guardarInteraccion',{datos:d}),
-  getSalud:             ()=>EN_GAS?gasRun('getSalud'):apiGet('getSalud'),
-  guardarSalud:         (d)=>EN_GAS?gasRun('guardarSalud',d):apiPost('guardarSalud',{datos:d}),
-  getApartados:         ()=>EN_GAS?gasRun('getApartados'):apiGet('getApartados'),
-  guardarApartado:      (d)=>EN_GAS?gasRun('guardarApartado',d):apiPost('guardarApartado',{datos:d}),
-  actualizarApartado:   (fila,estado)=>EN_GAS?gasRun('actualizarApartado',fila,estado):apiPost('actualizarApartado',{fila,estado}),
-  getFinancieroAvanzado:()=>EN_GAS?gasRun('getFinancieroAvanzado'):apiGet('getFinancieroAvanzado'),
-  getRevision:          (tipo,anio,mes,semana)=>EN_GAS?gasRun('getRevision',tipo,anio,mes,semana):apiGet('getRevision',{tipo,anio,mes,semana}),
-  getNecesidades:       (anio,mes,fecha)=>EN_GAS?gasRun('getNecesidades',anio,mes,fecha):apiGet('getNecesidades',{anio,mes,fecha}),
-  getFlujoPorMes:       ()=>EN_GAS?gasRun('getFlujoPorMes'):apiGet('getFlujoPorMes'),
-  getScoreVida:         ()=>EN_GAS?gasRun('getScoreVida'):apiGet('getScoreVida'),
-  enviarSOS:            (d)=>EN_GAS?gasRun('enviarSOS',d):apiPost('enviarSOS',{datos:d}),
-  getPatrimonio:        ()=>EN_GAS?gasRun('getPatrimonio'):apiGet('getPatrimonio'),
-  getAhorro:            ()=>EN_GAS?gasRun('getAhorro'):apiGet('getAhorro'),
-  getEfectivo:          ()=>EN_GAS?gasRun('getEfectivo'):apiGet('getEfectivo'),
-  getInversion:         ()=>EN_GAS?gasRun('getInversion'):apiGet('getInversion'),
-  guardarAhorro:        (d)=>EN_GAS?gasRun('guardarAhorro',d):apiPost('guardarAhorro',{datos:d}),
-  guardarEfectivo:      (d)=>EN_GAS?gasRun('guardarEfectivo',d):apiPost('guardarEfectivo',{datos:d}),
-  guardarInversion:     (d)=>EN_GAS?gasRun('guardarInversion',d):apiPost('guardarInversion',{datos:d}),
-  setActivityCheck:     (tipo,fila,dia,valor)=>EN_GAS?gasRun('setActivityCheck',tipo,fila,dia,valor):apiPost('setActivityCheck',{tipo,fila,dia,valor}),
-  marcarActivityItem:   (tipo,fila,valor)=>EN_GAS?gasRun('marcarActivityItem',tipo,fila,valor):apiPost('marcarActivityItem',{tipo,fila,valor}),
-  agregarAActivity:     (tipo,datos)=>EN_GAS?gasRun('agregarAActivity',tipo,datos):apiPost('agregarAActivity',{tipo,datos}),
-  resetearElectronics:  ()=>EN_GAS?gasRun('resetearElectronicsHoy'):apiGet('resetearElectronics'),
-  getNutricion:         ()=>EN_GAS?gasRun('getNutricion'):apiGet('getNutricion'),
-  getMetasNutricion:    ()=>EN_GAS?gasRun('getMetasNutricion'):apiGet('getMetasNutricion'),
-  guardarNutricion:     (d)=>EN_GAS?gasRun('guardarNutricion',d):apiPost('guardarNutricion',{datos:d}),
-  getEntrenamiento:     ()=>EN_GAS?gasRun('getEntrenamiento'):apiGet('getEntrenamiento'),
-  guardarEntrenamiento: (d)=>EN_GAS?gasRun('guardarEntrenamiento',d):apiPost('guardarEntrenamiento',{datos:d}),
-  // v6.069 — NOTAS (sticky notes). Hoja NOTAS del Sheet.
-  getNotas:             ()=>EN_GAS?gasRun('getNotas'):apiGet('getNotas'),
-  guardarNota:          (d)=>EN_GAS?gasRun('guardarNota',d):apiPost('guardarNota',{datos:d}),
-  actualizarNota:       (d)=>EN_GAS?gasRun('actualizarNota',d):apiPost('actualizarNota',{datos:d}),
-  borrarNota:           (id)=>EN_GAS?gasRun('borrarNota',id):apiPost('borrarNota',{id:id}),
-  moverNota:            (id,slot)=>EN_GAS?gasRun('moverNota',id,slot):apiPost('moverNota',{id:id,slot:slot}),
-  // v8.5 — Timers (cronómetros). Backend: getTimers / crearTimer / actualizarTimer.
-  getTimers:            ()=>EN_GAS?gasRun('getTimers'):apiGet('getTimers'),
-  crearTimer:           (datos)=>EN_GAS?gasRun('crearTimer',datos):apiPost('crearTimer',{datos:datos}),
-  actualizarTimer:      (clave,campos)=>EN_GAS?gasRun('actualizarTimer',clave,campos):apiPost('actualizarTimer',{clave:clave,campos:campos}),
-};
-// v8.5 — Exponer api en window para módulos cargados aparte (p.ej. raw-timers).
-try { window.api = api; } catch(e){}
-
-
-/* ── CALCULADORAS HUD — verbatim raw-overlay.js v9 ── */
-function _calcSimsNeeds(){
-  // Cada need: 0-100. Empieza en 0 y SUMA según datos reales.
-  // Si no hay datos definidos para un need → queda en 0.
-  // (Los thresholds y fórmulas reales se definirán cuando exista la lógica de scoring.)
-  var n = { hambre:0, energia:0, cuerpo:0, higiene:0, mental:0, disfrute:0, entorno:0, social:0, trabajo:0 };
-  var act = window._actData;
-  if(act){
-    var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
-    // Hábitos personales con tag sims → +14 al need correspondiente si tiene check hoy
-    (act.habitosPersonal||[]).forEach(function(h){
-      if(h.checks && h.checks[diaKey] && h.sims){
-        var k = h.sims.toLowerCase().trim();
-        if(n.hasOwnProperty(k)) n[k] = Math.min(100, n[k] + 14);
-      }
-    });
-    // Trabajo: porcentaje de hábitos electronics completados hoy
-    var elecHabits = (act.habitosElectronics||[]);
-    if(elecHabits.length){
-      var elecDone = elecHabits.filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
-      n.trabajo = Math.round((elecDone/elecHabits.length)*100);
-    }
-  }
-  // Mental: pensamientos registrados (cap 10 → 100%)
-  if(window._pensamientosData && window._pensamientosData.items && window._pensamientosData.items.length){
-    var pCount = window._pensamientosData.items.length;
-    n.mental = Math.min(100, pCount*10);
-  }
-  // Social: relaciones con interacción últimos 7 días
-  if(window._relacionesData && window._relacionesData.items && window._relacionesData.items.length){
-    var hace7 = new Date(); hace7.setDate(hace7.getDate()-7);
-    var recientes = window._relacionesData.items.filter(function(r){
-      return r.ultimaVez && new Date(r.ultimaVez) >= hace7;
-    }).length;
-    n.social = Math.min(100, recientes*20);
-  }
-  // Disfrute: logros completados
-  if(window._logrosData && window._logrosData.items && window._logrosData.items.length){
-    var done = window._logrosData.items.filter(function(l){
-      return l.completado==='Sí'||l.completado===true;
-    }).length;
-    n.disfrute = Math.min(100, done*10);
-  }
-  return n;
-}
-
-//  XP / NIVEL / STATS — derivados de actData/logrosData/etc
-// ══════════════════════════════════════════
-function _calcXPNivel(){
-  var xp = 0;
-  // Hábitos completados (cualquier check de la semana)
-  var act = window._actData;
-  if(act){
-    (act.habitosPersonal||[]).forEach(function(h){
-      if(h.checks){ Object.keys(h.checks).forEach(function(k){ if(h.checks[k]) xp += 25; }); }
-    });
-    (act.habitosElectronics||[]).forEach(function(h){
-      if(h.checks){ Object.keys(h.checks).forEach(function(k){ if(h.checks[k]) xp += 30; }); }
-    });
-  }
-  // Logros completados
-  if(window._logrosData && window._logrosData.items){
-    window._logrosData.items.forEach(function(l){
-      if(l.completado==='Sí'||l.completado===true) xp += 200;
-    });
-  }
-  // Bitácora: pensamientos, relaciones, salud
-  if(window._pensamientosData && window._pensamientosData.items){
-    xp += window._pensamientosData.items.length * 8;
-  }
-  if(window._relacionesData && window._relacionesData.items){
-    xp += window._relacionesData.items.length * 12;
-  }
-  if(window._saludData && window._saludData.items){
-    xp += window._saludData.items.length * 15;
-  }
-  // Cada nivel cuesta 1000 XP base, escalando 250 por nivel: 1000, 1250, 1500, ...
-  // Aproximación lineal simple: nivel = floor(xp/1000)+1, xpEnNivel = xp % 1000, meta = 1000
-  var nivel = Math.max(1, Math.floor(xp / 1000) + 1);
-  var xpActual = xp % 1000;
-  var xpMeta = 1000;
-  return { xpTotal:xp, nivel:nivel, xpActual:xpActual, xpMeta:xpMeta };
-}
-
-function _calcRachaCreditos(){
-  // Racha: días consecutivos con al menos 1 hábito personal cumplido (aproximación)
-  // Como solo tenemos checks por día de la semana actual, contamos días con check de la semana
-  var racha = 0;
-  var act = window._actData;
-  if(act && act.habitosPersonal){
-    var dias = ['L','M','W','J','V','S','D'];
-    var hoyIdx = (new Date().getDay()+6)%7;
-    // Cuenta días hacia atrás desde hoy mientras haya al menos un check
-    for(var i=hoyIdx; i>=0; i--){
-      var dk = dias[i];
-      var hayCheck = act.habitosPersonal.some(function(h){ return h.checks && h.checks[dk]; });
-      if(hayCheck) racha++;
-      else break;
-    }
-  }
-  // Créditos: 100 por logro completado + 10 por hábito hoy
-  var creditos = 0;
-  if(window._logrosData && window._logrosData.items){
-    creditos += window._logrosData.items.filter(function(l){ return l.completado==='Sí'||l.completado===true; }).length * 100;
-  }
-  if(act){
-    var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
-    creditos += (act.habitosPersonal||[]).filter(function(h){ return h.checks && h.checks[diaKey]; }).length * 10;
-    creditos += (act.habitosElectronics||[]).filter(function(h){ return h.checks && h.checks[diaKey]; }).length * 15;
-  }
-  // Energía: derivada del need 'energia' del Sim
-  var n = (typeof _calcSimsNeeds==='function') ? _calcSimsNeeds() : { energia:50 };
-  var energia = n.energia || 50;
-  return { racha:racha, creditos:creditos, energia:energia };
-}
-
-function _calcMisionDiaria(){
-  // Misión: completar X hábitos de hoy. X = total de hábitos personales hoy.
-  var act = window._actData;
-  if(!act) return { hechos:0, total:3, label:'Registra 3 hábitos hoy', recompensa:'+50 XP' };
-  var diaKey = ['L','M','W','J','V','S','D'][(new Date().getDay()+6)%7];
-  var hechos = (act.habitosPersonal||[]).filter(function(h){ return h.checks && h.checks[diaKey]; }).length;
-  var total  = (act.habitosPersonal||[]).length || 3;
-  var meta   = Math.min(total, 3);
-  return {
-    hechos: Math.min(hechos, meta),
-    total: meta,
-    label: 'Completa '+meta+' hábitos hoy',
-    recompensa: '+'+(meta*25)+' XP',
-  };
-}
-
-function _calcLogroReciente(){
-  // Logro reciente NO completado con mayor avance
-  var lg = window._logrosData;
-  if(!lg || !lg.items || !lg.items.length) return { titulo:'—', avance:0 };
-  var pendientes = lg.items.filter(function(l){ return !(l.completado==='Sí'||l.completado===true); });
-  if(!pendientes.length){
-    var ult = lg.items[lg.items.length-1];
-    return { titulo:(ult && ult.titulo)||'—', avance:100 };
-  }
-  // Tomar el de mayor avance
-  pendientes.sort(function(a,b){ return (b.avance||0)-(a.avance||0); });
-  var p = pendientes[0];
-  return { titulo:p.titulo||'—', avance:Math.round(p.avance||0) };
-}
-
-function _calcNivelSiguiente(){
-  var x = _calcXPNivel();
-  var pct = Math.round((x.xpActual/x.xpMeta)*100);
-  var dots = 8;
-  var dotsLlenos = Math.min(dots, Math.round((pct/100)*dots));
-  return {
-    nivelAct: x.nivel,
-    nivelSig: x.nivel+1,
-    xpFalta: x.xpMeta - x.xpActual,
-    pct: pct,
-    dots: dots,
-    dotsLlenos: dotsLlenos,
-    creditosBonus: 250,
-  };
-}
-
-
-/* ═══ BOOT — temporizador visual + primer frame; nunca espera la API ═══ */
+/* ═══ BOOT (solo si existe el nodo — standalone; la app real ya
+   tiene su loading en raw-loading.js) ═══ */
 (function(){
+  var b=document.getElementById('boot');
+  if(!b) return;
   var braille=['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏'];
   var el=document.getElementById('boot-spin'),k=0;
   var iv=setInterval(function(){el.textContent=braille[k++%braille.length]},70);
@@ -811,14 +564,13 @@ function _calcNivelSiguiente(){
   requestAnimationFrame(function(){requestAnimationFrame(function(){
     var falta=Math.max(0,1400-(performance.now()-t0));
     setTimeout(function(){
-      var b=document.getElementById('boot');
       b.classList.add('off');clearInterval(iv);clearInterval(ivL);
       setTimeout(function(){if(b.parentNode)b.parentNode.removeChild(b)},600);
     },falta);
   })});
 })();
 
-/* ═══ COUNT-UP (patrón v8-v9) — mismo reloj de tweens del motor ═══ */
+/* ═══ COUNT-UP (patrón v8-v9) ═══ */
 function _fmtNum(v){return Math.round(v).toLocaleString('es-MX')}
 function _fmtMXN(v){return '$' + Math.round(v).toLocaleString('es-MX')}
 function _esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
@@ -828,7 +580,6 @@ function countUpTexto(el,target,fmt,sufijo){
   tween(900,function(e){el.textContent=fmt(target*e)+sufijo});
 }
 
-/* ═══ DISTRIBUCIÓN getAll → mismas window.* que consume v9 ═══ */
 function _distribuirGetAll(d){
   if(d.activityCheck) window._actData          = d.activityCheck;
   if(d.logros)        window._logrosData        = d.logros;
@@ -838,8 +589,9 @@ function _distribuirGetAll(d){
   window._capa1Data = d;
 }
 
-/* ═══ CHIPS HUD — misma información del HOME v9 ═══ */
+/* ═══ CHIPS HUD — misma info del HOME v9 (calculadoras originales) ═══ */
 function poblarChips(){
+  if(typeof _calcXPNivel!=='function')return;   /* aún no cargan los módulos */
   var x=_calcXPNivel(),rc=_calcRachaCreditos(),mi=_calcMisionDiaria(),
       lg=_calcLogroReciente(),ns=_calcNivelSiguiente(),needs=_calcSimsNeeds();
   var userL=document.getElementById('chip-user-l');
@@ -866,7 +618,7 @@ function poblarChips(){
   if(sigV)countUpTexto(sigV,ns.xpFalta,function(v){return '+'+_fmtNum(v)+' XP'});
 }
 
-/* ═══ FILAS DE CARDS + GAJOS CON ESTADO ═══ */
+/* ═══ CARDS + GAJOS CON ESTADO ═══ */
 function _metricasSector(d){
   var m={};
   try{var p=d.patrimonio||{};var pi=((p.banco&&p.banco.items)||[]).length+
@@ -904,7 +656,7 @@ function poblarCards(d){
     }
     intens.push(mm?Math.min(1,mm.n/maxN):0);
   });
-  for(var i=0;i<N;i++){   /* escritura ÚNICA — el motor no toca emissive */
+  for(var i=0;i<N;i++){   /* escritura ÚNICA, no por frame */
     gajoMeshes[i].material.emissiveIntensity=.12+.26*intens[i];
     gajoMeshes[i].children[0].material.opacity=.55+.35*intens[i];
   }
@@ -914,7 +666,7 @@ function _marcarSync(txt){
     if(bs.length>=3)bs[2].textContent=txt});
 }
 
-/* ═══════════════ v11 — SECCIONES REALES (nivel 2) ═══════════════ */
+/* ═══ SECCIONES v11 en el panel del motor (sectores SIN board real) ═══ */
 var DIAS7=['L','M','W','J','V','S','D'];
 function _r11Filas(html){return html||'<div class="v11-vacio">SIN REGISTROS</div>'}
 var _v11Render={
@@ -1002,28 +754,76 @@ function _v11RenderSeccion(i){
   var cu=document.getElementById('sec-cuerpo');
   if(!cu)return;
   var d=window._capa1Data;
-  var id=SEC[i].id;
   if(!d){cu.innerHTML='<div class="v11-vacio">SINCRONIZANDO…</div>';return}
-  var fn=_v11Render[id];
+  var fn=_v11Render[SEC[i].id];
   cu.innerHTML=fn?fn(d):'<div class="v11-vacio">SECCIÓN EN CONSTRUCCIÓN</div>';
   cu.scrollTop=0;
 }
 
-/* ═══ HOOKS v11 — extienden irNivel/girarA POR FUERA (motor intacto) ═══ */
+/* ═══ HOOKS — extienden por FUERA; el motor queda intacto ═══ */
+/* Sectores con board REAL en la app (formularios completos) */
+var _V11_BOARDS = { bitacora:'bitacora', activity:'activity' };
+function _v11BoardAbierto(){
+  return document.documentElement.classList.contains('os-seccion');
+}
 (function(){
   var _irNivelMotor=irNivel,_girarAMotor=girarA;
   irNivel=function(n){
+    if(APP_REAL&&_v11BoardAbierto())return;      /* board real abierto: motor en pausa */
+    if(APP_REAL&&n===2&&nivel===1&&_V11_BOARDS[SEC[idx].id]){
+      _osMostrar(_V11_BOARDS[SEC[idx].id]);      /* desviar a la sección REAL */
+      return;
+    }
     var prev=nivel;
     _irNivelMotor(n);
     if(nivel===2&&prev!==2)_v11RenderSeccion(idx);
   };
   girarA=function(i){
+    if(APP_REAL&&_v11BoardAbierto())return;
     _girarAMotor(i);
     if(nivel===2)tween(200,function(){},function(){_v11RenderSeccion(idx)});
   };
 })();
 
-/* ═══ ARRANQUE: getAll en paralelo al boot (llamada DIRECTA) ═══ */
+/* ═══ APP REAL: home = motor (el dial viejo NO se abre) ═══ */
+if(APP_REAL)(function(){
+  var _osMostrarBase=_osMostrar;
+  _osMostrar=function(seccion){
+    if(!_OS_SECCIONES[seccion])seccion='home';
+    if(seccion==='home'){
+      /* rutina home SIN abrirDial: boards fuera, clases, tabs — y el
+         motor recibe el control (regresa al anillo si venías de board) */
+      window._osSeccion='home';
+      document.documentElement.classList.remove('os-seccion');
+      document.querySelectorAll('.board-face:not(.anverso)').forEach(function(f){
+        f.classList.remove('active')});
+      var b=document.getElementById('board-anverso');
+      if(b)b.classList.add('slide-right');
+      document.documentElement.classList.remove('niv-1','niv-2','niv-warp');
+      document.documentElement.classList.add('niv-0');
+      if(typeof _osMarcarTabs==='function')_osMarcarTabs('home');
+      var dd=document.getElementById('entrada-dropdown');
+      if(dd){dd.classList.remove('show');dd.style.display='none';}
+      if(typeof nivel!=='undefined'&&nivel===2)irNivel(1);
+      return;
+    }
+    _osMostrarBase(seccion);   /* secciones reales tal cual (dial jamás visible → cerrarDial no corre) */
+  };
+  window._osMostrar=_osMostrar;
+  /* Teclas: con un board real abierto, el motor NO debe comerse las
+     flechas (inputs/textareas) ni Escape. Captura antes que el motor. */
+  window.addEventListener('keydown',function(e){
+    if(!_v11BoardAbierto())return;
+    if(['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','Escape'].indexOf(e.key)<0)return;
+    e.stopPropagation();                          /* el listener del motor no lo ve */
+    if(e.key==='Escape'&&!(e.target&&/input|textarea|select/i.test(e.target.tagName))){
+      _osMostrar('home');
+    }
+  },true);
+})();
+
+/* ═══ ARRANQUE: getAll directa (el cache del servidor absorbe la doble
+   llamada con el refreshTodo de la app; ~200ms en cache-hit) ═══ */
 function cargarDatosCapa1(){
   api.getAll().then(function(d){
     if(!d||d.ok===false){_marcarSync('ERR');console.error('getAll:',d&&d.error);return}

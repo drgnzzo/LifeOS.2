@@ -286,3 +286,20 @@ html.oculta-hud .hudfila{opacity:0;transform:translateX(-50%) translateY(-8px)}
   box-shadow:0 0 8px color-mix(in srgb,var(--sc,#A78BFA) 60%,transparent)}
 .v11-vacio{padding:30px;text-align:center;color:var(--hud-text-faint);
   font-size:11px;letter-spacing:.2em;text-transform:uppercase}
+
+/* ═══ v11.0 — OVERRIDES APP REAL (html.app-real; no afectan standalone) ═══ */
+html.app-real #hud-top{top:calc(var(--hero-h,58px) + 14px)}
+/* con un board real abierto (os-seccion), el motor se oculta por completo
+   — solo el canvas #gl queda vivo como fondo bajo la board */
+html.os-seccion #visor,html.os-seccion #anclas,html.os-seccion #hud-top,
+html.os-seccion #hud-bot,html.os-seccion #estado,html.os-seccion #hint,
+html.os-seccion #fps,html.os-seccion #seccion,html.os-seccion .sec-lado{display:none !important}
+/* .app (z:2, pantalla completa, transparente) NO debe robar los clics del
+   motor en home; el hero y los popups abiertos siguen interactivos */
+@media(min-width:900px){
+  html.app-real:not(.os-seccion) .app{pointer-events:none}
+  html.app-real .app .hero,
+  html.app-real .app .popup,
+  html.app-real .app .show,
+  html.app-real .app #entrada-dropdown{pointer-events:auto}
+}

@@ -26,9 +26,37 @@
   <link rel="stylesheet" href="raw-tokens.css?v=8400">
   <link rel="stylesheet" href="raw-app.css?v=9090">
   <link rel="stylesheet" href="raw-mobile.css?v=9050">
+  <link rel="stylesheet" href="raw-v11.css?v=1100">
 
 </head>
 <body>
+<!-- ═══ v11.0 · MOTOR DE ESCENA (home nuevo; canvas transparente: el
+     fondo cósmico bg-canvas de siempre se ve a través) ═══ -->
+<canvas id="gl" style="z-index:1"></canvas>
+<div id="anclas"></div>
+<div id="visor"><div id="mundoCSS"></div></div>
+<div id="telon"></div>
+<div id="seccion"><div class="panel hud-corners">
+  <h1><span id="sec-t">—</span></h1>
+  <div class="meta">PROYECCIÓN HOLOGRÁFICA · ESC PARA EMERGER · [←/→] SECTOR</div>
+  <div id="sec-cuerpo"></div>
+</div></div>
+<div class="sec-lado" id="sec-izq"><span class="fl">◀</span> —</div>
+<div class="sec-lado" id="sec-der">— <span class="fl">▶</span></div>
+<div class="hudfila" id="hud-top">
+  <div class="hchip" style="--a:#A78BFA"><span class="l" id="chip-user-l">USER · Nv 1</span><span class="v" id="chip-user">0 / 1,000 XP</span></div>
+  <div class="hchip" style="--a:#C4B5FD"><span class="l">Estado del Sim</span><span class="v" id="chip-sim">9 needs · OK</span></div>
+  <div class="hchip" style="--a:#8FA6F8"><span class="l">Energía · Racha · Créditos</span><span class="v" id="chip-erc">— · — · —</span></div>
+</div>
+<div class="hudfila" id="hud-bot">
+  <div class="hchip" style="--a:#A78BFA"><span class="l">Nivel actual</span><span class="v" id="chip-nivel">1 · 0/1,000</span></div>
+  <div class="hchip" style="--a:#9BB0FA"><span class="l">Misión diaria</span><span class="v" id="chip-mision">0 / 3</span></div>
+  <div class="hchip" style="--a:#C4B5FD"><span class="l">Logro reciente</span><span class="v" id="chip-logro">—</span></div>
+  <div class="hchip" style="--a:#B49DF9"><span class="l">Nivel siguiente</span><span class="v" id="chip-signivel">+1,000 XP</span></div>
+</div>
+<div class="hud" id="estado">NIVEL 0 · ÓRBITA</div>
+<div class="hud" id="hint">[RUEDA/↓] SUMERGIR · [CLIC] SECTOR</div>
+<div class="hud" id="fps">— fps</div>
 <canvas id="bg-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none"></canvas>
 <div id="pts" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden"></div>
 <div id="prog" class="prog-bar"></div>
@@ -47,7 +75,7 @@
         <div class="hero-icon"><i class="fas fa-diamond"></i></div>
         <div class="hero-brand-txt">
           <div class="hero-title">Life<span>OS</span></div>
-          <div class="hero-sub">v.9.9 · Sheets</div>
+          <div class="hero-sub">v.11.0 · Escena</div>
         </div>
       </div>
     </div>
@@ -681,12 +709,15 @@
 <script src="raw-bitacora.js?v=5189"></script>
 <script src="raw-carousel.js?v=6030"></script>
 <script src="raw-notas.js?v=7020"></script>
-<script src="raw-niveles.js?v=8310"></script>
+<!-- v11.0: raw-niveles.js retirado — dinámica de niveles reemplazada por raw-escena.js -->
 <script src="raw-mobile.js?v=9050"></script>
-<script src="raw-coverflow.js?v=9070"></script>
+<!-- v11.0: raw-coverflow.js retirado — dinámica de niveles reemplazada por raw-escena.js -->
 <script src="raw-timers.js?v=9060"></script>
 <script src="raw-loading.js?v=8420"></script>
 <script src="raw-007.js?v=8280"></script>
+<!-- ═══ v11.0 · motor de escena (SIEMPRE al final) ═══ -->
+<script src="three.min.js?v=1100"></script>
+<script src="raw-escena.js?v=1100"></script>
 
 <!-- ── v7.055 — Registrar el service worker (PWA instalable) ── -->
 <script>
